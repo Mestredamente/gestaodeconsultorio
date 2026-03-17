@@ -96,16 +96,14 @@ export default function Agenda() {
         })
         .eq('id', finData.id)
     } else {
-      await supabase
-        .from('financeiro')
-        .insert({
-          usuario_id: user.id,
-          paciente_id: apt.paciente_id,
-          mes,
-          ano,
-          valor_recebido: 0,
-          valor_a_receber: Number(valorSessao),
-        })
+      await supabase.from('financeiro').insert({
+        usuario_id: user.id,
+        paciente_id: apt.paciente_id,
+        mes,
+        ano,
+        valor_recebido: 0,
+        valor_a_receber: Number(valorSessao),
+      })
     }
     toast({ title: 'Status atualizado: Compareceu' })
   }
