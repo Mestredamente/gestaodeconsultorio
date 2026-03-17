@@ -72,21 +72,37 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // 3. Fetch Usuario (Clinician PIX)
+    // 3. Fetch Usuario
     const { data: usuario } = await supabaseClient
       .from('usuarios')
-      .select('chave_pix')
+      .select('chave_pix, template_cobranca')
       .eq('id', user.id)
       .single()
 
     const chave_pix = usuario?.chave_pix || 'Chave PIX não cadastrada'
+    const template =
+      usuario?.template_cobranca ||
+      'Olá [Nome], você tem R$ [valor] a pagar referente a [periodo]. PIX: [chave_pix]'
 
     // 4. Format Message
     const valorStr = Number(valor_a_receber).toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
-    const message = `Olá ${paciente.nome}, você tem R$ ${valorStr} a pagar referente a ${mes}/${ano}. PIX: ${chave_pix}`
+    const message = template
+      .replace(/\[Nome\]/gi, paciente.nome)
+      .replace(/\[valor\]/gi, valorStr)
+      .replace(/\[periodo\]/gi, `${String(mes).padStart(2, '0')}/${ano}`)
+      .replace(/\[chave_pix\]/gi, chave_pix)
+
+    // 5. Insert History
+    await supabaseClient.from('historico_cobrancas').insert({
+      usuario_id: user.id,
+      paciente_id: paciente_id,
+      valor_cobrado: valor_a_receber,
+      mes_referencia: mes,
+      ano_referencia: ano,
+    })
 
     return new Response(JSON.stringify({ message, telefone: paciente.telefone }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

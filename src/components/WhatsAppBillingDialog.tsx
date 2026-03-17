@@ -25,9 +25,11 @@ import { gerarCobrancaWhatsapp } from '@/services/whatsapp'
 export default function WhatsAppBillingDialog({
   pacienteId,
   patientName,
+  onSuccess,
 }: {
   pacienteId: string
   patientName: string
+  onSuccess?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -61,6 +63,7 @@ export default function WhatsAppBillingDialog({
 
       window.open(url, '_blank')
       setOpen(false)
+      if (onSuccess) onSuccess()
     } catch (err: any) {
       toast({ title: 'Erro ao gerar cobrança', description: err.message, variant: 'destructive' })
     } finally {

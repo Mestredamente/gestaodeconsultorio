@@ -19,6 +19,8 @@ import {
 import { Download, FileBarChart } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 const months = [
   { value: '1', label: 'Janeiro' },
@@ -74,8 +76,6 @@ export default function Reports() {
 
       const yearNum = parseInt(year)
       const monthNum = parseInt(month)
-
-      // Start and end dates for appointments in the selected month
       const startDate = new Date(yearNum, monthNum - 1, 1).toISOString()
       const endDate = new Date(yearNum, monthNum, 1).toISOString()
 
@@ -123,11 +123,9 @@ export default function Reports() {
             }
           })
 
-          // Filter out patients with no activity or financial pending for the selected period
           const activeRows = reportData.filter(
             (r) => r.totalSessions > 0 || r.valorRecebido > 0 || r.valorAReceber > 0,
           )
-
           setData(activeRows.sort((a, b) => a.patientName.localeCompare(b.patientName)))
         }
       } catch (error) {
@@ -148,10 +146,12 @@ export default function Reports() {
       'Desmarcações',
       'Valor Recebido',
       'Valor a Receber',
+      'Status de Pagamento',
       'Taxa de Comparecimento (%)',
     ]
 
     const csvData = data.map((row) => {
+      const status = row.valorAReceber > 0 ? 'Pendente' : 'Pago'
       return [
         `"${row.patientName}"`,
         row.totalSessions,
@@ -159,11 +159,11 @@ export default function Reports() {
         row.desmarcacoes,
         row.valorRecebido.toFixed(2).replace('.', ','),
         row.valorAReceber.toFixed(2).replace('.', ','),
+        status,
         row.attendanceRate.toFixed(1).replace('.', ','),
       ].join(';')
     })
 
-    // \uFEFF is the BOM to force Excel to read UTF-8 properly
     const csvContent = '\uFEFF' + [headers.join(';'), ...csvData].join('\n')
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
@@ -266,8 +266,21 @@ export default function Reports() {
               </TableRow>
             ) : (
               data.map((row) => (
-                <TableRow key={row.patientId} className="hover:bg-slate-50 transition-colors">
-                  <TableCell className="font-medium text-slate-900">{row.patientName}</TableCell>
+                <TableRow
+                  key={row.patientId}
+                  className={cn(
+                    'transition-colors',
+                    row.valorAReceber > 0 ? 'bg-red-50/50 hover:bg-red-50/80' : 'hover:bg-slate-50',
+                  )}
+                >
+                  <TableCell className="font-medium text-slate-900">
+                    {row.patientName}
+                    {row.valorAReceber > 0 && (
+                      <Badge variant="destructive" className="ml-2 text-[10px] h-5 py-0">
+                        Pendente
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center text-slate-600">{row.totalSessions}</TableCell>
                   <TableCell className="text-center text-red-600 font-medium">
                     {row.faltas}
@@ -278,7 +291,12 @@ export default function Reports() {
                   <TableCell className="text-right font-medium text-emerald-600">
                     {formatBRL(row.valorRecebido)}
                   </TableCell>
-                  <TableCell className="text-right font-medium text-amber-600">
+                  <TableCell
+                    className={cn(
+                      'text-right font-medium',
+                      row.valorAReceber > 0 ? 'text-red-700' : 'text-slate-600',
+                    )}
+                  >
                     {formatBRL(row.valorAReceber)}
                   </TableCell>
                   <TableCell className="text-right text-slate-600">

@@ -5,6 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
   ArrowLeft,
   Edit3,
   FileText,
@@ -14,6 +22,7 @@ import {
   MapPin,
   DollarSign,
   HeartPulse,
+  MessageCircle,
 } from 'lucide-react'
 import PatientEditForm from '@/components/PatientEditForm'
 import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
@@ -34,18 +43,29 @@ export default function PatientDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [patient, setPatient] = useState<any>(null)
+  const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
   const fetchPatient = async () => {
-    setLoading(true)
     const { data } = await supabase.from('pacientes').select('*').eq('id', id).single()
     if (data) setPatient(data)
-    setLoading(false)
+  }
+
+  const fetchHistory = async () => {
+    const { data } = await supabase
+      .from('historico_cobrancas')
+      .select('*')
+      .eq('paciente_id', id)
+      .order('data_envio', { ascending: false })
+    if (data) setHistory(data)
   }
 
   useEffect(() => {
-    if (id) fetchPatient()
+    if (id) {
+      setLoading(true)
+      Promise.all([fetchPatient(), fetchHistory()]).then(() => setLoading(false))
+    }
   }, [id])
 
   if (loading) {
@@ -59,11 +79,15 @@ export default function PatientDetail() {
   if (!patient) return <div className="text-center py-20">Paciente não encontrado.</div>
 
   const formatBRL = (val: number) =>
-    Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    Number(val).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+    })
   const initial = patient.nome.charAt(0).toUpperCase()
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-6 animate-fade-in-up pb-10">
       <Button
         variant="ghost"
         onClick={() => navigate('/pacientes')}
@@ -88,7 +112,11 @@ export default function PatientDetail() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              <WhatsAppBillingDialog pacienteId={patient.id} patientName={patient.nome} />
+              <WhatsAppBillingDialog
+                pacienteId={patient.id}
+                patientName={patient.nome}
+                onSuccess={fetchHistory}
+              />
               {!isEditing && (
                 <Button
                   variant="outline"
@@ -145,25 +173,76 @@ export default function PatientDetail() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="pb-4 border-b border-slate-100">
-              <CardTitle className="text-lg text-rose-600 flex items-center gap-2">
-                <HeartPulse className="w-5 h-5" /> Contato de Emergência
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InfoItem
-                icon={Phone}
-                label="Nome do Contato"
-                value={patient.contato_emergencia_nome}
-              />
-              <InfoItem
-                icon={Phone}
-                label="Telefone de Emergência"
-                value={patient.contato_emergencia_telefone}
-              />
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="shadow-sm border-slate-200">
+              <CardHeader className="pb-4 border-b border-slate-100">
+                <CardTitle className="text-lg text-rose-600 flex items-center gap-2">
+                  <HeartPulse className="w-5 h-5" /> Contato de Emergência
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 grid grid-cols-1 gap-4">
+                <InfoItem
+                  icon={Phone}
+                  label="Nome do Contato"
+                  value={patient.contato_emergencia_nome}
+                />
+                <InfoItem
+                  icon={Phone}
+                  label="Telefone de Emergência"
+                  value={patient.contato_emergencia_telefone}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-slate-200">
+              <CardHeader className="pb-4 border-b border-slate-100">
+                <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
+                  <MessageCircle className="w-5 h-5 text-emerald-600" /> Histórico de Cobranças
+                  (WhatsApp)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 overflow-hidden">
+                <div className="max-h-[220px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50/50 sticky top-0">
+                      <TableRow>
+                        <TableHead>Data de Envio</TableHead>
+                        <TableHead>Período Ref.</TableHead>
+                        <TableHead className="text-right">Valor Cobrado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {history.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center text-slate-500 py-6">
+                            Nenhuma cobrança registrada.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        history.map((h) => (
+                          <TableRow key={h.id}>
+                            <TableCell className="font-medium text-slate-600 whitespace-nowrap">
+                              {new Date(h.data_envio).toLocaleDateString('pt-BR')} às{' '}
+                              {new Date(h.data_envio).toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </TableCell>
+                            <TableCell>
+                              {String(h.mes_referencia).padStart(2, '0')}/{h.ano_referencia}
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-slate-900">
+                              {formatBRL(h.valor_cobrado)}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
     </div>
