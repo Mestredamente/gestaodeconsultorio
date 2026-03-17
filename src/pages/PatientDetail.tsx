@@ -16,6 +16,7 @@ import {
   HeartPulse,
 } from 'lucide-react'
 import PatientEditForm from '@/components/PatientEditForm'
+import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
 
 const InfoItem = ({ icon: Icon, label, value }: any) => (
   <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50/50 border border-slate-100">
@@ -86,7 +87,8 @@ export default function PatientDetail() {
                 <Phone className="w-4 h-4" /> {patient.telefone || 'Sem telefone'}
               </p>
             </div>
-            <div className="flex gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              <WhatsAppBillingDialog pacienteId={patient.id} patientName={patient.nome} />
               {!isEditing && (
                 <Button
                   variant="outline"
