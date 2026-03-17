@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { Save, Copy, Upload, ImageIcon, Trash2 } from 'lucide-react'
+import { Save, Copy, Upload, ImageIcon, Trash2, Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -37,6 +37,8 @@ export default function Settings() {
   const [templateLembrete, setTemplateLembrete] = useState(
     'Olá [Nome], você tem uma consulta marcada conosco para [data] às [hora].',
   )
+  const [especialidades, setEspecialidades] = useState<string[]>([])
+  const [novaEspecialidade, setNovaEspecialidade] = useState('')
 
   useEffect(() => {
     if (user) {
@@ -60,6 +62,7 @@ export default function Settings() {
               data.template_lembrete ||
                 'Olá [Nome], você tem uma consulta marcada conosco para [data] às [hora].',
             )
+            setEspecialidades(data.especialidades_disponiveis || [])
           }
         })
     }
@@ -74,12 +77,20 @@ export default function Settings() {
       anamnese_template: questions,
       lembrete_whatsapp_ativo: lembreteAtivo,
       template_lembrete: templateLembrete,
+      especialidades_disponiveis: especialidades,
     }
     const { error } = await supabase.from('usuarios').upsert(payload)
     setLoading(false)
     if (error)
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     else toast({ title: 'Configurações salvas!' })
+  }
+
+  const addEspecialidade = () => {
+    if (novaEspecialidade.trim() && !especialidades.includes(novaEspecialidade.trim())) {
+      setEspecialidades([...especialidades, novaEspecialidade.trim()])
+      setNovaEspecialidade('')
+    }
   }
 
   return (
@@ -90,24 +101,30 @@ export default function Settings() {
           defaultValue="perfil"
           className="w-full bg-white shadow-sm border-slate-200 border rounded-xl overflow-hidden"
         >
-          <TabsList className="w-full justify-start rounded-none border-b border-slate-100 bg-slate-50/50 p-0 h-auto">
+          <TabsList className="w-full flex flex-wrap justify-start rounded-none border-b border-slate-100 bg-slate-50/50 p-0 h-auto">
             <TabsTrigger
               value="perfil"
-              className="rounded-none py-3 px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
-              Perfil da Clínica
+              Perfil
+            </TabsTrigger>
+            <TabsTrigger
+              value="especialidades"
+              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+            >
+              Especialidades
             </TabsTrigger>
             <TabsTrigger
               value="anamnese"
-              className="rounded-none py-3 px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
-              Anamnese Digital
+              Anamnese
             </TabsTrigger>
             <TabsTrigger
               value="lembretes"
-              className="rounded-none py-3 px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
-              Lembretes WhatsApp
+              Lembretes
             </TabsTrigger>
           </TabsList>
 
@@ -183,6 +200,48 @@ export default function Settings() {
                 onChange={(e) => setFormData({ ...formData, template_cobranca: e.target.value })}
                 className="resize-none"
               />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="especialidades" className="p-6 m-0 space-y-5">
+            <div>
+              <h3 className="font-semibold text-slate-900">Especialidades e Serviços</h3>
+              <p className="text-sm text-slate-500">
+                Cadastre as opções que ficarão disponíveis para agendamento.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={novaEspecialidade}
+                onChange={(e) => setNovaEspecialidade(e.target.value)}
+                placeholder="Ex: Terapia de Casal, Avaliação Neuropsicológica..."
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addEspecialidade())}
+              />
+              <Button type="button" onClick={addEspecialidade} variant="secondary">
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {especialidades.length === 0 && (
+                <p className="text-sm text-slate-400">Nenhuma especialidade cadastrada.</p>
+              )}
+              {especialidades.map((esp, idx) => (
+                <div
+                  key={idx}
+                  className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-md border border-slate-100"
+                >
+                  <span className="text-sm font-medium">{esp}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => setEspecialidades(especialidades.filter((_, i) => i !== idx))}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
             </div>
           </TabsContent>
 

@@ -15,6 +15,7 @@ import {
   DollarSign,
   HeartPulse,
   Copy,
+  Link as LinkIcon,
 } from 'lucide-react'
 import PatientEditForm from '@/components/PatientEditForm'
 import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
@@ -71,9 +72,15 @@ export default function PatientDetail() {
 
   const formatBRL = (val: number) =>
     Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
   const copyAnamnese = () => {
     navigator.clipboard.writeText(`${window.location.origin}/anamnese/${patient.hash_anamnese}`)
     toast({ title: 'Link de Anamnese copiado!' })
+  }
+
+  const copyPortal = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/portal/${patient.hash_anamnese}`)
+    toast({ title: 'Link do Portal do Paciente copiado!' })
   }
 
   return (
@@ -102,6 +109,13 @@ export default function PatientDetail() {
             </div>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               <WhatsAppBillingDialog pacienteId={patient.id} patientName={patient.nome} />
+              <Button
+                variant="outline"
+                className="gap-2 text-indigo-600 border-indigo-200 bg-indigo-50/50"
+                onClick={copyPortal}
+              >
+                <LinkIcon className="w-4 h-4" /> Portal do Paciente
+              </Button>
               <Button
                 variant="outline"
                 className="gap-2 text-primary border-primary/20 bg-primary/5"

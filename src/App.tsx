@@ -16,6 +16,7 @@ import Stock from './pages/Stock'
 import Logs from './pages/Logs'
 import PublicBooking from './pages/PublicBooking'
 import PublicAnamnesis from './pages/PublicAnamnesis'
+import PublicPortal from './pages/PublicPortal'
 import NotFound from './pages/NotFound'
 import Auth from './pages/Auth'
 import ResetPassword from './pages/ResetPassword'
@@ -42,6 +43,7 @@ const AppRoutes = () => (
     <Route path="/login" element={<Navigate to="/auth" replace />} />
     <Route path="/agendar/:clinicId" element={<PublicBooking />} />
     <Route path="/anamnese/:hash" element={<PublicAnamnesis />} />
+    <Route path="/portal/:hash" element={<PublicPortal />} />
     <Route
       element={
         <ProtectedRoute>
