@@ -37,7 +37,7 @@ CREATE OR REPLACE FUNCTION public.get_patient_portal_data(p_hash uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-AS $
+AS $$
 DECLARE
     v_result jsonb;
     v_paciente record;
@@ -121,5 +121,4 @@ BEGIN
         'past_sessions', v_all_past
     );
 END;
-$;
-
+$$;
