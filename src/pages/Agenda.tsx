@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useNavigate } from 'react-router-dom'
 import {
   Check,
   X,
@@ -11,6 +12,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Calendar as CalendarIcon,
+  Video,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -55,10 +57,10 @@ import { Calendar } from '@/components/ui/calendar'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function Agenda() {
+  const navigate = useNavigate()
   const [appointments, setAppointments] = useState<any[]>([])
   const [externalEvents, setExternalEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [receiptData, setReceiptData] = useState<any>(null)
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [view, setView] = useState<'daily' | 'weekly' | 'monthly'>('daily')
@@ -107,7 +109,6 @@ export default function Agenda() {
 
     if (!error && data) setAppointments(data)
 
-    // Check Calendar Sync Status to Mock External Events
     const { data: uData } = await supabase
       .from('usuarios')
       .select('sync_calendarios')
@@ -126,12 +127,8 @@ export default function Agenda() {
             pacientes: { nome: 'Bloqueio de Agenda' },
           },
         ])
-      } else {
-        setExternalEvents([])
-      }
-    } else {
-      setExternalEvents([])
-    }
+      } else setExternalEvents([])
+    } else setExternalEvents([])
 
     setLoading(false)
   }, [user, view, currentDate])
@@ -175,39 +172,39 @@ export default function Agenda() {
   }, [user, fetchAppointments, fetchInitialData])
 
   const nextPeriod = () => {
-    if (view === 'monthly') setCurrentDate(addMonths(currentDate, 1))
-    else if (view === 'weekly') setCurrentDate(addDays(currentDate, 7))
-    else setCurrentDate(addDays(currentDate, 1))
+    view === 'monthly'
+      ? setCurrentDate(addMonths(currentDate, 1))
+      : view === 'weekly'
+        ? setCurrentDate(addDays(currentDate, 7))
+        : setCurrentDate(addDays(currentDate, 1))
   }
-
   const prevPeriod = () => {
-    if (view === 'monthly') setCurrentDate(subMonths(currentDate, 1))
-    else if (view === 'weekly') setCurrentDate(subDays(currentDate, 7))
-    else setCurrentDate(subDays(currentDate, 1))
+    view === 'monthly'
+      ? setCurrentDate(subMonths(currentDate, 1))
+      : view === 'weekly'
+        ? setCurrentDate(subDays(currentDate, 7))
+        : setCurrentDate(subDays(currentDate, 1))
   }
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
     setIsSubmitting(true)
-
-    const isoDate = new Date(formData.data_hora).toISOString()
     const { data: newAppt, error } = await supabase
       .from('agendamentos')
       .insert({
         usuario_id: user.id,
         paciente_id: formData.paciente_id,
-        data_hora: isoDate,
+        data_hora: new Date(formData.data_hora).toISOString(),
         especialidade: formData.especialidade || null,
         valor_total: Number(formData.valor_total),
         status: 'agendado',
       })
       .select()
       .single()
-
-    if (error) {
+    if (error)
       toast({ title: 'Erro ao agendar', description: error.message, variant: 'destructive' })
-    } else {
+    else {
       supabase.functions.invoke('enviar_lembrete_consulta', {
         body: { agendamento_id: newAppt.id },
       })
@@ -228,7 +225,6 @@ export default function Agenda() {
       const now = new Date(apt.data_hora)
       const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
       const valorToAdd = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
-
       if (valorToAdd > 0) {
         const { data: finData } = await supabase
           .from('financeiro')
@@ -247,14 +243,16 @@ export default function Agenda() {
             })
             .eq('id', finData.id)
         else
-          await supabase.from('financeiro').insert({
-            usuario_id: user.id,
-            paciente_id: apt.paciente_id,
-            mes: now.getMonth() + 1,
-            ano: now.getFullYear(),
-            valor_recebido: 0,
-            valor_a_receber: valorToAdd,
-          })
+          await supabase
+            .from('financeiro')
+            .insert({
+              usuario_id: user.id,
+              paciente_id: apt.paciente_id,
+              mes: now.getMonth() + 1,
+              ano: now.getFullYear(),
+              valor_recebido: 0,
+              valor_a_receber: valorToAdd,
+            })
       }
     }
   }
@@ -270,14 +268,12 @@ export default function Agenda() {
       return eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) })
     return []
   }
-  const days = getDaysForView()
 
   const renderAppointmentCard = (apt: any) => {
     const timeStr = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
     })
-
     if (apt.status === 'external') {
       return (
         <Card
@@ -336,7 +332,17 @@ export default function Agenda() {
               <p className="text-sm text-slate-500 font-medium">Valor: {valueStr}</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 w-full lg:w-auto justify-start lg:justify-end">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
+            {apt.status === 'agendado' && isSameDay(new Date(apt.data_hora), new Date()) && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors"
+                onClick={() => navigate(`/atendimento/${apt.id}`)}
+              >
+                <Video className="w-4 h-4" /> Entrar Sessão
+              </Button>
+            )}
             <Button
               size="icon"
               variant="outline"
@@ -455,7 +461,7 @@ export default function Agenda() {
               {Array.from({ length: startOfMonth(currentDate).getDay() }).map((_, i) => (
                 <div key={`empty-${i}`} />
               ))}
-              {days.map((d) => {
+              {getDaysForView().map((d) => {
                 const dayAppts = [...appointments, ...externalEvents].filter((a) =>
                   isSameDay(new Date(a.data_hora), d),
                 )
@@ -501,22 +507,19 @@ export default function Agenda() {
             </div>
           ) : (
             <div className="space-y-8">
-              {days.map((d) => {
+              {getDaysForView().map((d) => {
                 const dayAppts = [...appointments, ...externalEvents]
                   .filter((a) => isSameDay(new Date(a.data_hora), d))
                   .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime())
-                if (dayAppts.length === 0) {
-                  if (view === 'daily')
-                    return (
-                      <div
-                        key={d.toISOString()}
-                        className="text-center p-12 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500"
-                      >
-                        Nenhuma sessão agendada.
-                      </div>
-                    )
-                  return null
-                }
+                if (dayAppts.length === 0)
+                  return view === 'daily' ? (
+                    <div
+                      key={d.toISOString()}
+                      className="text-center p-12 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500"
+                    >
+                      Nenhuma sessão agendada.
+                    </div>
+                  ) : null
                 return (
                   <div key={d.toISOString()} className="space-y-4">
                     {view === 'weekly' && (
@@ -543,14 +546,13 @@ export default function Agenda() {
               <Label>Paciente</Label>
               <Select
                 value={formData.paciente_id}
-                onValueChange={(v) => {
-                  const pt = patients.find((p) => p.id === v)
+                onValueChange={(v) =>
                   setFormData({
                     ...formData,
                     paciente_id: v,
-                    valor_total: pt?.valor_sessao?.toString() || '0',
+                    valor_total: patients.find((p) => p.id === v)?.valor_sessao?.toString() || '0',
                   })
-                }}
+                }
                 required
               >
                 <SelectTrigger className="bg-white">

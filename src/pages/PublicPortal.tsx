@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import {
   Scale,
   Ban,
   CheckCircle,
+  Video,
 } from 'lucide-react'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
@@ -32,6 +33,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 
 export default function PublicPortal() {
   const { hash } = useParams()
+  const navigate = useNavigate()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
@@ -66,12 +68,14 @@ export default function PublicPortal() {
 
   const handleRating = async () => {
     if (!data.pending_survey?.[0]) return
-    await supabase.from('avaliacoes').insert({
-      paciente_id: data.paciente_id,
-      agendamento_id: data.pending_survey[0].id,
-      nota: rating,
-      comentario: comment,
-    })
+    await supabase
+      .from('avaliacoes')
+      .insert({
+        paciente_id: data.paciente_id,
+        agendamento_id: data.pending_survey[0].id,
+        nota: rating,
+        comentario: comment,
+      })
     setRatingSubmitted(true)
     toast({ title: 'Avaliação enviada com sucesso! Obrigado.' })
   }
@@ -82,9 +86,7 @@ export default function PublicPortal() {
     if (!error) {
       toast({ title: 'Contrato aceito com sucesso.' })
       fetchPortalData()
-    } else {
-      toast({ title: 'Erro ao aceitar contrato.', variant: 'destructive' })
-    }
+    } else toast({ title: 'Erro ao aceitar contrato.', variant: 'destructive' })
   }
 
   const handleCancelAppointment = async () => {
@@ -100,9 +102,16 @@ export default function PublicPortal() {
       setCancelAptId(null)
       setCancelJustification('')
       fetchPortalData()
-    } else {
-      toast({ title: 'Erro ao desmarcar consulta.', variant: 'destructive' })
-    }
+    } else toast({ title: 'Erro ao desmarcar consulta.', variant: 'destructive' })
+  }
+
+  const isToday = (d: Date) => {
+    const today = new Date()
+    return (
+      d.getDate() === today.getDate() &&
+      d.getMonth() === today.getMonth() &&
+      d.getFullYear() === today.getFullYear()
+    )
   }
 
   if (loading)
@@ -121,8 +130,6 @@ export default function PublicPortal() {
     )
 
   const showLegalTab = data.texto_contrato || data.politica_cancelamento
-  const parsedContrato = replaceVars(data.texto_contrato)
-  const parsedPolitica = replaceVars(data.politica_cancelamento)
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 animate-fade-in">
@@ -227,20 +234,34 @@ export default function PublicPortal() {
               data.agendamentos.map((apt: any) => {
                 const dateObj = new Date(apt.data_hora)
                 const title = `Consulta: ${data.paciente_nome} - ${apt.especialidade || 'Geral'}`
+                const today = isToday(dateObj)
                 return (
-                  <Card key={apt.id} className="shadow-sm border-slate-200">
+                  <Card
+                    key={apt.id}
+                    className={cn(
+                      'shadow-sm border-slate-200',
+                      today && 'border-indigo-300 bg-indigo-50/10',
+                    )}
+                  >
                     <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <Badge
                             variant="outline"
-                            className="bg-primary/5 text-primary border-primary/20 capitalize"
+                            className={cn(
+                              'capitalize',
+                              today
+                                ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                : 'bg-primary/5 text-primary border-primary/20',
+                            )}
                           >
-                            {dateObj.toLocaleDateString('pt-BR', {
-                              weekday: 'long',
-                              day: 'numeric',
-                              month: 'long',
-                            })}
+                            {today
+                              ? 'Hoje'
+                              : dateObj.toLocaleDateString('pt-BR', {
+                                  weekday: 'long',
+                                  day: 'numeric',
+                                  month: 'long',
+                                })}
                           </Badge>
                           <Badge variant="secondary" className="gap-1">
                             <Clock className="w-3 h-3" />{' '}
@@ -255,6 +276,14 @@ export default function PublicPortal() {
                         </h3>
                       </div>
                       <div className="flex flex-col gap-2 min-w-[180px]">
+                        {today && (
+                          <Button
+                            className="gap-2 justify-start bg-indigo-600 hover:bg-indigo-700 text-white shadow-md animate-pulse"
+                            onClick={() => navigate(`/sessao/${hash}`)}
+                          >
+                            <Video className="w-4 h-4 shrink-0" /> Entrar na Sessão
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -332,7 +361,6 @@ export default function PublicPortal() {
                   </div>
                 </div>
               )}
-
               {data.texto_contrato && (
                 <Card className="shadow-sm">
                   <CardHeader className="border-b border-slate-100 bg-slate-50/50">
@@ -340,12 +368,11 @@ export default function PublicPortal() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="bg-slate-50 p-4 rounded-md text-sm text-slate-700 whitespace-pre-wrap h-64 overflow-y-auto border border-slate-200">
-                      {parsedContrato}
+                      {replaceVars(data.texto_contrato)}
                     </div>
                   </CardContent>
                 </Card>
               )}
-
               {data.politica_cancelamento && (
                 <Card className="shadow-sm">
                   <CardHeader className="border-b border-slate-100 bg-slate-50/50">
@@ -353,12 +380,11 @@ export default function PublicPortal() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="bg-slate-50 p-4 rounded-md text-sm text-slate-700 whitespace-pre-wrap border border-slate-200">
-                      {parsedPolitica}
+                      {replaceVars(data.politica_cancelamento)}
                     </div>
                   </CardContent>
                 </Card>
               )}
-
               <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                 {data.contrato_aceito ? (
                   <div className="flex items-center gap-3 text-emerald-700">

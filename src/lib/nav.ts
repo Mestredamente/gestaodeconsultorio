@@ -7,6 +7,7 @@ import {
   FileBarChart,
   Package,
   ShieldAlert,
+  Megaphone,
 } from 'lucide-react'
 
 export const navItems = [
@@ -14,6 +15,7 @@ export const navItems = [
   { name: 'Agenda', href: '/agenda', icon: Calendar },
   { name: 'Pacientes', href: '/pacientes', icon: Users },
   { name: 'Carteira', href: '/carteira', icon: Wallet },
+  { name: 'Marketing', href: '/marketing', icon: Megaphone },
   { name: 'Relatórios', href: '/relatorios', icon: FileBarChart },
   { name: 'Estoque', href: '/estoque', icon: Package },
   { name: 'Logs', href: '/logs', icon: ShieldAlert },

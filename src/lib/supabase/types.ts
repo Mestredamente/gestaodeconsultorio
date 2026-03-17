@@ -378,6 +378,41 @@ export type Database = {
           },
         ]
       }
+      notificacoes: {
+        Row: {
+          data_criacao: string
+          id: string
+          lida: boolean
+          mensagem: string
+          titulo: string
+          usuario_id: string
+        }
+        Insert: {
+          data_criacao?: string
+          id?: string
+          lida?: boolean
+          mensagem: string
+          titulo: string
+          usuario_id: string
+        }
+        Update: {
+          data_criacao?: string
+          id?: string
+          lida?: boolean
+          mensagem?: string
+          titulo?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'notificacoes_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       pacientes: {
         Row: {
           anamnese: Json | null
@@ -868,6 +903,13 @@ export const Constants = {
 //   quantidade_mudanca: integer (not null)
 //   tipo: text (not null)
 //   data_movimentacao: timestamp with time zone (not null, default: now())
+// Table: notificacoes
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   titulo: text (not null)
+//   mensagem: text (not null)
+//   lida: boolean (not null, default: false)
+//   data_criacao: timestamp with time zone (not null, default: now())
 // Table: pacientes
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -968,6 +1010,9 @@ export const Constants = {
 //   PRIMARY KEY movimentacao_estoque_pkey: PRIMARY KEY (id)
 //   CHECK movimentacao_estoque_tipo_check: CHECK ((tipo = ANY (ARRAY['entrada'::text, 'saida'::text])))
 //   FOREIGN KEY movimentacao_estoque_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: notificacoes
+//   PRIMARY KEY notificacoes_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY notificacoes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: pacientes
 //   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -1033,6 +1078,16 @@ export const Constants = {
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: movimentacao_estoque
 //   Policy "movimentacao_estoque_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: notificacoes
+//   Policy "notificacoes_delete" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//   Policy "notificacoes_insert" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: (usuario_id = auth.uid())
+//   Policy "notificacoes_select" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//   Policy "notificacoes_update" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: pacientes

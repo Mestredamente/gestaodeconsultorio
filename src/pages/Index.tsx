@@ -1,7 +1,18 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Check, X, RefreshCw, Cake, LogOut, Settings2, Coins } from 'lucide-react'
+import {
+  Calendar,
+  Check,
+  X,
+  RefreshCw,
+  Cake,
+  LogOut,
+  Settings2,
+  Coins,
+  Package,
+  AlertTriangle,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -24,12 +35,14 @@ export default function Index() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [birthdays, setBirthdays] = useState<any[]>([])
   const [revenue, setRevenue] = useState(0)
+  const [lowStockCount, setLowStockCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [prefs, setPrefs] = useState({
     show_agenda: true,
     show_birthdays: true,
     show_revenue: true,
+    show_stock_alert: true,
   })
 
   const todayStr = new Intl.DateTimeFormat('pt-BR', {
@@ -50,66 +63,54 @@ export default function Index() {
           .select('preferencias_dashboard')
           .eq('id', user.id)
           .maybeSingle()
-
-        if (!uError && u?.preferencias_dashboard) {
-          setPrefs(u.preferencias_dashboard)
-        }
+        if (!uError && u?.preferencias_dashboard) setPrefs(u.preferencias_dashboard)
 
         const startOfDay = new Date()
         startOfDay.setHours(0, 0, 0, 0)
         const endOfDay = new Date(startOfDay)
         endOfDay.setDate(endOfDay.getDate() + 1)
 
-        const { data: appts, error: apptsError } = await supabase
-          .from('agendamentos')
-          .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
-          .eq('usuario_id', user.id)
-          .gte('data_hora', startOfDay.toISOString())
-          .lt('data_hora', endOfDay.toISOString())
-          .order('data_hora', { ascending: true })
+        const [apptsRes, patsRes, finRes, stockRes] = await Promise.all([
+          supabase
+            .from('agendamentos')
+            .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
+            .eq('usuario_id', user.id)
+            .gte('data_hora', startOfDay.toISOString())
+            .lt('data_hora', endOfDay.toISOString())
+            .order('data_hora', { ascending: true }),
+          supabase.from('pacientes').select('id, nome, data_nascimento').eq('usuario_id', user.id),
+          supabase
+            .from('financeiro')
+            .select('valor_recebido')
+            .eq('usuario_id', user.id)
+            .eq('mes', new Date().getMonth() + 1)
+            .eq('ano', new Date().getFullYear()),
+          supabase
+            .from('estoque')
+            .select('quantidade, quantidade_minima')
+            .eq('usuario_id', user.id),
+        ])
 
-        if (!apptsError && appts) {
-          setAppointments(appts)
-        } else {
-          setAppointments([])
+        if (apptsRes.data) setAppointments(apptsRes.data)
+        if (patsRes.data) {
+          const currentMonth = new Date().getMonth() + 1
+          setBirthdays(
+            patsRes.data.filter(
+              (p) =>
+                p.data_nascimento && parseInt(p.data_nascimento.split('-')[1]) === currentMonth,
+            ),
+          )
         }
-
-        const currentMonth = new Date().getMonth() + 1
-        const { data: pats, error: patsError } = await supabase
-          .from('pacientes')
-          .select('id, nome, data_nascimento')
-          .eq('usuario_id', user.id)
-
-        if (!patsError && pats) {
-          const bdays = pats.filter((p) => {
-            if (!p.data_nascimento) return false
-            const [, month] = p.data_nascimento.split('-')
-            return parseInt(month) === currentMonth
-          })
-          setBirthdays(bdays)
-        } else {
-          setBirthdays([])
-        }
-
-        const { data: fin, error: finError } = await supabase
-          .from('financeiro')
-          .select('valor_recebido')
-          .eq('usuario_id', user.id)
-          .eq('mes', currentMonth)
-          .eq('ano', new Date().getFullYear())
-
-        if (!finError && fin) {
-          setRevenue(fin.reduce((s, f) => s + Number(f.valor_recebido), 0) || 0)
-        } else {
-          setRevenue(0)
-        }
+        if (finRes.data)
+          setRevenue(finRes.data.reduce((s, f) => s + Number(f.valor_recebido), 0) || 0)
+        if (stockRes.data)
+          setLowStockCount(
+            stockRes.data.filter((s) => s.quantidade <= (s.quantidade_minima || 0)).length,
+          )
       })
     } catch (err) {
       console.error('Error fetching dashboard data:', err)
       setError(true)
-      setAppointments([])
-      setBirthdays([])
-      setRevenue(0)
     } finally {
       setLoading(false)
     }
@@ -117,31 +118,16 @@ export default function Index() {
 
   useEffect(() => {
     fetchDashboardData()
-    if (!user) return
-    const subscription = supabase
-      .channel('dash_agendamentos')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'agendamentos', filter: `usuario_id=eq.${user.id}` },
-        () => fetchDashboardData(),
-      )
-      .subscribe()
-    return () => {
-      supabase.removeChannel(subscription)
-    }
-  }, [user, fetchDashboardData])
+  }, [fetchDashboardData])
 
   const updateStatus = async (id: string, status: string) => {
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
     try {
       const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
-      if (!error) {
-        toast({ title: `Status atualizado: ${status.toUpperCase()}` })
-      } else {
-        throw error
-      }
+      if (!error) toast({ title: `Status atualizado: ${status.toUpperCase()}` })
+      else throw error
     } catch (err: any) {
-      toast({ title: 'Erro ao atualizar status', description: err.message, variant: 'destructive' })
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
       fetchDashboardData()
     }
   }
@@ -149,24 +135,7 @@ export default function Index() {
   const savePrefs = async (newPref: any) => {
     const updated = { ...prefs, ...newPref }
     setPrefs(updated)
-    try {
-      await supabase.from('usuarios').update({ preferencias_dashboard: updated }).eq('id', user?.id)
-    } catch (err) {
-      console.error('Error saving preferences:', err)
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'compareceu':
-        return 'bg-emerald-100 text-emerald-700'
-      case 'faltou':
-        return 'bg-red-100 text-red-700'
-      case 'desmarcou':
-        return 'bg-amber-100 text-amber-700'
-      default:
-        return 'bg-slate-100 text-slate-700'
-    }
+    await supabase.from('usuarios').update({ preferencias_dashboard: updated }).eq('id', user?.id)
   }
 
   return (
@@ -196,17 +165,24 @@ export default function Index() {
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label>Mostrar Aniversariantes</Label>
-                  <Switch
-                    checked={prefs.show_birthdays}
-                    onCheckedChange={(v) => savePrefs({ show_birthdays: v })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
                   <Label>Mostrar Receita Mês</Label>
                   <Switch
                     checked={prefs.show_revenue}
                     onCheckedChange={(v) => savePrefs({ show_revenue: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Mostrar Alertas de Estoque</Label>
+                  <Switch
+                    checked={prefs.show_stock_alert !== false}
+                    onCheckedChange={(v) => savePrefs({ show_stock_alert: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Mostrar Aniversariantes</Label>
+                  <Switch
+                    checked={prefs.show_birthdays}
+                    onCheckedChange={(v) => savePrefs({ show_birthdays: v })}
                   />
                 </div>
               </div>
@@ -219,11 +195,9 @@ export default function Index() {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex items-center justify-between">
-          <p className="text-red-600 text-sm font-medium">
-            Alguns dados não puderam ser carregados.
-          </p>
-          <Button variant="outline" size="sm" onClick={fetchDashboardData} className="bg-white">
+        <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex justify-between">
+          <p className="text-red-600 text-sm">Alguns dados não puderam ser carregados.</p>
+          <Button variant="outline" size="sm" onClick={fetchDashboardData}>
             Tentar novamente
           </Button>
         </div>
@@ -268,7 +242,13 @@ export default function Index() {
                             <span
                               className={cn(
                                 'text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider mt-1 inline-block',
-                                getStatusColor(apt.status),
+                                apt.status === 'compareceu'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : apt.status === 'faltou'
+                                    ? 'bg-red-100 text-red-700'
+                                    : apt.status === 'desmarcou'
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : 'bg-slate-100 text-slate-700',
                               )}
                             >
                               {apt.status}
@@ -279,7 +259,7 @@ export default function Index() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="flex-1 sm:flex-none text-emerald-600 hover:bg-emerald-50"
+                            className="text-emerald-600 hover:bg-emerald-50"
                             onClick={() => updateStatus(apt.id, 'compareceu')}
                           >
                             <Check className="w-4 h-4 mr-1" /> Compareceu
@@ -287,18 +267,10 @@ export default function Index() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="flex-1 sm:flex-none text-red-600 hover:bg-red-50"
+                            className="text-red-600 hover:bg-red-50"
                             onClick={() => updateStatus(apt.id, 'faltou')}
                           >
                             <X className="w-4 h-4 mr-1" /> Faltou
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1 sm:flex-none text-amber-600 hover:bg-amber-50"
-                            onClick={() => updateStatus(apt.id, 'desmarcou')}
-                          >
-                            <RefreshCw className="w-4 h-4 mr-1" /> Desmarcou
                           </Button>
                         </div>
                       </div>
@@ -313,6 +285,20 @@ export default function Index() {
         <div className="space-y-6">
           <ServiceGoalTracker />
 
+          {prefs.show_stock_alert !== false && lowStockCount > 0 && (
+            <Card className="shadow-sm border-amber-200 h-fit bg-amber-50/50">
+              <CardHeader className="border-b border-amber-100/50 pb-4">
+                <CardTitle className="text-lg flex items-center gap-2 text-amber-800">
+                  <AlertTriangle className="w-5 h-5" /> Alertas de Estoque
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 text-center">
+                <h2 className="text-4xl font-bold text-amber-600">{lowStockCount}</h2>
+                <p className="text-amber-800 font-medium text-sm mt-1">Itens em nível crítico</p>
+              </CardContent>
+            </Card>
+          )}
+
           {prefs.show_revenue && (
             <Card className="shadow-sm border-slate-200 h-fit">
               <CardHeader className="border-b border-slate-100 bg-emerald-50/50 pb-4">
@@ -324,41 +310,6 @@ export default function Index() {
                 <h2 className="text-3xl font-bold text-emerald-900">
                   {revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </h2>
-              </CardContent>
-            </Card>
-          )}
-
-          {prefs.show_birthdays && (
-            <Card className="shadow-sm border-slate-200 h-fit">
-              <CardHeader className="border-b border-slate-100 bg-rose-50/50 pb-4">
-                <CardTitle className="text-lg flex items-center gap-2 text-rose-600">
-                  <Cake className="w-5 h-5" /> Aniversariantes do Mês
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loading ? (
-                  <div className="p-8 flex justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-rose-500"></div>
-                  </div>
-                ) : birthdays.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500 text-sm">
-                    Nenhum aniversário este mês.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100">
-                    {birthdays.map((b) => {
-                      const [, month, day] = b.data_nascimento.split('-')
-                      return (
-                        <div key={b.id} className="p-4 flex items-center justify-between">
-                          <p className="font-medium text-slate-800">{b.nome}</p>
-                          <span className="text-sm font-bold text-rose-500 bg-rose-100 px-2 py-1 rounded-md">
-                            {day}/{month}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}

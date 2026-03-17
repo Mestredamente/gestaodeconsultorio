@@ -14,6 +14,9 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Stock from './pages/Stock'
 import Logs from './pages/Logs'
+import Marketing from './pages/Marketing'
+import TelehealthSession from './pages/TelehealthSession'
+import PublicTelehealth from './pages/PublicTelehealth'
 import PublicBooking from './pages/PublicBooking'
 import PublicAnamnesis from './pages/PublicAnamnesis'
 import PublicPortal from './pages/PublicPortal'
@@ -45,7 +48,16 @@ const AppRoutes = () => (
     <Route path="/agendar/:clinicId" element={<PublicBooking />} />
     <Route path="/anamnese/:hash" element={<PublicAnamnesis />} />
     <Route path="/portal/:hash" element={<PublicPortal />} />
+    <Route path="/sessao/:hash" element={<PublicTelehealth />} />
     <Route path="/validar-prescricao/:hash" element={<PublicPrescription />} />
+    <Route
+      path="/atendimento/:agendamentoId"
+      element={
+        <ProtectedRoute>
+          <TelehealthSession />
+        </ProtectedRoute>
+      }
+    />
     <Route
       element={
         <ProtectedRoute>
@@ -60,6 +72,7 @@ const AppRoutes = () => (
       <Route path="/pacientes/:id/prontuario" element={<PatientRecord />} />
       <Route path="/carteira" element={<Finances />} />
       <Route path="/financeiro" element={<Navigate to="/carteira" replace />} />
+      <Route path="/marketing" element={<Marketing />} />
       <Route path="/relatorios" element={<Reports />} />
       <Route path="/estoque" element={<Stock />} />
       <Route path="/logs" element={<Logs />} />

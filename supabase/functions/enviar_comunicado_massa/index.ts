@@ -1,0 +1,60 @@
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
+import { createClient } from 'npm:@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } },
+    )
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Unauthorized')
+
+    const { titulo, conteudo, tipo } = await req.json()
+
+    // Registra a campanha no banco
+    const { data: campanha, error: campError } = await supabase
+      .from('comunicacoes_campanhas')
+      .insert({ usuario_id: user.id, titulo, conteudo, tipo })
+      .select()
+      .single()
+
+    if (campError) throw campError
+
+    // Busca emails dos pacientes do usuário logado
+    const { data: pacientes } = await supabase
+      .from('pacientes')
+      .select('email, nome')
+      .eq('usuario_id', user.id)
+      .not('email', 'is', null)
+
+    const validPatients = (pacientes || []).filter((p) => p.email && p.email.trim() !== '')
+
+    // TODO: Integração real com provedor de email (SendGrid, Resend, etc.) para envio em massa.
+    // Simulando o delay do envio
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    // Log de auditoria da ação
+    await supabase.from('logs_auditoria').insert({
+      usuario_id: user.id,
+      acao: 'SEND_MASS_EMAIL',
+      tabela_afetada: 'comunicacoes_campanhas',
+      registro_id: campanha.id,
+      detalhes: { recipients_count: validPatients.length, titulo, action: 'Mock Send' },
+    })
+
+    return new Response(JSON.stringify({ success: true, count: validPatients.length, campanha }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})
