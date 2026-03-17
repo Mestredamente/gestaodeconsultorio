@@ -17,6 +17,12 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 
+type HistoricoEntry = {
+  id: string
+  date: string
+  content: string
+}
+
 export default function PatientRecord() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -29,9 +35,8 @@ export default function PatientRecord() {
   const [prontuarioId, setProntuarioId] = useState<string | null>(null)
   const [queixa, setQueixa] = useState('')
   const [isEditingQueixa, setIsEditingQueixa] = useState(false)
-  const [historico, setHistorico] = useState<any[]>([])
+  const [historico, setHistorico] = useState<HistoricoEntry[]>([])
 
-  // Modal State
   const [isEvolModalOpen, setIsEvolModalOpen] = useState(false)
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
   const [newContent, setNewContent] = useState('')
@@ -41,11 +46,9 @@ export default function PatientRecord() {
       if (!user || !id) return
       setLoading(true)
 
-      // Fetch Patient
       const { data: pData } = await supabase.from('pacientes').select('*').eq('id', id).single()
       setPatient(pData)
 
-      // Fetch Clinic Info
       const { data: cData } = await supabase
         .from('usuarios')
         .select('nome_consultorio')
@@ -53,9 +56,8 @@ export default function PatientRecord() {
         .single()
       setClinicInfo(cData)
 
-      // Fetch Prontuario
       const { data: prData } = await supabase
-        .from('prontuarios' as any)
+        .from('prontuarios')
         .select('*')
         .eq('paciente_id', id)
         .maybeSingle()
@@ -63,12 +65,13 @@ export default function PatientRecord() {
       if (prData) {
         setProntuarioId(prData.id)
         setQueixa(prData.queixa_principal || '')
-        setHistorico(prData.historico_sessoes || [])
+        const rawHistorico = (prData.historico_sessoes as unknown as HistoricoEntry[]) || []
+        setHistorico(
+          rawHistorico.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        )
       }
-
       setLoading(false)
     }
-
     fetchData()
   }, [id, user])
 
@@ -77,7 +80,7 @@ export default function PatientRecord() {
     if (!user || !id) return null
 
     const { data, error } = await supabase
-      .from('prontuarios' as any)
+      .from('prontuarios')
       .insert({
         paciente_id: id,
         usuario_id: user.id,
@@ -99,7 +102,7 @@ export default function PatientRecord() {
     if (!pid) return
 
     const { error } = await supabase
-      .from('prontuarios' as any)
+      .from('prontuarios')
       .update({ queixa_principal: queixa })
       .eq('id', pid)
 
@@ -120,7 +123,7 @@ export default function PatientRecord() {
     const pid = await ensureProntuario()
     if (!pid) return
 
-    const newEntry = {
+    const newEntry: HistoricoEntry = {
       id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
       date: newDate,
       content: newContent,
@@ -131,8 +134,8 @@ export default function PatientRecord() {
     )
 
     const { error } = await supabase
-      .from('prontuarios' as any)
-      .update({ historico_sessoes: updatedHistorico })
+      .from('prontuarios')
+      .update({ historico_sessoes: updatedHistorico as any })
       .eq('id', pid)
 
     if (!error) {
@@ -143,10 +146,6 @@ export default function PatientRecord() {
     } else {
       toast({ title: 'Erro ao salvar', variant: 'destructive' })
     }
-  }
-
-  const handlePrint = () => {
-    window.print()
   }
 
   if (loading) {
@@ -163,28 +162,14 @@ export default function PatientRecord() {
     <>
       <style media="print">
         {`
-          body * {
-            visibility: hidden;
-          }
-          #print-area {
-            display: block !important;
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-          #print-area, #print-area * {
-            visibility: visible;
-          }
-          html, body {
-            background-color: white !important;
-            min-height: 100%;
-          }
+          body * { visibility: hidden; }
+          #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; }
+          #print-area, #print-area * { visibility: visible; }
+          html, body { background-color: white !important; min-height: 100%; }
           @page { size: auto; margin: 20mm; }
         `}
       </style>
 
-      {/* Main UI */}
       <div className="space-y-8 animate-fade-in-up pb-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -196,11 +181,11 @@ export default function PatientRecord() {
               <ArrowLeft className="w-4 h-4" /> Voltar para Detalhes
             </Button>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              <FileText className="w-6 h-6 text-primary" /> Prontuário Médico
+              <FileText className="w-6 h-6 text-primary" /> Prontuário
             </h1>
             <p className="text-slate-500 text-sm mt-1">Paciente: {patient.nome}</p>
           </div>
-          <Button variant="outline" onClick={handlePrint} className="gap-2">
+          <Button variant="outline" onClick={() => window.print()} className="gap-2">
             <Printer className="w-4 h-4" /> Gerar PDF
           </Button>
         </div>
@@ -256,9 +241,7 @@ export default function PatientRecord() {
             <div className="text-center p-12 bg-white border border-dashed border-slate-300 rounded-xl shadow-sm">
               <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <h3 className="text-lg font-medium text-slate-900">Sem registros</h3>
-              <p className="text-slate-500 mt-1">
-                Nenhuma evolução clínica foi registrada para este paciente ainda.
-              </p>
+              <p className="text-slate-500 mt-1">Nenhuma evolução clínica foi registrada.</p>
             </div>
           ) : (
             <div className="relative border-l-2 border-slate-200 ml-4 space-y-8 pb-4">
@@ -283,7 +266,6 @@ export default function PatientRecord() {
         </div>
       </div>
 
-      {/* Modal Nova Evolução */}
       <Dialog open={isEvolModalOpen} onOpenChange={setIsEvolModalOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
@@ -322,7 +304,6 @@ export default function PatientRecord() {
         </DialogContent>
       </Dialog>
 
-      {/* Print Only UI */}
       <div id="print-area" className="hidden bg-white text-black p-8 font-sans">
         <div className="text-center border-b-2 border-slate-800 pb-4 mb-8">
           <h1 className="text-3xl font-bold uppercase tracking-wider">

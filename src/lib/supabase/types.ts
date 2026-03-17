@@ -176,6 +176,45 @@ export type Database = {
           },
         ]
       }
+      prontuarios: {
+        Row: {
+          historico_sessoes: Json
+          id: string
+          paciente_id: string
+          queixa_principal: string | null
+          usuario_id: string
+        }
+        Insert: {
+          historico_sessoes?: Json
+          id?: string
+          paciente_id: string
+          queixa_principal?: string | null
+          usuario_id: string
+        }
+        Update: {
+          historico_sessoes?: Json
+          id?: string
+          paciente_id?: string
+          queixa_principal?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'prontuarios_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: true
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'prontuarios_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       usuarios: {
         Row: {
           chave_pix: string | null
@@ -379,6 +418,12 @@ export const Constants = {
 //   data_nascimento: date (nullable)
 //   contato_emergencia_nome: text (nullable)
 //   contato_emergencia_telefone: text (nullable)
+// Table: prontuarios
+//   id: uuid (not null, default: gen_random_uuid())
+//   paciente_id: uuid (not null)
+//   usuario_id: uuid (not null)
+//   queixa_principal: text (nullable)
+//   historico_sessoes: jsonb (not null, default: '[]'::jsonb)
 // Table: usuarios
 //   id: uuid (not null)
 //   email: text (nullable)
@@ -402,6 +447,11 @@ export const Constants = {
 // Table: pacientes
 //   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: prontuarios
+//   FOREIGN KEY prontuarios_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   UNIQUE prontuarios_paciente_id_key: UNIQUE (paciente_id)
+//   PRIMARY KEY prontuarios_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY prontuarios_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: usuarios
 //   FOREIGN KEY usuarios_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 //   PRIMARY KEY usuarios_pkey: PRIMARY KEY (id)
@@ -427,6 +477,10 @@ export const Constants = {
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: pacientes
 //   Policy "pacientes_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: prontuarios
+//   Policy "prontuarios_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: usuarios
@@ -484,3 +538,5 @@ export const Constants = {
 // --- INDEXES ---
 // Table: financeiro
 //   CREATE UNIQUE INDEX financeiro_usuario_paciente_mes_ano_key ON public.financeiro USING btree (usuario_id, paciente_id, mes, ano)
+// Table: prontuarios
+//   CREATE UNIQUE INDEX prontuarios_paciente_id_key ON public.prontuarios USING btree (paciente_id)
