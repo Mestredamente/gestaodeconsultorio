@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -55,12 +55,27 @@ const formSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? Number(v) : null)),
+  convenio_id: z.string().optional(),
+  numero_carteira: z.string().optional(),
 })
 
 export default function NewPatientForm() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [convenios, setConvenios] = useState<any[]>([])
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('convenios' as any)
+        .select('*')
+        .eq('usuario_id', user.id)
+        .then(({ data }) => {
+          if (data) setConvenios(data)
+        })
+    }
+  }, [user])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -83,6 +98,8 @@ export default function NewPatientForm() {
       valor_sessao: '' as any,
       frequencia_pagamento: 'sessão',
       dia_pagamento: '' as any,
+      convenio_id: '',
+      numero_carteira: '',
     },
   })
 
@@ -109,6 +126,8 @@ export default function NewPatientForm() {
       valor_sessao: values.valor_sessao,
       frequencia_pagamento: values.frequencia_pagamento,
       dia_pagamento: values.dia_pagamento,
+      convenio_id: values.convenio_id || null,
+      numero_carteira: values.numero_carteira || null,
     }
     const { error } = await supabase.from('pacientes').insert(payload as any)
     setLoading(false)
@@ -117,26 +136,7 @@ export default function NewPatientForm() {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     else {
       toast({ title: 'Paciente cadastrado com sucesso!' })
-      form.reset({
-        nome: '',
-        data_nascimento: '',
-        cpf: '',
-        telefone: '',
-        email: '',
-        endereco: '',
-        cep: '',
-        rua: '',
-        numero: '',
-        complemento: '',
-        bairro: '',
-        cidade: '',
-        estado: '',
-        contato_emergencia_nome: '',
-        contato_emergencia_telefone: '',
-        valor_sessao: '' as any,
-        frequencia_pagamento: 'sessão',
-        dia_pagamento: '' as any,
-      })
+      form.reset()
     }
   }
 
@@ -220,7 +220,7 @@ export default function NewPatientForm() {
 
             <div className="pt-4 border-t border-slate-100">
               <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">
-                Configurações de Pagamento
+                Configurações de Pagamento e Convênio
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
@@ -228,7 +228,7 @@ export default function NewPatientForm() {
                   name="valor_sessao"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Valor da Sessão (R$)</FormLabel>
+                      <FormLabel>Valor Base Sessão (R$)</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} value={field.value || ''} />
                       </FormControl>
@@ -278,6 +278,51 @@ export default function NewPatientForm() {
                     </FormItem>
                   )}
                 />
+                {convenios.length > 0 && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="convenio_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Convênio</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <FormControl>
+                              <SelectTrigger className="bg-white">
+                                <SelectValue placeholder="Opcional" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {convenios.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="numero_carteira"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nº da Carteirinha</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Código do paciente"
+                              {...field}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
               </div>
             </div>
 
@@ -367,40 +412,6 @@ export default function NewPatientForm() {
                       <FormControl>
                         <Input {...field} value={field.value || ''} />
                       </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-100">
-              <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">
-                Contato de Emergência
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="contato_emergencia_nome"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome do Contato</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Maria da Silva" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="contato_emergencia_telefone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Telefone do Contato</FormLabel>
-                      <FormControl>
-                        <Input placeholder="(00) 00000-0000" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />

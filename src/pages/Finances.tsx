@@ -2,7 +2,15 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Legend } from 'recharts'
-import { ArrowDownRight, ArrowUpRight, Wallet, Plus, RefreshCw } from 'lucide-react'
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Wallet,
+  Plus,
+  RefreshCw,
+  CheckCircle,
+  FileText,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import {
@@ -79,6 +87,7 @@ export default function Finances() {
   const [patients, setPatients] = useState<any[]>([])
   const [finances, setFinances] = useState<any[]>([])
   const [despesas, setDespesas] = useState<any[]>([])
+  const [reembolsos, setReembolsos] = useState<any[]>([])
 
   const [isDespesaModalOpen, setIsDespesaModalOpen] = useState(false)
   const [newDespesa, setNewDespesa] = useState({
@@ -103,6 +112,7 @@ export default function Finances() {
           setPatients(parsed.patients)
           setFinances(parsed.finances)
           setDespesas(parsed.despesas)
+          setReembolsos(parsed.reembolsos || [])
           setLoading(false)
         }
       } catch (e) {
@@ -114,7 +124,7 @@ export default function Finances() {
       await measurePerformance(`fetchFinances_${year}`, async () => {
         const yearNum = parseInt(year)
 
-        const [patientsRes, financeRes, despesasRes] = await Promise.all([
+        const [patientsRes, financeRes, despesasRes, reembolsosRes] = await Promise.all([
           supabase
             .from('pacientes')
             .select('id, nome, valor_sessao, frequencia_pagamento, dia_pagamento')
@@ -126,6 +136,15 @@ export default function Finances() {
             .eq('usuario_id', user.id)
             .gte('data', `${yearNum}-01-01`)
             .lt('data', `${yearNum + 1}-01-01`),
+          supabase
+            .from('agendamentos')
+            .select(
+              'id, data_hora, valor_total, status_reembolso, codigo_autorizacao, convenio_id, pacientes(nome), convenios(nome)',
+            )
+            .eq('usuario_id', user.id)
+            .eq('tipo_pagamento', 'convenio')
+            .gte('data_hora', `${yearNum}-01-01`)
+            .lt('data_hora', `${yearNum + 1}-01-01`),
         ])
 
         if (patientsRes.error || financeRes.error || despesasRes.error) {
@@ -135,6 +154,7 @@ export default function Finances() {
         if (patientsRes.data) setPatients(patientsRes.data)
         if (financeRes.data) setFinances(financeRes.data)
         if (despesasRes.data) setDespesas(despesasRes.data)
+        if (reembolsosRes.data) setReembolsos(reembolsosRes.data)
 
         localStorage.setItem(
           cacheKey,
@@ -142,6 +162,7 @@ export default function Finances() {
             patients: patientsRes.data || [],
             finances: financeRes.data || [],
             despesas: despesasRes.data || [],
+            reembolsos: reembolsosRes.data || [],
           }),
         )
       })
@@ -157,38 +178,51 @@ export default function Finances() {
     fetchYearData()
   }, [fetchYearData])
 
-  const { currentRecebido, currentDespesas, chartData, patientsSummary } = useMemo(() => {
-    const monthNum = parseInt(month)
-    const monthFin = finances.filter((f) => f.mes === monthNum)
-    const monthDesp = despesas.filter((d) => new Date(d.data).getMonth() + 1 === monthNum)
+  const { currentRecebido, currentDespesas, chartData, patientsSummary, pendenciasReembolso } =
+    useMemo(() => {
+      const monthNum = parseInt(month)
+      const monthFin = finances.filter((f) => f.mes === monthNum)
+      const monthDesp = despesas.filter((d) => new Date(d.data).getMonth() + 1 === monthNum)
 
-    const pSummary = patients
-      .map((p) => {
-        const f = monthFin.find((fin) => fin.paciente_id === p.id)
-        return {
-          ...p,
-          valor_recebido: f ? Number(f.valor_recebido) : 0,
-          valor_a_receber: f ? Number(f.valor_a_receber) : 0,
-        }
-      })
-      .filter((p) => p.valor_recebido > 0 || p.valor_a_receber > 0)
-      .sort((a, b) => b.valor_a_receber - a.valor_a_receber)
+      const pSummary = patients
+        .map((p) => {
+          const f = monthFin.find((fin) => fin.paciente_id === p.id)
+          return {
+            ...p,
+            valor_recebido: f ? Number(f.valor_recebido) : 0,
+            valor_a_receber: f ? Number(f.valor_a_receber) : 0,
+          }
+        })
+        .filter((p) => p.valor_recebido > 0 || p.valor_a_receber > 0)
+        .sort((a, b) => b.valor_a_receber - a.valor_a_receber)
 
-    return {
-      currentRecebido: monthFin.reduce((sum, f) => sum + Number(f.valor_recebido), 0),
-      currentDespesas: monthDesp.reduce((sum, d) => sum + Number(d.valor), 0),
-      chartData: Array.from({ length: 12 }, (_, i) => {
-        const finM = finances.filter((f) => f.mes === i + 1)
-        const despM = despesas.filter((d) => new Date(d.data).getMonth() + 1 === i + 1)
-        return {
-          month: monthNames[i],
-          recebido: finM.reduce((s, f) => s + Number(f.valor_recebido), 0),
-          saida: despM.reduce((s, d) => s + Number(d.valor), 0),
-        }
-      }),
-      patientsSummary: pSummary,
-    }
-  }, [month, finances, despesas, patients])
+      const pendingReembolsos = reembolsos.filter((r) => r.status_reembolso !== 'recebido')
+      const groupedReembolsos = pendingReembolsos.reduce((acc, curr) => {
+        const convName = Array.isArray(curr.convenios)
+          ? curr.convenios[0]?.nome
+          : curr.convenios?.nome || 'Convênio Desconhecido'
+        if (!acc[convName]) acc[convName] = { operadora: convName, total: 0, items: [] }
+        acc[convName].total += Number(curr.valor_total)
+        acc[convName].items.push(curr)
+        return acc
+      }, {} as any)
+
+      return {
+        currentRecebido: monthFin.reduce((sum, f) => sum + Number(f.valor_recebido), 0),
+        currentDespesas: monthDesp.reduce((sum, d) => sum + Number(d.valor), 0),
+        chartData: Array.from({ length: 12 }, (_, i) => {
+          const finM = finances.filter((f) => f.mes === i + 1)
+          const despM = despesas.filter((d) => new Date(d.data).getMonth() + 1 === i + 1)
+          return {
+            month: monthNames[i],
+            recebido: finM.reduce((s, f) => s + Number(f.valor_recebido), 0),
+            saida: despM.reduce((s, d) => s + Number(d.valor), 0),
+          }
+        }),
+        patientsSummary: pSummary,
+        pendenciasReembolso: Object.values(groupedReembolsos),
+      }
+    }, [month, finances, despesas, patients, reembolsos])
 
   const handleAddDespesa = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -207,10 +241,6 @@ export default function Finances() {
     if (!error && data) {
       const newDespesas = [...despesas, data]
       setDespesas(newDespesas)
-
-      const cacheKey = `finances_${user.id}_${year}`
-      localStorage.setItem(cacheKey, JSON.stringify({ patients, finances, despesas: newDespesas }))
-
       setIsDespesaModalOpen(false)
       setNewDespesa({
         descricao: '',
@@ -219,6 +249,18 @@ export default function Finances() {
         categoria: '',
       })
       toast({ title: 'Despesa adicionada!' })
+      fetchYearData()
+    }
+  }
+
+  const handleUpdateReembolso = async (id: string, novoStatus: string) => {
+    const { error } = await supabase
+      .from('agendamentos')
+      .update({ status_reembolso: novoStatus })
+      .eq('id', id)
+    if (!error) {
+      toast({ title: `Status de reembolso atualizado para ${novoStatus}` })
+      fetchYearData()
     }
   }
 
@@ -318,10 +360,11 @@ export default function Finances() {
       </div>
 
       <Tabs defaultValue="fluxo" className="w-full">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 h-auto flex-wrap">
           <TabsTrigger value="fluxo">Fluxo Anual</TabsTrigger>
-          <TabsTrigger value="receitas">Faturamento por Paciente</TabsTrigger>
+          <TabsTrigger value="receitas">Faturamento</TabsTrigger>
           <TabsTrigger value="despesas">Despesas</TabsTrigger>
+          <TabsTrigger value="reembolsos">Pendências de Convênio</TabsTrigger>
         </TabsList>
         <TabsContent value="fluxo">
           <Card className="shadow-sm">
@@ -517,6 +560,90 @@ export default function Finances() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+        <TabsContent value="reembolsos" className="space-y-4">
+          {pendenciasReembolso.length === 0 ? (
+            <Card className="p-10 text-center border-dashed text-slate-500 shadow-none">
+              Nenhuma pendência de convênio para o ano selecionado.
+            </Card>
+          ) : (
+            pendenciasReembolso.map((grupo: any, i: number) => (
+              <Card key={i} className="shadow-sm overflow-hidden border-slate-200">
+                <div className="bg-slate-50/50 p-4 border-b border-slate-100 flex justify-between items-center">
+                  <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary" /> {grupo.operadora}
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">
+                      A Receber
+                    </p>
+                    <p className="text-lg font-bold text-amber-600">{formatBRL(grupo.total)}</p>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data da Sessão</TableHead>
+                      <TableHead>Paciente</TableHead>
+                      <TableHead>Cód. Autorização</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right">Status e Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {grupo.items.map((item: any) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          {new Date(item.data_hora).toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {
+                            (Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes)
+                              ?.nome
+                          }
+                        </TableCell>
+                        <TableCell className="text-slate-500 font-mono text-xs">
+                          {item.codigo_autorizacao || '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatBRL(Number(item.valor_total))}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {item.status_reembolso === 'pendente' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleUpdateReembolso(item.id, 'solicitado')}
+                            >
+                              Marcar como Solicitado
+                            </Button>
+                          )}
+                          {item.status_reembolso === 'solicitado' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="bg-amber-100 text-amber-700 hover:bg-amber-200"
+                              onClick={() => handleUpdateReembolso(item.id, 'recebido')}
+                            >
+                              <CheckCircle className="w-3 h-3 mr-1" /> Recebido
+                            </Button>
+                          )}
+                          <Badge
+                            variant={
+                              item.status_reembolso === 'pendente' ? 'destructive' : 'outline'
+                            }
+                            className="capitalize ml-2"
+                          >
+                            {item.status_reembolso}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            ))
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FileText, Plus, Printer, Trash2, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 export function PrescriptionsList({ pacienteId, clinicInfo, patientName }: any) {
   const { user } = useAuth()
@@ -16,7 +18,9 @@ export function PrescriptionsList({ pacienteId, clinicInfo, patientName }: any) 
   const [open, setOpen] = useState(false)
   const [printData, setPrintData] = useState<any>(null)
 
+  const [docType, setDocType] = useState('receita')
   const [items, setItems] = useState([{ nome: '', instrucoes: '' }])
+  const [laudoText, setLaudoText] = useState('')
 
   const fetchPrescriptions = async () => {
     const { data } = await supabase
@@ -32,26 +36,39 @@ export function PrescriptionsList({ pacienteId, clinicInfo, patientName }: any) 
   }, [pacienteId])
 
   const handleSave = async () => {
-    const validItems = items.filter((i) => i.nome.trim())
-    if (!validItems.length) {
-      toast({ title: 'Adicione ao menos um item', variant: 'destructive' })
-      return
+    let payload = []
+
+    if (docType === 'receita') {
+      const validItems = items.filter((i) => i.nome.trim())
+      if (!validItems.length) {
+        toast({ title: 'Adicione ao menos um item', variant: 'destructive' })
+        return
+      }
+      payload = validItems.map((i) => ({ ...i, tipo: 'receita' }))
+    } else {
+      if (!laudoText.trim()) {
+        toast({ title: 'O texto do laudo não pode ser vazio', variant: 'destructive' })
+        return
+      }
+      payload = [{ tipo: 'laudo', nome: 'Laudo / Relatório Clínico', texto: laudoText }]
     }
+
     await supabase.from('prescricoes').insert({
       usuario_id: user?.id,
       paciente_id: pacienteId,
-      conteudo_json: validItems,
+      conteudo_json: payload,
     })
     setOpen(false)
     setItems([{ nome: '', instrucoes: '' }])
+    setLaudoText('')
     fetchPrescriptions()
-    toast({ title: 'Prescrição emitida com sucesso!' })
+    toast({ title: 'Documento emitido com sucesso e disponível no portal!' })
   }
 
   const handleDelete = async (id: string) => {
     await supabase.from('prescricoes').delete().eq('id', id)
     fetchPrescriptions()
-    toast({ title: 'Prescrição removida' })
+    toast({ title: 'Documento removido' })
   }
 
   const handlePrint = (p: any) => {
@@ -59,29 +76,35 @@ export function PrescriptionsList({ pacienteId, clinicInfo, patientName }: any) 
     setTimeout(() => window.print(), 300)
   }
 
+  const getDocSummary = (p: any) => {
+    const firstItem = p.conteudo_json[0]
+    if (firstItem?.tipo === 'laudo') return 'Laudo / Relatório Clínico'
+    return `${p.conteudo_json.length} item(s) prescrito(s)`
+  }
+
   return (
     <div className="space-y-6 animate-fade-in print:hidden">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
         <div>
           <h3 className="text-lg font-bold text-emerald-900 flex items-center gap-2">
-            <FileText className="w-5 h-5" /> Prescrições e Pedidos Digitais
+            <FileText className="w-5 h-5" /> Laudos e Prescrições Digitais
           </h3>
           <p className="text-sm text-emerald-700 mt-1">
-            Crie receitas com validação por QR Code nativa.
+            Crie receitas e laudos com validação por QR Code nativa, enviados direto para o portal.
           </p>
         </div>
         <Button
           onClick={() => setOpen(true)}
           className="gap-2 shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white"
         >
-          <Plus className="w-4 h-4" /> Nova Prescrição
+          <Plus className="w-4 h-4" /> Novo Documento
         </Button>
       </div>
 
       {prescriptions.length === 0 ? (
         <div className="text-center p-10 border border-dashed border-slate-300 rounded-xl bg-white shadow-sm">
           <ShieldCheck className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500 font-medium">Nenhuma prescrição digital emitida.</p>
+          <p className="text-slate-500 font-medium">Nenhum documento digital emitido.</p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -99,9 +122,7 @@ export function PrescriptionsList({ pacienteId, clinicInfo, patientName }: any) 
                     <p className="font-bold text-slate-800">
                       Emissão: {new Date(p.data_emissao).toLocaleDateString('pt-BR')}
                     </p>
-                    <p className="text-sm font-medium text-slate-500 mt-0.5">
-                      {p.conteudo_json.length} item(s) prescrito(s)
-                    </p>
+                    <p className="text-sm font-medium text-slate-500 mt-0.5">{getDocSummary(p)}</p>
                   </div>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
@@ -130,63 +151,95 @@ export function PrescriptionsList({ pacienteId, clinicInfo, patientName }: any) 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl">Emitir Prescrição</DialogTitle>
+            <DialogTitle className="text-xl">Emitir Documento</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto px-1">
-            {items.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex gap-3 items-start bg-slate-50 p-4 rounded-lg border border-slate-200 relative group"
-              >
-                <div className="flex-1 space-y-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-slate-500 uppercase tracking-wider">
-                      Medicamento ou Exame
-                    </Label>
-                    <Input
-                      placeholder="Ex: Amoxicilina 500mg"
-                      className="bg-white font-medium"
-                      value={item.nome}
-                      onChange={(e) => {
-                        const n = [...items]
-                        n[idx].nome = e.target.value
-                        setItems(n)
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-slate-500 uppercase tracking-wider">
-                      Instruções de Uso (Opcional)
-                    </Label>
-                    <Input
-                      placeholder="Ex: Tomar 1 comprimido de 8 em 8 horas..."
-                      className="bg-white"
-                      value={item.instrucoes}
-                      onChange={(e) => {
-                        const n = [...items]
-                        n[idx].instrucoes = e.target.value
-                        setItems(n)
-                      }}
-                    />
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 text-slate-400 hover:text-red-500"
-                  onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+          <div className="py-4 space-y-6">
+            <RadioGroup value={docType} onValueChange={setDocType} className="flex gap-4">
+              <div className="flex items-center space-x-2 border p-3 rounded-lg flex-1 cursor-pointer hover:bg-slate-50 transition-colors">
+                <RadioGroupItem value="receita" id="r1" />
+                <Label htmlFor="r1" className="cursor-pointer font-medium">
+                  Prescrição / Receita
+                </Label>
               </div>
-            ))}
-            <Button
-              variant="outline"
-              className="w-full border-dashed border-2 py-6 text-slate-500 hover:text-primary"
-              onClick={() => setItems([...items, { nome: '', instrucoes: '' }])}
-            >
-              <Plus className="w-4 h-4 mr-2" /> Adicionar Item
-            </Button>
+              <div className="flex items-center space-x-2 border p-3 rounded-lg flex-1 cursor-pointer hover:bg-slate-50 transition-colors">
+                <RadioGroupItem value="laudo" id="r2" />
+                <Label htmlFor="r2" className="cursor-pointer font-medium">
+                  Laudo / Relatório
+                </Label>
+              </div>
+            </RadioGroup>
+
+            <div className="max-h-[50vh] overflow-y-auto px-1 space-y-4">
+              {docType === 'receita' ? (
+                <>
+                  {items.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex gap-3 items-start bg-slate-50 p-4 rounded-lg border border-slate-200 relative group"
+                    >
+                      <div className="flex-1 space-y-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500 uppercase tracking-wider">
+                            Medicamento ou Exame
+                          </Label>
+                          <Input
+                            placeholder="Ex: Amoxicilina 500mg"
+                            className="bg-white font-medium"
+                            value={item.nome}
+                            onChange={(e) => {
+                              const n = [...items]
+                              n[idx].nome = e.target.value
+                              setItems(n)
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500 uppercase tracking-wider">
+                            Instruções de Uso (Opcional)
+                          </Label>
+                          <Input
+                            placeholder="Ex: Tomar 1 comprimido de 8 em 8 horas..."
+                            className="bg-white"
+                            value={item.instrucoes}
+                            onChange={(e) => {
+                              const n = [...items]
+                              n[idx].instrucoes = e.target.value
+                              setItems(n)
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 text-slate-400 hover:text-red-500"
+                        onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    className="w-full border-dashed border-2 py-6 text-slate-500 hover:text-primary"
+                    onClick={() => setItems([...items, { nome: '', instrucoes: '' }])}
+                  >
+                    <Plus className="w-4 h-4 mr-2" /> Adicionar Item
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Corpo do Relatório/Laudo</Label>
+                  <Textarea
+                    value={laudoText}
+                    onChange={(e) => setLaudoText(e.target.value)}
+                    placeholder="Escreva o parecer clínico aqui..."
+                    className="min-h-[300px] resize-y bg-white"
+                  />
+                </div>
+              )}
+            </div>
+
             <Button
               className="w-full h-12 text-base shadow-sm mt-4 bg-emerald-600 hover:bg-emerald-700"
               onClick={handleSave}
@@ -205,7 +258,9 @@ export function PrescriptionsList({ pacienteId, clinicInfo, patientName }: any) 
               <h1 className="text-3xl font-bold uppercase tracking-wider text-slate-900">
                 {clinicInfo?.nome_consultorio || 'Consultório Clínico'}
               </h1>
-              <p className="text-lg text-slate-600 font-medium mt-1">Receituário Digital</p>
+              <p className="text-lg text-slate-600 font-medium mt-1">
+                Documento Digital Verificado
+              </p>
             </div>
             <ShieldCheck className="w-12 h-12 text-slate-300" />
           </div>
@@ -226,16 +281,22 @@ export function PrescriptionsList({ pacienteId, clinicInfo, patientName }: any) 
           </div>
 
           <div className="space-y-8 min-h-[500px]">
-            {printData.conteudo_json.map((item: any, i: number) => (
-              <div key={i} className="pl-6 border-l-4 border-slate-300">
-                <p className="text-2xl font-bold text-slate-900 leading-tight">{item.nome}</p>
-                {item.instrucoes && (
-                  <p className="text-xl text-slate-700 mt-2 leading-relaxed">
-                    <strong>Uso:</strong> {item.instrucoes}
-                  </p>
-                )}
+            {printData.conteudo_json[0]?.tipo === 'laudo' ? (
+              <div className="whitespace-pre-wrap text-lg leading-relaxed text-slate-800 text-justify">
+                {printData.conteudo_json[0].texto}
               </div>
-            ))}
+            ) : (
+              printData.conteudo_json.map((item: any, i: number) => (
+                <div key={i} className="pl-6 border-l-4 border-slate-300">
+                  <p className="text-2xl font-bold text-slate-900 leading-tight">{item.nome}</p>
+                  {item.instrucoes && (
+                    <p className="text-xl text-slate-700 mt-2 leading-relaxed">
+                      <strong>Uso:</strong> {item.instrucoes}
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
           </div>
 
           <div className="absolute bottom-16 left-16 right-16 pt-8 border-t-2 border-slate-300 flex justify-between items-end">

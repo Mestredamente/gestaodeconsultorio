@@ -16,6 +16,7 @@ import {
   Ban,
   CheckCircle,
   Video,
+  ShieldCheck,
 } from 'lucide-react'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
@@ -139,6 +140,7 @@ export default function PublicPortal() {
     )
 
   const showLegalTab = data.texto_contrato || data.politica_cancelamento
+  const hasDocuments = data.documentos && data.documentos.length > 0
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 animate-fade-in">
@@ -224,6 +226,11 @@ export default function PublicPortal() {
             <TabsTrigger value="historico" className="gap-2 py-2">
               <Activity className="w-4 h-4" /> Meu Histórico
             </TabsTrigger>
+            {hasDocuments && (
+              <TabsTrigger value="documentos" className="gap-2 py-2">
+                <FileText className="w-4 h-4" /> Laudos e Prescrições
+              </TabsTrigger>
+            )}
             {showLegalTab && (
               <TabsTrigger value="juridico" className="gap-2 py-2 relative">
                 <Scale className="w-4 h-4" /> Contratos e Políticas
@@ -399,6 +406,44 @@ export default function PublicPortal() {
               </div>
             )}
           </TabsContent>
+
+          {hasDocuments && (
+            <TabsContent value="documentos" className="space-y-4">
+              {data.documentos.map((doc: any) => (
+                <Card key={doc.id} className="shadow-sm border-slate-200">
+                  <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-emerald-50 text-emerald-600 rounded-full">
+                        <ShieldCheck className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900">
+                          {doc.conteudo_json[0]?.tipo === 'laudo'
+                            ? 'Laudo / Relatório Clínico'
+                            : 'Prescrição / Receita'}
+                        </h3>
+                        <p className="text-sm text-slate-500 font-medium mt-0.5">
+                          Emitido em {new Date(doc.data_emissao).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() =>
+                        window.open(
+                          `${window.location.origin}/validar-prescricao/${doc.hash_verificacao}`,
+                          '_blank',
+                        )
+                      }
+                    >
+                      <ExternalLink className="w-4 h-4" /> Visualizar Documento
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+          )}
 
           {showLegalTab && (
             <TabsContent value="juridico" className="space-y-6">

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,11 +43,27 @@ const formSchema = z.object({
     .optional()
     .nullable()
     .transform((v) => (v ? Number(v) : null)),
+  convenio_id: z.string().optional().nullable(),
+  numero_carteira: z.string().optional().nullable(),
 })
 
 export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
+  const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [convenios, setConvenios] = useState<any[]>([])
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('convenios' as any)
+        .select('*')
+        .eq('usuario_id', user.id)
+        .then(({ data }) => {
+          if (data) setConvenios(data)
+        })
+    }
+  }, [user])
 
   const {
     register,
@@ -75,6 +92,8 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
       valor_sessao: patient?.valor_sessao ? String(patient.valor_sessao) : '',
       frequencia_pagamento: patient?.frequencia_pagamento || 'sessão',
       dia_pagamento: patient?.dia_pagamento ? String(patient.dia_pagamento) : '',
+      convenio_id: patient?.convenio_id || '',
+      numero_carteira: patient?.numero_carteira || '',
     },
   })
 
@@ -109,6 +128,7 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
   )
 
   const freqPagamento = watch('frequencia_pagamento')
+  const convId = watch('convenio_id')
 
   return (
     <form
@@ -125,10 +145,10 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
 
       <div className="pt-2 border-t border-slate-100">
         <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
-          Pagamento
+          Pagamento e Convênio
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <Field id="valor_sessao" label="Valor da Sessão (R$)" type="number" step="0.01" />
+          <Field id="valor_sessao" label="Valor Base Sessão (R$)" type="number" step="0.01" />
           <div className="space-y-1.5">
             <Label className="text-slate-600">Frequência</Label>
             <Select
@@ -146,6 +166,27 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
             </Select>
           </div>
           <Field id="dia_pagamento" label="Dia de Vencimento" type="number" min="1" max="31" />
+          {convenios.length > 0 && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-slate-600">Convênio</Label>
+                <Select value={convId || ''} onValueChange={(val) => setValue('convenio_id', val)}>
+                  <SelectTrigger className="bg-slate-50">
+                    <SelectValue placeholder="Opcional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhum (Particular)</SelectItem>
+                    {convenios.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Field id="numero_carteira" label="Nº da Carteirinha" />
+            </>
+          )}
         </div>
       </div>
 
@@ -163,16 +204,6 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
           <Field id="bairro" label="Bairro" />
           <Field id="cidade" label="Cidade" />
           <Field id="estado" label="Estado" />
-        </div>
-      </div>
-
-      <div className="pt-2 border-t border-slate-100">
-        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
-          Contato de Emergência
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <Field id="contato_emergencia_nome" label="Nome do Contato" />
-          <Field id="contato_emergencia_telefone" label="Telefone do Contato" />
         </div>
       </div>
 

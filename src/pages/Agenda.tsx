@@ -66,7 +66,9 @@ export default function Agenda() {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [patients, setPatients] = useState<any[]>([])
   const [especialidades, setEspecialidades] = useState<string[]>([])
+  const [convenios, setConvenios] = useState<any[]>([])
   const [clinicName, setClinicName] = useState('')
+  const [usrSettings, setUsrSettings] = useState<any>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -75,6 +77,9 @@ export default function Agenda() {
     especialidade: '',
     valor_total: '0',
     recorrencia: 'único',
+    tipo_pagamento: 'particular',
+    convenio_id: '',
+    codigo_autorizacao: '',
   })
 
   const { toast } = useToast()
@@ -99,7 +104,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, especialidade, valor_total, status_nota_fiscal, paciente_id, justificativa_falta, pacientes (id, nome, valor_sessao)`,
+        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, pacientes (id, nome, valor_sessao)`,
       )
       .eq('usuario_id', user.id)
       .gte('data_hora', s.toISOString())
@@ -134,23 +139,29 @@ export default function Agenda() {
 
   const fetchInitialData = useCallback(async () => {
     if (!user) return
-    const [pts, usr] = await Promise.all([
+    const [pts, usr, cvs] = await Promise.all([
       supabase
         .from('pacientes')
-        .select('id, nome, valor_sessao')
+        .select('id, nome, valor_sessao, convenio_id')
         .eq('usuario_id', user.id)
         .order('nome'),
       supabase
         .from('usuarios')
-        .select('especialidades_disponiveis, nome_consultorio')
+        .select('especialidades_disponiveis, nome_consultorio, whatsapp_confirmacao_ativa')
         .eq('id', user.id)
         .single(),
+      supabase
+        .from('convenios' as any)
+        .select('*')
+        .eq('usuario_id', user.id),
     ])
     if (pts.data) setPatients(pts.data)
     if (usr.data) {
       setEspecialidades(usr.data.especialidades_disponiveis || [])
       setClinicName(usr.data.nome_consultorio || '')
+      setUsrSettings(usr.data)
     }
+    if (cvs.data) setConvenios(cvs.data)
   }, [user])
 
   useEffect(() => {
@@ -171,23 +182,15 @@ export default function Agenda() {
   }, [user, fetchAppointments, fetchInitialData])
 
   const nextPeriod = () => {
-    if (view === 'monthly') {
-      setCurrentDate(addMonths(currentDate, 1))
-    } else if (view === 'weekly') {
-      setCurrentDate(addDays(currentDate, 7))
-    } else {
-      setCurrentDate(addDays(currentDate, 1))
-    }
+    if (view === 'monthly') setCurrentDate(addMonths(currentDate, 1))
+    else if (view === 'weekly') setCurrentDate(addDays(currentDate, 7))
+    else setCurrentDate(addDays(currentDate, 1))
   }
 
   const prevPeriod = () => {
-    if (view === 'monthly') {
-      setCurrentDate(subMonths(currentDate, 1))
-    } else if (view === 'weekly') {
-      setCurrentDate(subDays(currentDate, 7))
-    } else {
-      setCurrentDate(subDays(currentDate, 1))
-    }
+    if (view === 'monthly') setCurrentDate(subMonths(currentDate, 1))
+    else if (view === 'weekly') setCurrentDate(subDays(currentDate, 7))
+    else setCurrentDate(subDays(currentDate, 1))
   }
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
@@ -209,13 +212,9 @@ export default function Agenda() {
 
     for (let i = 0; i < count; i++) {
       let nextDate = new Date(baseDate)
-      if (formData.recorrencia === 'semanal') {
-        nextDate.setDate(baseDate.getDate() + i * 7)
-      } else if (formData.recorrencia === 'quinzenal') {
-        nextDate.setDate(baseDate.getDate() + i * 14)
-      } else if (formData.recorrencia === 'mensal') {
-        nextDate.setMonth(baseDate.getMonth() + i)
-      }
+      if (formData.recorrencia === 'semanal') nextDate.setDate(baseDate.getDate() + i * 7)
+      else if (formData.recorrencia === 'quinzenal') nextDate.setDate(baseDate.getDate() + i * 14)
+      else if (formData.recorrencia === 'mensal') nextDate.setMonth(baseDate.getMonth() + i)
 
       appointmentsToInsert.push({
         usuario_id: user.id,
@@ -224,18 +223,24 @@ export default function Agenda() {
         especialidade: formData.especialidade || null,
         valor_total: Number(formData.valor_total),
         status: 'agendado',
+        tipo_pagamento: formData.tipo_pagamento,
+        convenio_id: formData.tipo_pagamento === 'convenio' ? formData.convenio_id : null,
+        codigo_autorizacao:
+          formData.tipo_pagamento === 'convenio' ? formData.codigo_autorizacao : null,
+        status_reembolso: formData.tipo_pagamento === 'convenio' ? 'pendente' : 'n/a',
       })
     }
 
     const { data: inserted, error } = await supabase
       .from('agendamentos')
-      .insert(appointmentsToInsert)
+      .insert(appointmentsToInsert as any)
       .select()
 
     if (error)
       toast({ title: 'Erro ao agendar', description: error.message, variant: 'destructive' })
     else {
-      if (inserted && inserted.length > 0) {
+      // Confirmação Automática WhatsApp Trigger
+      if (usrSettings?.whatsapp_confirmacao_ativa && inserted && inserted.length > 0) {
         supabase.functions.invoke('enviar_lembrete_consulta', {
           body: { agendamento_id: inserted[0].id },
         })
@@ -251,6 +256,9 @@ export default function Agenda() {
         especialidade: '',
         valor_total: '0',
         recorrencia: 'único',
+        tipo_pagamento: 'particular',
+        convenio_id: '',
+        codigo_autorizacao: '',
       })
     }
     setIsSubmitting(false)
@@ -262,7 +270,7 @@ export default function Agenda() {
     await supabase.from('agendamentos').update({ status: newStatus }).eq('id', apt.id)
     toast({ title: `Status atualizado: ${newStatus}` })
 
-    if (newStatus === 'compareceu' && user) {
+    if (newStatus === 'compareceu' && user && apt.tipo_pagamento !== 'convenio') {
       const now = new Date(apt.data_hora)
       const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
       const valorToAdd = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
@@ -365,6 +373,14 @@ export default function Agenda() {
                 {apt.especialidade && (
                   <Badge variant="secondary" className="text-xs">
                     {apt.especialidade}
+                  </Badge>
+                )}
+                {apt.tipo_pagamento === 'convenio' && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                  >
+                    Convênio
                   </Badge>
                 )}
               </div>
@@ -576,100 +592,161 @@ export default function Agenda() {
       )}
 
       <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Agendamento</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreateAppointment} className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label>Paciente</Label>
-              <Select
-                value={formData.paciente_id}
-                onValueChange={(v) =>
-                  setFormData({
-                    ...formData,
-                    paciente_id: v,
-                    valor_total: patients.find((p) => p.id === v)?.valor_sessao?.toString() || '0',
-                  })
-                }
-                required
-              >
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {patients.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Data e Hora</Label>
-              <Input
-                type="datetime-local"
-                required
-                value={formData.data_hora}
-                onChange={(e) => setFormData({ ...formData, data_hora: e.target.value })}
-                className="bg-white"
-              />
-            </div>
-            {especialidades.length > 0 && (
-              <div className="space-y-2">
-                <Label>Especialidade</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Paciente</Label>
                 <Select
-                  value={formData.especialidade}
-                  onValueChange={(v) => setFormData({ ...formData, especialidade: v })}
+                  value={formData.paciente_id}
+                  onValueChange={(v) => {
+                    const p = patients.find((x) => x.id === v)
+                    setFormData({
+                      ...formData,
+                      paciente_id: v,
+                      valor_total: p?.valor_sessao?.toString() || '0',
+                      tipo_pagamento: p?.convenio_id ? 'convenio' : 'particular',
+                      convenio_id: p?.convenio_id || '',
+                    })
+                  }}
+                  required
                 >
                   <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Opcional..." />
+                    <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {especialidades.map((esp) => (
-                      <SelectItem key={esp} value={esp}>
-                        {esp}
+                    {patients.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
-            <div className="space-y-2">
-              <Label>Recorrência (Frequência Fixa)</Label>
-              <Select
-                value={formData.recorrencia}
-                onValueChange={(v) => setFormData({ ...formData, recorrencia: v })}
-              >
-                <SelectTrigger className="bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="único">Único</SelectItem>
-                  <SelectItem value="semanal">Semanal (Próximas 12 semanas)</SelectItem>
-                  <SelectItem value="quinzenal">Quinzenal (Próximas 6 sessões)</SelectItem>
-                  <SelectItem value="mensal">Mensal (Próximos 3 meses)</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Label>Data e Hora</Label>
+                <Input
+                  type="datetime-local"
+                  required
+                  value={formData.data_hora}
+                  onChange={(e) => setFormData({ ...formData, data_hora: e.target.value })}
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Recorrência (Frequência Fixa)</Label>
+                <Select
+                  value={formData.recorrencia}
+                  onValueChange={(v) => setFormData({ ...formData, recorrencia: v })}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="único">Único</SelectItem>
+                    <SelectItem value="semanal">Semanal (Próximas 12 semanas)</SelectItem>
+                    <SelectItem value="quinzenal">Quinzenal (Próximas 6 sessões)</SelectItem>
+                    <SelectItem value="mensal">Mensal (Próximos 3 meses)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {especialidades.length > 0 && (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Especialidade</Label>
+                  <Select
+                    value={formData.especialidade}
+                    onValueChange={(v) => setFormData({ ...formData, especialidade: v })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Opcional..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {especialidades.map((esp) => (
+                        <SelectItem key={esp} value={esp}>
+                          {esp}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>Valor da Sessão (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.valor_total}
-                onChange={(e) => setFormData({ ...formData, valor_total: e.target.value })}
-                className="bg-white"
-              />
+
+            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg space-y-4">
+              <h4 className="font-semibold text-slate-800 text-sm">Cobrança</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tipo de Pagamento</Label>
+                  <Select
+                    value={formData.tipo_pagamento}
+                    onValueChange={(v) => setFormData({ ...formData, tipo_pagamento: v })}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="particular">Particular</SelectItem>
+                      <SelectItem value="convenio">Convênio</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Valor da Sessão (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.valor_total}
+                    onChange={(e) => setFormData({ ...formData, valor_total: e.target.value })}
+                    className="bg-white"
+                  />
+                </div>
+                {formData.tipo_pagamento === 'convenio' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Operadora do Convênio</Label>
+                      <Select
+                        value={formData.convenio_id}
+                        onValueChange={(v) => setFormData({ ...formData, convenio_id: v })}
+                        required={formData.tipo_pagamento === 'convenio'}
+                      >
+                        <SelectTrigger className="bg-white">
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {convenios.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Código de Autorização</Label>
+                      <Input
+                        value={formData.codigo_autorizacao}
+                        onChange={(e) =>
+                          setFormData({ ...formData, codigo_autorizacao: e.target.value })
+                        }
+                        className="bg-white"
+                        placeholder="Opcional"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
+
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setIsNewModalOpen(false)}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Salvando...' : 'Salvar'}
+                {isSubmitting ? 'Salvando...' : 'Salvar Agendamento'}
               </Button>
             </DialogFooter>
           </form>

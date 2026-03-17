@@ -23,6 +23,8 @@ import {
   Scale,
   Calendar,
   UserRound,
+  MessageCircle,
+  Building2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -44,6 +46,8 @@ export default function Settings() {
     texto_contrato: '',
     politica_cancelamento: '',
     agendamento_publico_ativo: false,
+    whatsapp_confirmacao_ativa: false,
+    template_confirmacao: 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
   })
 
   const [questions, setQuestions] = useState<any[]>([])
@@ -56,6 +60,9 @@ export default function Settings() {
   const [metaConsultas, setMetaConsultas] = useState(50)
   const [syncCals, setSyncCals] = useState({ google: false, outlook: false })
   const [userTemplates, setUserTemplates] = useState<any[]>([])
+
+  const [convenios, setConvenios] = useState<any[]>([])
+  const [novoConvenio, setNewConvenio] = useState({ nome: '', registro_ans: '', contato: '' })
 
   useEffect(() => {
     if (user) {
@@ -75,6 +82,10 @@ export default function Settings() {
               texto_contrato: data.texto_contrato || '',
               politica_cancelamento: data.politica_cancelamento || '',
               agendamento_publico_ativo: data.agendamento_publico_ativo || false,
+              whatsapp_confirmacao_ativa: (data as any).whatsapp_confirmacao_ativa || false,
+              template_confirmacao:
+                (data as any).template_confirmacao ||
+                'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
             })
             setQuestions(data.anamnese_template || [])
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
@@ -92,8 +103,19 @@ export default function Settings() {
         .then(({ data }) => {
           if (data) setUserTemplates(data)
         })
+
+      fetchConvenios()
     }
   }, [user])
+
+  const fetchConvenios = async () => {
+    if (!user) return
+    const { data } = await supabase
+      .from('convenios' as any)
+      .select('*')
+      .eq('usuario_id', user.id)
+    if (data) setConvenios(data)
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -108,7 +130,7 @@ export default function Settings() {
       meta_mensal_consultas: metaConsultas,
       sync_calendarios: syncCals,
     }
-    const { error } = await supabase.from('usuarios').upsert(payload)
+    const { error } = await supabase.from('usuarios').upsert(payload as any)
     setLoading(false)
     if (error)
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
@@ -148,8 +170,34 @@ export default function Settings() {
     }
   }
 
+  const handleAddConvenio = async () => {
+    if (!novoConvenio.nome.trim()) return
+    const { error } = await supabase.from('convenios' as any).insert({
+      usuario_id: user?.id,
+      nome: novoConvenio.nome,
+      registro_ans: novoConvenio.registro_ans,
+      contato: novoConvenio.contato,
+    })
+    if (!error) {
+      setNewConvenio({ nome: '', registro_ans: '', contato: '' })
+      fetchConvenios()
+      toast({ title: 'Convênio adicionado!' })
+    } else {
+      toast({ title: 'Erro ao adicionar convênio', variant: 'destructive' })
+    }
+  }
+
+  const handleDeleteConvenio = async (id: string) => {
+    await supabase
+      .from('convenios' as any)
+      .delete()
+      .eq('id', id)
+    fetchConvenios()
+    toast({ title: 'Convênio removido!' })
+  }
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in-up pb-10">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up pb-10">
       <h1 className="text-2xl font-bold tracking-tight text-slate-900">Configurações Gerais</h1>
       <form onSubmit={handleSave}>
         <Tabs
@@ -159,37 +207,43 @@ export default function Settings() {
           <TabsList className="w-full flex flex-wrap justify-start rounded-none border-b border-slate-100 bg-slate-50/50 p-0 h-auto">
             <TabsTrigger
               value="perfil"
-              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
             >
-              <UserRound className="w-4 h-4" /> Perfil do Profissional
+              <UserRound className="w-4 h-4" /> Perfil
+            </TabsTrigger>
+            <TabsTrigger
+              value="whatsapp"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
+            >
+              <MessageCircle className="w-4 h-4" /> WhatsApp
+            </TabsTrigger>
+            <TabsTrigger
+              value="convenios"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
+            >
+              <Building2 className="w-4 h-4" /> Convênios
             </TabsTrigger>
             <TabsTrigger
               value="especialidades"
-              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
               Especialidades
             </TabsTrigger>
             <TabsTrigger
               value="juridico"
-              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
               Jurídico
             </TabsTrigger>
             <TabsTrigger
               value="modelos"
-              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
               Modelos
             </TabsTrigger>
             <TabsTrigger
-              value="anamnese"
-              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
-            >
-              Anamnese
-            </TabsTrigger>
-            <TabsTrigger
               value="integracoes"
-              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
               Integrações
             </TabsTrigger>
@@ -280,21 +334,184 @@ export default function Settings() {
                 </div>
               </div>
             </div>
+          </TabsContent>
 
-            <div className="space-y-2 pt-4 border-t border-slate-100">
-              <Label>Template de Cobrança WhatsApp</Label>
-              <p className="text-xs text-slate-500 mb-1">
-                Variáveis permitidas:{' '}
-                <span className="font-mono bg-slate-100 px-1 rounded">[Nome]</span>,{' '}
-                <span className="font-mono bg-slate-100 px-1 rounded">[valor]</span>,{' '}
-                <span className="font-mono bg-slate-100 px-1 rounded">[periodo]</span>,{' '}
-                <span className="font-mono bg-slate-100 px-1 rounded">[chave_pix]</span>
+          <TabsContent value="whatsapp" className="p-6 m-0 space-y-6">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-emerald-500" /> Integração WhatsApp e
+                WhatsApp Business
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Configure as mensagens automáticas enviadas para os pacientes.
               </p>
-              <Textarea
-                value={formData.template_cobranca}
-                onChange={(e) => setFormData({ ...formData, template_cobranca: e.target.value })}
-                className="min-h-[100px]"
-              />
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold text-slate-800">
+                      Confirmação Automática de Agendamento
+                    </Label>
+                    <p className="text-sm text-slate-500">
+                      Envia uma mensagem assim que a consulta é marcada.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.whatsapp_confirmacao_ativa}
+                    onCheckedChange={(v) =>
+                      setFormData({ ...formData, whatsapp_confirmacao_ativa: v })
+                    }
+                  />
+                </div>
+                {formData.whatsapp_confirmacao_ativa && (
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    <Label>Template de Confirmação</Label>
+                    <Textarea
+                      value={formData.template_confirmacao}
+                      onChange={(e) =>
+                        setFormData({ ...formData, template_confirmacao: e.target.value })
+                      }
+                      rows={3}
+                      className="bg-white"
+                    />
+                    <p className="text-xs text-slate-500">
+                      Variáveis: [Nome], [data], [hora], [link_portal]
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold text-slate-800">
+                      Lembretes de Sessões (24h antes)
+                    </Label>
+                    <p className="text-sm text-slate-500">
+                      Envia um lembrete automático 1 dia antes da consulta.
+                    </p>
+                  </div>
+                  <Switch checked={lembreteAtivo} onCheckedChange={setLembreteAtivo} />
+                </div>
+                {lembreteAtivo && (
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    <Label>Template de Lembrete</Label>
+                    <Textarea
+                      value={templateLembrete}
+                      onChange={(e) => setTemplateLembrete(e.target.value)}
+                      rows={3}
+                      className="bg-white"
+                    />
+                    <p className="text-xs text-slate-500">
+                      Variáveis: [Nome], [data], [hora], [link_portal]
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
+                <div>
+                  <Label className="text-base font-semibold text-slate-800">
+                    Cobrança de Valores Pendentes
+                  </Label>
+                  <p className="text-sm text-slate-500 mb-3">
+                    Template utilizado ao acionar a cobrança manual na aba do paciente.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Textarea
+                    value={formData.template_cobranca}
+                    onChange={(e) =>
+                      setFormData({ ...formData, template_cobranca: e.target.value })
+                    }
+                    rows={3}
+                    className="bg-white"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Variáveis: [Nome], [valor], [periodo], [chave_pix]
+                  </p>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="convenios" className="p-6 m-0 space-y-6">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" /> Operadoras de Saúde e Convênios
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Cadastre os convênios aceitos na clínica para vinculá-los aos agendamentos.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
+              <div className="space-y-1 w-full flex-1">
+                <Label>Nome do Convênio</Label>
+                <Input
+                  value={novoConvenio.nome}
+                  onChange={(e) => setNewConvenio({ ...novoConvenio, nome: e.target.value })}
+                  placeholder="Ex: SulAmérica, Bradesco Saúde..."
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-1 w-full sm:w-48">
+                <Label>Registro ANS</Label>
+                <Input
+                  value={novoConvenio.registro_ans}
+                  onChange={(e) =>
+                    setNewConvenio({ ...novoConvenio, registro_ans: e.target.value })
+                  }
+                  placeholder="Opcional"
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-1 w-full sm:w-48">
+                <Label>Contato/Portal</Label>
+                <Input
+                  value={novoConvenio.contato}
+                  onChange={(e) => setNewConvenio({ ...novoConvenio, contato: e.target.value })}
+                  placeholder="Telefone ou site"
+                  className="bg-white"
+                />
+              </div>
+              <Button type="button" onClick={handleAddConvenio} className="w-full sm:w-auto">
+                <Plus className="w-4 h-4 mr-2" /> Adicionar
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {convenios.length === 0 && (
+                <div className="text-center py-6 text-slate-500 border border-dashed rounded-lg">
+                  Nenhum convênio cadastrado.
+                </div>
+              )}
+              {convenios.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex justify-between items-center bg-white px-4 py-3 rounded-md border border-slate-200 shadow-sm"
+                >
+                  <div>
+                    <p className="font-semibold text-slate-800">{c.nome}</p>
+                    <p className="text-xs text-slate-500">
+                      {c.registro_ans && `ANS: ${c.registro_ans}`}
+                      {c.registro_ans && c.contato && ' | '}
+                      {c.contato && `Contato: ${c.contato}`}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    onClick={() => handleDeleteConvenio(c.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
             </div>
           </TabsContent>
 
@@ -395,77 +612,6 @@ export default function Settings() {
             <TemplatesManager />
           </TabsContent>
 
-          <TabsContent value="anamnese" className="p-6 m-0 space-y-5">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-              <div>
-                <h3 className="font-semibold text-slate-900">Campos do Formulário Público</h3>
-                <p className="text-sm text-slate-500">
-                  Perguntas que os pacientes responderão antes da consulta.
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={() =>
-                  setQuestions([
-                    ...questions,
-                    { id: Date.now().toString(), label: '', type: 'text' },
-                  ])
-                }
-                size="sm"
-              >
-                Adicionar Pergunta
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {questions.map((q, idx) => (
-                <div
-                  key={q.id}
-                  className="flex flex-col sm:flex-row gap-3 items-start sm:items-end bg-slate-50 p-3 rounded-lg border border-slate-100"
-                >
-                  <div className="flex-1 w-full space-y-1">
-                    <Label>Pergunta</Label>
-                    <Input
-                      value={q.label}
-                      onChange={(e) => {
-                        const n = [...questions]
-                        n[idx].label = e.target.value
-                        setQuestions(n)
-                      }}
-                    />
-                  </div>
-                  <div className="w-full sm:w-40 space-y-1">
-                    <Label>Tipo</Label>
-                    <Select
-                      value={q.type}
-                      onValueChange={(val) => {
-                        const n = [...questions]
-                        n[idx].type = val
-                        setQuestions(n)
-                      }}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="text">Texto Curto</SelectItem>
-                        <SelectItem value="textarea">Texto Longo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-red-500 bg-white"
-                    onClick={() => setQuestions(questions.filter((_, i) => i !== idx))}
-                    type="button"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-
           <TabsContent value="integracoes" className="p-6 m-0 space-y-6">
             <div>
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -531,27 +677,6 @@ export default function Settings() {
                 />
               </div>
             </div>
-            <div className="pt-6 border-t border-slate-100">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
-                <div>
-                  <Label className="text-base">Lembretes WhatsApp Automáticos</Label>
-                  <p className="text-sm text-slate-500">
-                    Envia WhatsApp 24h antes da consulta agendada.
-                  </p>
-                </div>
-                <Switch checked={lembreteAtivo} onCheckedChange={setLembreteAtivo} />
-              </div>
-              {lembreteAtivo && (
-                <div className="space-y-2 pt-4 pl-1">
-                  <Label>Mensagem do Lembrete</Label>
-                  <Textarea
-                    value={templateLembrete}
-                    onChange={(e) => setTemplateLembrete(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              )}
-            </div>
           </TabsContent>
 
           <div className="p-6 pt-0 flex flex-col sm:flex-row gap-4 mt-4">
@@ -567,7 +692,7 @@ export default function Settings() {
                 toast({ title: 'Link de agendamento copiado!' })
               }}
             >
-              <Copy className="w-4 h-4" /> Link de Agendamento
+              <Copy className="w-4 h-4" /> Copiar Link de Agendamento Público
             </Button>
           </div>
         </Tabs>
