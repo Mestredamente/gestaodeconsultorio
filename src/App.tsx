@@ -50,6 +50,7 @@ const AppRoutes = () => (
     <Route path="/portal/:hash" element={<PublicPortal />} />
     <Route path="/sessao/:hash" element={<PublicTelehealth />} />
     <Route path="/validar-prescricao/:hash" element={<PublicPrescription />} />
+
     <Route
       path="/atendimento/:agendamentoId"
       element={
@@ -58,6 +59,15 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
+    <Route
+      path="/consulta-online/:agendamentoId"
+      element={
+        <ProtectedRoute>
+          <TelehealthSession />
+        </ProtectedRoute>
+      }
+    />
+
     <Route
       element={
         <ProtectedRoute>

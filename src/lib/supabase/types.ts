@@ -11,6 +11,9 @@ export type Database = {
     Tables: {
       agendamentos: {
         Row: {
+          codigo_autorizacao: string | null
+          convenio_id: string | null
+          data_faturamento: string | null
           data_hora: string
           especialidade: string | null
           id: string
@@ -19,11 +22,16 @@ export type Database = {
           sinal_pago: boolean | null
           status: string
           status_nota_fiscal: string | null
+          status_reembolso: string | null
+          tipo_pagamento: string | null
           usuario_id: string
           valor_sinal: number | null
           valor_total: number | null
         }
         Insert: {
+          codigo_autorizacao?: string | null
+          convenio_id?: string | null
+          data_faturamento?: string | null
           data_hora: string
           especialidade?: string | null
           id?: string
@@ -32,11 +40,16 @@ export type Database = {
           sinal_pago?: boolean | null
           status?: string
           status_nota_fiscal?: string | null
+          status_reembolso?: string | null
+          tipo_pagamento?: string | null
           usuario_id: string
           valor_sinal?: number | null
           valor_total?: number | null
         }
         Update: {
+          codigo_autorizacao?: string | null
+          convenio_id?: string | null
+          data_faturamento?: string | null
           data_hora?: string
           especialidade?: string | null
           id?: string
@@ -45,11 +58,20 @@ export type Database = {
           sinal_pago?: boolean | null
           status?: string
           status_nota_fiscal?: string | null
+          status_reembolso?: string | null
+          tipo_pagamento?: string | null
           usuario_id?: string
           valor_sinal?: number | null
           valor_total?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'agendamentos_convenio_id_fkey'
+            columns: ['convenio_id']
+            isOneToOne: false
+            referencedRelation: 'convenios'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'agendamentos_paciente_id_fkey'
             columns: ['paciente_id']
@@ -163,6 +185,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'comunicacoes_campanhas_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      convenios: {
+        Row: {
+          contato: string | null
+          created_at: string
+          id: string
+          nome: string
+          registro_ans: string | null
+          usuario_id: string
+        }
+        Insert: {
+          contato?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          registro_ans?: string | null
+          usuario_id: string
+        }
+        Update: {
+          contato?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          registro_ans?: string | null
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'convenios_usuario_id_fkey'
             columns: ['usuario_id']
             isOneToOne: false
             referencedRelation: 'usuarios'
@@ -461,6 +518,7 @@ export type Database = {
           contato_emergencia_nome: string | null
           contato_emergencia_telefone: string | null
           contrato_aceito: boolean | null
+          convenio_id: string | null
           cpf: string | null
           data_aceite_contrato: string | null
           data_criacao: string | null
@@ -475,6 +533,7 @@ export type Database = {
           id: string
           nome: string
           numero: string | null
+          numero_carteira: string | null
           recorrencia: string | null
           rua: string | null
           telefone: string | null
@@ -490,6 +549,7 @@ export type Database = {
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
           contrato_aceito?: boolean | null
+          convenio_id?: string | null
           cpf?: string | null
           data_aceite_contrato?: string | null
           data_criacao?: string | null
@@ -504,6 +564,7 @@ export type Database = {
           id?: string
           nome: string
           numero?: string | null
+          numero_carteira?: string | null
           recorrencia?: string | null
           rua?: string | null
           telefone?: string | null
@@ -519,6 +580,7 @@ export type Database = {
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
           contrato_aceito?: boolean | null
+          convenio_id?: string | null
           cpf?: string | null
           data_aceite_contrato?: string | null
           data_criacao?: string | null
@@ -533,6 +595,7 @@ export type Database = {
           id?: string
           nome?: string
           numero?: string | null
+          numero_carteira?: string | null
           recorrencia?: string | null
           rua?: string | null
           telefone?: string | null
@@ -540,6 +603,13 @@ export type Database = {
           valor_sessao?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'pacientes_convenio_id_fkey'
+            columns: ['convenio_id']
+            isOneToOne: false
+            referencedRelation: 'convenios'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'pacientes_usuario_id_fkey'
             columns: ['usuario_id']
@@ -666,8 +736,10 @@ export type Database = {
           preferencias_dashboard: Json | null
           sync_calendarios: Json | null
           template_cobranca: string | null
+          template_confirmacao: string | null
           template_lembrete: string | null
           texto_contrato: string | null
+          whatsapp_confirmacao_ativa: boolean | null
         }
         Insert: {
           agendamento_publico_ativo?: boolean | null
@@ -684,8 +756,10 @@ export type Database = {
           preferencias_dashboard?: Json | null
           sync_calendarios?: Json | null
           template_cobranca?: string | null
+          template_confirmacao?: string | null
           template_lembrete?: string | null
           texto_contrato?: string | null
+          whatsapp_confirmacao_ativa?: boolean | null
         }
         Update: {
           agendamento_publico_ativo?: boolean | null
@@ -702,8 +776,10 @@ export type Database = {
           preferencias_dashboard?: Json | null
           sync_calendarios?: Json | null
           template_cobranca?: string | null
+          template_confirmacao?: string | null
           template_lembrete?: string | null
           texto_contrato?: string | null
+          whatsapp_confirmacao_ativa?: boolean | null
         }
         Relationships: []
       }
@@ -895,6 +971,11 @@ export const Constants = {
 //   sinal_pago: boolean (nullable, default: false)
 //   status_nota_fiscal: text (nullable, default: 'pendente'::text)
 //   justificativa_falta: text (nullable)
+//   tipo_pagamento: text (nullable, default: 'particular'::text)
+//   convenio_id: uuid (nullable)
+//   codigo_autorizacao: text (nullable)
+//   status_reembolso: text (nullable, default: 'pendente'::text)
+//   data_faturamento: date (nullable)
 // Table: appointments
 //   id: uuid (not null, default: gen_random_uuid())
 //   patient_name: text (not null)
@@ -916,6 +997,13 @@ export const Constants = {
 //   conteudo: text (not null)
 //   data_envio: timestamp with time zone (not null, default: now())
 //   tipo: text (not null, default: 'newsletter'::text)
+// Table: convenios
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   nome: text (not null)
+//   registro_ans: text (nullable)
+//   contato: text (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: despesas
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -998,6 +1086,8 @@ export const Constants = {
 //   data_aceite_contrato: timestamp with time zone (nullable)
 //   recorrencia: text (nullable, default: 'único'::text)
 //   dia_fixo: text (nullable)
+//   convenio_id: uuid (nullable)
+//   numero_carteira: text (nullable)
 // Table: prescricoes
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)
@@ -1035,9 +1125,12 @@ export const Constants = {
 //   meta_mensal_consultas: integer (nullable, default: 50)
 //   sync_calendarios: jsonb (nullable, default: '{"google": false, "outlook": false}'::jsonb)
 //   agendamento_publico_ativo: boolean (nullable, default: false)
+//   whatsapp_confirmacao_ativa: boolean (nullable, default: false)
+//   template_confirmacao: text (nullable, default: 'Olá [Nome], sua consulta foi agendada para [data] às [hora].'::text)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
+//   FOREIGN KEY agendamentos_convenio_id_fkey: FOREIGN KEY (convenio_id) REFERENCES convenios(id) ON DELETE SET NULL
 //   FOREIGN KEY agendamentos_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY agendamentos_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY agendamentos_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -1053,6 +1146,9 @@ export const Constants = {
 // Table: comunicacoes_campanhas
 //   PRIMARY KEY comunicacoes_campanhas_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY comunicacoes_campanhas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: convenios
+//   PRIMARY KEY convenios_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY convenios_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: despesas
 //   PRIMARY KEY despesas_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY despesas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -1080,6 +1176,7 @@ export const Constants = {
 //   PRIMARY KEY notificacoes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY notificacoes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: pacientes
+//   FOREIGN KEY pacientes_convenio_id_fkey: FOREIGN KEY (convenio_id) REFERENCES convenios(id) ON DELETE SET NULL
 //   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: prescricoes
@@ -1124,6 +1221,10 @@ export const Constants = {
 //     USING: true
 // Table: comunicacoes_campanhas
 //   Policy "campanhas_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: convenios
+//   Policy "convenios_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: despesas
@@ -1336,6 +1437,7 @@ export const Constants = {
 //       v_paciente record;
 //       v_agendamentos jsonb;
 //       v_historico jsonb;
+//       v_documentos jsonb;
 //       v_clinica record;
 //       v_past_appointments jsonb;
 //       v_all_past jsonb;
@@ -1358,23 +1460,21 @@ export const Constants = {
 //           'status', a.status,
 //           'especialidade', a.especialidade,
 //           'valor_total', a.valor_total
-//       )), '[]'::jsonb) INTO v_agendamentos
+//       ) ORDER BY a.data_hora ASC), '[]'::jsonb) INTO v_agendamentos
 //       FROM public.agendamentos a
-//       WHERE a.paciente_id = v_paciente.id AND a.data_hora >= NOW() AND a.status = 'agendado'
-//       ORDER BY a.data_hora ASC;
+//       WHERE a.paciente_id = v_paciente.id AND a.data_hora >= NOW() AND a.status = 'agendado';
 //
 //       SELECT COALESCE(jsonb_agg(jsonb_build_object(
 //           'id', a.id,
 //           'data_hora', a.data_hora,
 //           'especialidade', a.especialidade
-//       )), '[]'::jsonb) INTO v_past_appointments
+//       ) ORDER BY a.data_hora DESC), '[]'::jsonb) INTO v_past_appointments
 //       FROM public.agendamentos a
 //       LEFT JOIN public.avaliacoes av ON a.id = av.agendamento_id
 //       WHERE a.paciente_id = v_paciente.id
 //         AND a.status = 'compareceu'
 //         AND a.data_hora < NOW()
 //         AND av.id IS NULL
-//       ORDER BY a.data_hora DESC
 //       LIMIT 1;
 //
 //       SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -1390,6 +1490,15 @@ export const Constants = {
 //       FROM public.prontuarios
 //       WHERE paciente_id = v_paciente.id LIMIT 1;
 //
+//       SELECT COALESCE(jsonb_agg(jsonb_build_object(
+//           'id', pr.id,
+//           'data_emissao', pr.data_emissao,
+//           'hash_verificacao', pr.hash_verificacao,
+//           'conteudo_json', pr.conteudo_json
+//       ) ORDER BY pr.data_emissao DESC), '[]'::jsonb) INTO v_documentos
+//       FROM public.prescricoes pr
+//       WHERE pr.paciente_id = v_paciente.id;
+//
 //       RETURN jsonb_build_object(
 //           'usuario_id', v_paciente.usuario_id,
 //           'paciente_id', v_paciente.id,
@@ -1401,6 +1510,7 @@ export const Constants = {
 //           'politica_cancelamento', v_clinica.politica_cancelamento,
 //           'agendamentos', v_agendamentos,
 //           'historico', COALESCE(v_historico, '[]'::jsonb),
+//           'documentos', v_documentos,
 //           'pending_survey', v_past_appointments,
 //           'past_sessions', v_all_past
 //       );

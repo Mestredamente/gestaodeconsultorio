@@ -31,6 +31,19 @@ import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { TemplatesManager } from '@/components/TemplatesManager'
 
+const predefinedApproaches = [
+  'Terapia Cognitivo-Comportamental (TCC)',
+  'Psicanálise',
+  'Gestalt-terapia',
+  'Fenomenologia',
+  'Psicodrama',
+  'Abordagem Centrada na Pessoa (ACP)',
+  'Terapia Analítico-Comportamental (TAC)',
+  'Psicologia Junguiana',
+  'Terapia Sistêmica',
+  'Neuropsicologia',
+]
+
 export default function Settings() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -517,9 +530,10 @@ export default function Settings() {
 
           <TabsContent value="especialidades" className="p-6 m-0 space-y-5">
             <div>
-              <h3 className="font-semibold text-slate-900">Especialidades e Serviços</h3>
+              <h3 className="font-semibold text-slate-900">Especialidades e Abordagens</h3>
               <p className="text-sm text-slate-500">
-                Cadastre as opções que ficarão disponíveis para agendamento.
+                Cadastre as abordagens psicológicas e serviços que ficarão disponíveis para
+                agendamento.
               </p>
             </div>
             <div className="flex gap-2">
@@ -533,7 +547,23 @@ export default function Settings() {
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-2 pt-2">
+              {predefinedApproaches.map((a) => (
+                <Button
+                  key={a}
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  className="text-xs"
+                  onClick={() => {
+                    if (!especialidades.includes(a)) setEspecialidades([...especialidades, a])
+                  }}
+                >
+                  + {a}
+                </Button>
+              ))}
+            </div>
+            <div className="space-y-2 pt-4">
               {especialidades.map((esp, idx) => (
                 <div
                   key={idx}

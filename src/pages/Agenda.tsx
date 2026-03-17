@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import {
   format,
@@ -80,6 +81,7 @@ export default function Agenda() {
     tipo_pagamento: 'particular',
     convenio_id: '',
     codigo_autorizacao: '',
+    is_online: false,
   })
 
   const { toast } = useToast()
@@ -104,7 +106,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, pacientes (id, nome, valor_sessao)`,
+        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, is_online, pacientes (id, nome, valor_sessao)`,
       )
       .eq('usuario_id', user.id)
       .gte('data_hora', s.toISOString())
@@ -228,6 +230,7 @@ export default function Agenda() {
         codigo_autorizacao:
           formData.tipo_pagamento === 'convenio' ? formData.codigo_autorizacao : null,
         status_reembolso: formData.tipo_pagamento === 'convenio' ? 'pendente' : 'n/a',
+        is_online: formData.is_online,
       })
     }
 
@@ -239,7 +242,6 @@ export default function Agenda() {
     if (error)
       toast({ title: 'Erro ao agendar', description: error.message, variant: 'destructive' })
     else {
-      // Confirmação Automática WhatsApp Trigger
       if (usrSettings?.whatsapp_confirmacao_ativa && inserted && inserted.length > 0) {
         supabase.functions.invoke('enviar_lembrete_consulta', {
           body: { agendamento_id: inserted[0].id },
@@ -259,6 +261,7 @@ export default function Agenda() {
         tipo_pagamento: 'particular',
         convenio_id: '',
         codigo_autorizacao: '',
+        is_online: false,
       })
     }
     setIsSubmitting(false)
@@ -383,17 +386,25 @@ export default function Agenda() {
                     Convênio
                   </Badge>
                 )}
+                {apt.is_online && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200 gap-1"
+                  >
+                    <Video className="w-3 h-3" /> Online
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-slate-500 font-medium">Valor: {valueStr}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
-            {apt.status === 'agendado' && isSameDay(new Date(apt.data_hora), new Date()) && (
+            {apt.status === 'agendado' && apt.is_online && (
               <Button
                 size="sm"
                 variant="outline"
                 className="gap-2 bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors"
-                onClick={() => navigate(`/atendimento/${apt.id}`)}
+                onClick={() => navigate(`/consulta-online/${apt.id}`)}
               >
                 <Video className="w-4 h-4" /> Entrar Sessão
               </Button>
@@ -655,7 +666,7 @@ export default function Agenda() {
               </div>
               {especialidades.length > 0 && (
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Especialidade</Label>
+                  <Label>Especialidade / Abordagem</Label>
                   <Select
                     value={formData.especialidade}
                     onValueChange={(v) => setFormData({ ...formData, especialidade: v })}
@@ -673,6 +684,20 @@ export default function Agenda() {
                   </Select>
                 </div>
               )}
+            </div>
+
+            <div className="flex items-center space-x-2 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+              <Checkbox
+                id="is_online"
+                checked={formData.is_online}
+                onCheckedChange={(c) => setFormData({ ...formData, is_online: c as boolean })}
+              />
+              <Label
+                htmlFor="is_online"
+                className="cursor-pointer text-indigo-900 flex items-center gap-2"
+              >
+                <Video className="w-4 h-4" /> Atendimento Online (Telemedicina)
+              </Label>
             </div>
 
             <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg space-y-4">
@@ -694,7 +719,7 @@ export default function Agenda() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Valor da Sessão (R$)</Label>
+                  <Label>Valor da Sessão / Coparticipação (R$)</Label>
                   <Input
                     type="number"
                     step="0.01"

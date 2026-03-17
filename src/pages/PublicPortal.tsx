@@ -17,6 +17,9 @@ import {
   CheckCircle,
   Video,
   ShieldCheck,
+  DollarSign,
+  Copy,
+  CreditCard,
 } from 'lucide-react'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
@@ -46,6 +49,9 @@ export default function PublicPortal() {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const [cancelAptId, setCancelAptId] = useState<string | null>(null)
   const [cancelJustification, setCancelJustification] = useState('')
+
+  const [payApt, setPayApt] = useState<any>(null)
+  const [paying, setPaying] = useState(false)
 
   const fetchPortalData = async () => {
     if (!hash) return
@@ -115,6 +121,23 @@ export default function PublicPortal() {
     else toast({ title: 'Erro ao solicitar', variant: 'destructive' })
   }
 
+  const handleSimulatePayment = async () => {
+    if (!hash || !payApt) return
+    setPaying(true)
+    const { data: success, error } = await supabase.rpc('pay_appointment_portal', {
+      p_hash: hash,
+      p_agendamento_id: payApt.id,
+    })
+    setPaying(false)
+    if (success && !error) {
+      toast({ title: 'Pagamento confirmado com sucesso!' })
+      setPayApt(null)
+      fetchPortalData()
+    } else {
+      toast({ title: 'Erro ao processar pagamento.', variant: 'destructive' })
+    }
+  }
+
   const isToday = (d: Date) => {
     const today = new Date()
     return (
@@ -141,6 +164,9 @@ export default function PublicPortal() {
 
   const showLegalTab = data.texto_contrato || data.politica_cancelamento
   const hasDocuments = data.documentos && data.documentos.length > 0
+  const pendingPayments = data.agendamentos
+    ? data.agendamentos.filter((a: any) => Number(a.valor_total) > 0 && !a.sinal_pago)
+    : []
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 animate-fade-in">
@@ -171,13 +197,20 @@ export default function PublicPortal() {
         </div>
 
         <Card className="shadow-sm border-slate-200 bg-white">
-          <CardHeader className="pb-6 border-b border-slate-100 bg-slate-50/50 rounded-t-lg">
-            <CardTitle className="text-2xl font-bold text-slate-900">Portal do Paciente</CardTitle>
-            <CardDescription className="text-base mt-2">
-              Bem-vindo(a), <strong className="text-slate-800">{data.paciente_nome}</strong>
-              <br />
-              Clínica: <strong className="text-slate-800">{data.consultorio}</strong>
-            </CardDescription>
+          <CardHeader className="pb-6 border-b border-slate-100 bg-slate-50/50 rounded-t-lg flex flex-row items-start justify-between">
+            <div>
+              <CardTitle className="text-2xl font-bold text-slate-900">
+                Portal do Paciente
+              </CardTitle>
+              <CardDescription className="text-base mt-2">
+                Bem-vindo(a), <strong className="text-slate-800">{data.paciente_nome}</strong>
+                <br />
+                Clínica: <strong className="text-slate-800">{data.consultorio}</strong>
+              </CardDescription>
+            </div>
+            <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center">
+              <UserSquare className="w-6 h-6" />
+            </div>
           </CardHeader>
         </Card>
 
@@ -223,6 +256,12 @@ export default function PublicPortal() {
             <TabsTrigger value="agenda" className="gap-2 py-2">
               <Calendar className="w-4 h-4" /> Meus Agendamentos
             </TabsTrigger>
+            <TabsTrigger value="financeiro" className="gap-2 py-2 relative">
+              <DollarSign className="w-4 h-4" /> Financeiro
+              {pendingPayments.length > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="historico" className="gap-2 py-2">
               <Activity className="w-4 h-4" /> Meu Histórico
             </TabsTrigger>
@@ -243,7 +282,7 @@ export default function PublicPortal() {
 
           <TabsContent value="agenda" className="space-y-4">
             {!data.agendamentos || data.agendamentos.length === 0 ? (
-              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none">
+              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
                 Nenhuma consulta futura agendada.
               </Card>
             ) : (
@@ -286,13 +325,21 @@ export default function PublicPortal() {
                               minute: '2-digit',
                             })}
                           </Badge>
+                          {apt.is_online && (
+                            <Badge
+                              variant="outline"
+                              className="gap-1 bg-indigo-50 text-indigo-700 border-indigo-200"
+                            >
+                              <Video className="w-3 h-3" /> Online
+                            </Badge>
+                          )}
                         </div>
                         <h3 className="font-semibold text-lg text-slate-900">
                           {apt.especialidade || 'Consulta Geral'}
                         </h3>
                       </div>
                       <div className="flex flex-col gap-2 min-w-[180px]">
-                        {today && (
+                        {today && apt.is_online && (
                           <Button
                             className="gap-2 justify-start bg-indigo-600 hover:bg-indigo-700 text-white shadow-md animate-pulse"
                             onClick={() => navigate(`/sessao/${hash}`)}
@@ -333,6 +380,48 @@ export default function PublicPortal() {
                   </Card>
                 )
               })
+            )}
+          </TabsContent>
+
+          <TabsContent value="financeiro" className="space-y-4">
+            {pendingPayments.length === 0 ? (
+              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                Nenhuma pendência financeira.
+              </Card>
+            ) : (
+              pendingPayments.map((apt: any) => (
+                <Card key={apt.id} className="shadow-sm border-slate-200">
+                  <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+                    <div>
+                      <p className="font-semibold text-slate-800">
+                        Sessão: {new Date(apt.data_hora).toLocaleDateString('pt-BR')}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xl font-bold text-slate-900">
+                          {Number(apt.valor_total).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </p>
+                        {apt.convenio_id && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          >
+                            Coparticipação
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => setPayApt(apt)}
+                      className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <CreditCard className="w-4 h-4" /> Pagar Agora
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))
             )}
           </TabsContent>
 
@@ -542,6 +631,65 @@ export default function PublicPortal() {
               disabled={!cancelJustification.trim()}
             >
               Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!payApt} onOpenChange={(o) => !o && setPayApt(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pagamento de Sessão</DialogTitle>
+            <DialogDescription>
+              Realize o pagamento via PIX para confirmar sua consulta.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="bg-slate-50 p-4 rounded-lg text-center border border-slate-200">
+              <p className="text-sm text-slate-500 uppercase tracking-wider font-bold mb-1">
+                Valor
+              </p>
+              <p className="text-3xl font-bold text-slate-900">
+                {payApt &&
+                  Number(payApt.valor_total).toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-700">Chave PIX da Clínica:</p>
+              <div className="flex gap-2">
+                <code className="flex-1 p-3 bg-slate-100 rounded-md text-slate-800 border border-slate-200 text-sm break-all font-mono">
+                  {data?.chave_pix || 'Chave PIX não cadastrada'}
+                </code>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => {
+                    if (data?.chave_pix) {
+                      navigator.clipboard.writeText(data.chave_pix)
+                      toast({ title: 'Chave PIX copiada!' })
+                    }
+                  }}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayApt(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSimulatePayment}
+              disabled={paying || !data?.chave_pix}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {paying ? 'Processando...' : 'Confirmar Pagamento'}
             </Button>
           </DialogFooter>
         </DialogContent>

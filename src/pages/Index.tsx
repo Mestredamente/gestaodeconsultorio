@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Check, X, LogOut, Settings2, AlertTriangle } from 'lucide-react'
+import { Calendar, Check, X, LogOut, Settings2, AlertTriangle, Video } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { useNavigate } from 'react-router-dom'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ import { measurePerformance } from '@/lib/performance'
 export default function Index() {
   const { user, signOut } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [appointments, setAppointments] = useState<any[]>([])
   const [lowStockCount, setLowStockCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -37,6 +39,33 @@ export default function Index() {
     day: 'numeric',
     month: 'long',
   }).format(new Date())
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault()
+      const visits = parseInt(localStorage.getItem('visits') || '0')
+      if (visits > 0 && !localStorage.getItem('pwa_prompt_dismissed')) {
+        toast({
+          title: 'Instale nosso App',
+          description: 'Adicione a Gestão de Clínica à sua tela inicial.',
+          action: (
+            <Button
+              variant="outline"
+              onClick={() => {
+                e.prompt()
+                localStorage.setItem('pwa_prompt_dismissed', '1')
+              }}
+            >
+              Instalar
+            </Button>
+          ),
+        })
+      }
+      localStorage.setItem('visits', (visits + 1).toString())
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [toast])
 
   const fetchIndexData = useCallback(async () => {
     if (!user) return
@@ -60,7 +89,9 @@ export default function Index() {
         const [apptsRes, stockRes] = await Promise.all([
           supabase
             .from('agendamentos')
-            .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
+            .select(
+              'id, data_hora, status, is_online, paciente_id, pacientes(id, nome, valor_sessao)',
+            )
             .eq('usuario_id', user.id)
             .gte('data_hora', startOfDay.toISOString())
             .lt('data_hora', endOfDay.toISOString())
@@ -188,7 +219,7 @@ export default function Index() {
 
         {prefs.show_agenda !== false && (
           <Card className="lg:col-span-2 shadow-sm border-slate-200 h-fit">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" /> Sessões de Hoje
               </CardTitle>
@@ -218,9 +249,12 @@ export default function Index() {
                             {time}
                           </div>
                           <div>
-                            <p className="font-semibold text-slate-900">
-                              {pInfo?.nome || 'Paciente Excluído'}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-slate-900">
+                                {pInfo?.nome || 'Paciente Excluído'}
+                              </p>
+                              {apt.is_online && <Video className="w-4 h-4 text-indigo-500" />}
+                            </div>
                             <span
                               className={cn(
                                 'text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider mt-1 inline-block',
@@ -237,14 +271,23 @@ export default function Index() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex gap-2 w-full sm:w-auto">
+                        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                          {apt.is_online && apt.status === 'agendado' && (
+                            <Button
+                              size="sm"
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                              onClick={() => navigate(`/consulta-online/${apt.id}`)}
+                            >
+                              <Video className="w-4 h-4 mr-1" /> Sala
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
                             className="text-emerald-600 hover:bg-emerald-50"
                             onClick={() => updateStatus(apt.id, 'compareceu')}
                           >
-                            <Check className="w-4 h-4 mr-1" /> Compareceu
+                            <Check className="w-4 h-4 mr-1" /> Comp.
                           </Button>
                           <Button
                             size="sm"
