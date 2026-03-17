@@ -11,7 +11,7 @@ import PatientDetail from './pages/PatientDetail'
 import Finances from './pages/Finances'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
-import Login from './pages/Login'
+import Auth from './pages/Auth'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth()
@@ -22,13 +22,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     )
   }
-  if (!session) return <Navigate to="/login" replace />
+  if (!session) return <Navigate to="/auth" replace />
   return <>{children}</>
 }
 
 const AppRoutes = () => (
   <Routes>
-    <Route path="/login" element={<Login />} />
+    <Route path="/auth" element={<Auth />} />
+    <Route path="/login" element={<Navigate to="/auth" replace />} />
     <Route
       element={
         <ProtectedRoute>

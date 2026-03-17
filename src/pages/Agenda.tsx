@@ -5,18 +5,40 @@ import { Button } from '@/components/ui/button'
 import { Check, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Agenda() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+  const { user } = useAuth()
 
   useEffect(() => {
     const fetchAppointments = async () => {
+      if (!user) return
+
+      // Obter o intervalo do dia atual para filtrar agendamentos de hoje
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+
+      const endOfDay = new Date(startOfDay)
+      endOfDay.setDate(endOfDay.getDate() + 1)
+
       const { data, error } = await supabase
-        .from('appointments')
-        .select('*')
-        .order('appointment_time', { ascending: true })
+        .from('agendamentos')
+        .select(`
+          id,
+          data_hora,
+          status,
+          pacientes (
+            nome,
+            valor_sessao
+          )
+        `)
+        .eq('usuario_id', user.id)
+        .gte('data_hora', startOfDay.toISOString())
+        .lt('data_hora', endOfDay.toISOString())
+        .order('data_hora', { ascending: true })
 
       if (!error && data) {
         setAppointments(data)
@@ -25,10 +47,10 @@ export default function Agenda() {
     }
 
     fetchAppointments()
-  }, [])
+  }, [user])
 
   const updateStatus = async (id: string, status: string) => {
-    const { error } = await supabase.from('appointments').update({ status }).eq('id', id)
+    const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
 
     if (!error) {
       setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
@@ -54,10 +76,10 @@ export default function Agenda() {
   }).format(new Date())
 
   const statusColors: Record<string, string> = {
-    scheduled: 'border-l-slate-200',
-    attended: 'border-l-emerald-500',
-    missed: 'border-l-red-500',
-    cancelled: 'border-l-amber-500',
+    agendado: 'border-l-slate-200',
+    compareceu: 'border-l-emerald-500',
+    faltou: 'border-l-red-500',
+    desmarcou: 'border-l-amber-500',
   }
 
   return (
@@ -74,11 +96,17 @@ export default function Agenda() {
           </div>
         ) : (
           appointments.map((apt) => {
-            const timeStr = new Date(apt.appointment_time).toLocaleTimeString('pt-BR', {
+            const timeStr = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
               hour: '2-digit',
               minute: '2-digit',
             })
-            const valueStr = Number(apt.session_value).toLocaleString('pt-BR', {
+
+            // Garantir extração segura caso seja array (embora deva ser um objeto com foreign key correta)
+            const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+            const patientName = pacienteInfo?.nome || 'Paciente Desconhecido'
+            const sessionValue = pacienteInfo?.valor_sessao || 0
+
+            const valueStr = Number(sessionValue).toLocaleString('pt-BR', {
               style: 'currency',
               currency: 'BRL',
             })
@@ -88,7 +116,7 @@ export default function Agenda() {
                 key={apt.id}
                 className={cn(
                   'bg-white shadow-sm transition-all border-l-4 border-t-0 border-r-0 border-b-0',
-                  statusColors[apt.status] || statusColors.scheduled,
+                  statusColors[apt.status] || statusColors.agendado,
                 )}
               >
                 <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -97,7 +125,7 @@ export default function Agenda() {
                       <span className="font-bold text-slate-700">{timeStr}</span>
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg text-slate-900">{apt.patient_name}</h3>
+                      <h3 className="font-semibold text-lg text-slate-900">{patientName}</h3>
                       <p className="text-sm text-slate-500 font-medium">{valueStr}</p>
                     </div>
                   </div>
@@ -108,10 +136,10 @@ export default function Agenda() {
                       variant="outline"
                       className={cn(
                         'hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors',
-                        apt.status === 'attended' &&
+                        apt.status === 'compareceu' &&
                           'bg-emerald-50 text-emerald-600 border-emerald-200',
                       )}
-                      onClick={() => updateStatus(apt.id, 'attended')}
+                      onClick={() => updateStatus(apt.id, 'compareceu')}
                       title="Compareceu"
                     >
                       <Check className="w-5 h-5 text-emerald-500" />
@@ -121,9 +149,9 @@ export default function Agenda() {
                       variant="outline"
                       className={cn(
                         'hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors',
-                        apt.status === 'missed' && 'bg-red-50 text-red-600 border-red-200',
+                        apt.status === 'faltou' && 'bg-red-50 text-red-600 border-red-200',
                       )}
-                      onClick={() => updateStatus(apt.id, 'missed')}
+                      onClick={() => updateStatus(apt.id, 'faltou')}
                       title="Faltou"
                     >
                       <X className="w-5 h-5 text-red-500" />
@@ -133,9 +161,9 @@ export default function Agenda() {
                       variant="outline"
                       className={cn(
                         'hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 transition-colors font-bold text-lg text-amber-500',
-                        apt.status === 'cancelled' && 'bg-amber-50 text-amber-600 border-amber-200',
+                        apt.status === 'desmarcou' && 'bg-amber-50 text-amber-600 border-amber-200',
                       )}
-                      onClick={() => updateStatus(apt.id, 'cancelled')}
+                      onClick={() => updateStatus(apt.id, 'desmarcou')}
                       title="Desmarcou"
                     >
                       D
