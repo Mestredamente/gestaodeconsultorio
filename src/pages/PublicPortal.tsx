@@ -68,14 +68,12 @@ export default function PublicPortal() {
 
   const handleRating = async () => {
     if (!data.pending_survey?.[0]) return
-    await supabase
-      .from('avaliacoes')
-      .insert({
-        paciente_id: data.paciente_id,
-        agendamento_id: data.pending_survey[0].id,
-        nota: rating,
-        comentario: comment,
-      })
+    await supabase.from('avaliacoes').insert({
+      paciente_id: data.paciente_id,
+      agendamento_id: data.pending_survey[0].id,
+      nota: rating,
+      comentario: comment,
+    })
     setRatingSubmitted(true)
     toast({ title: 'Avaliação enviada com sucesso! Obrigado.' })
   }

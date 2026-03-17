@@ -10,14 +10,12 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
-  CircleDollarSign,
   Calendar as CalendarIcon,
   Video,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
-import ReceiptDialog from '@/components/ReceiptDialog'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -172,18 +170,23 @@ export default function Agenda() {
   }, [user, fetchAppointments, fetchInitialData])
 
   const nextPeriod = () => {
-    view === 'monthly'
-      ? setCurrentDate(addMonths(currentDate, 1))
-      : view === 'weekly'
-        ? setCurrentDate(addDays(currentDate, 7))
-        : setCurrentDate(addDays(currentDate, 1))
+    if (view === 'monthly') {
+      setCurrentDate(addMonths(currentDate, 1))
+    } else if (view === 'weekly') {
+      setCurrentDate(addDays(currentDate, 7))
+    } else {
+      setCurrentDate(addDays(currentDate, 1))
+    }
   }
+
   const prevPeriod = () => {
-    view === 'monthly'
-      ? setCurrentDate(subMonths(currentDate, 1))
-      : view === 'weekly'
-        ? setCurrentDate(subDays(currentDate, 7))
-        : setCurrentDate(subDays(currentDate, 1))
+    if (view === 'monthly') {
+      setCurrentDate(subMonths(currentDate, 1))
+    } else if (view === 'weekly') {
+      setCurrentDate(subDays(currentDate, 7))
+    } else {
+      setCurrentDate(subDays(currentDate, 1))
+    }
   }
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
