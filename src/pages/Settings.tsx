@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { Save, Copy, Upload, ImageIcon, Trash2, Plus } from 'lucide-react'
+import { Save, Copy, Upload, ImageIcon, Trash2, Plus, Scale } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -30,6 +30,8 @@ export default function Settings() {
     chave_pix: '',
     template_cobranca: '',
     logo_url: '',
+    texto_contrato: '',
+    politica_cancelamento: '',
   })
 
   const [questions, setQuestions] = useState<any[]>([])
@@ -55,6 +57,8 @@ export default function Settings() {
               chave_pix: data.chave_pix || '',
               template_cobranca: data.template_cobranca || '',
               logo_url: data.logo_url || '',
+              texto_contrato: data.texto_contrato || '',
+              politica_cancelamento: data.politica_cancelamento || '',
             })
             setQuestions(data.anamnese_template || [])
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
@@ -113,6 +117,12 @@ export default function Settings() {
               className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
               Especialidades
+            </TabsTrigger>
+            <TabsTrigger
+              value="juridico"
+              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+            >
+              Jurídico & Contratos
             </TabsTrigger>
             <TabsTrigger
               value="anamnese"
@@ -242,6 +252,45 @@ export default function Settings() {
                   </Button>
                 </div>
               ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="juridico" className="p-6 m-0 space-y-5">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Scale className="w-5 h-5 text-primary" /> Textos Legais e Políticas
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Estes textos serão exibidos no Portal do Paciente para leitura e aceite digital.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Contrato de Prestação de Serviços</Label>
+                <p className="text-xs text-slate-500">
+                  Insira as cláusulas de atendimento, honorários e confidencialidade.
+                </p>
+                <Textarea
+                  value={formData.texto_contrato}
+                  onChange={(e) => setFormData({ ...formData, texto_contrato: e.target.value })}
+                  className="min-h-[150px]"
+                  placeholder="Termos e condições do tratamento psicológico..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Política de Cancelamento e Faltas</Label>
+                <p className="text-xs text-slate-500">
+                  Regras sobre remarcações, prazos e cobranças em caso de falta.
+                </p>
+                <Textarea
+                  value={formData.politica_cancelamento}
+                  onChange={(e) =>
+                    setFormData({ ...formData, politica_cancelamento: e.target.value })
+                  }
+                  className="min-h-[100px]"
+                  placeholder="Consultas desmarcadas com menos de 24h de antecedência..."
+                />
+              </div>
             </div>
           </TabsContent>
 

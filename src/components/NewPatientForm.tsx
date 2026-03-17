@@ -9,6 +9,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Form,
   FormControl,
   FormField,
@@ -43,6 +50,11 @@ const formSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? Number(v) : null)),
+  frequencia_pagamento: z.string().default('sessão'),
+  dia_pagamento: z
+    .string()
+    .optional()
+    .transform((v) => (v ? Number(v) : null)),
 })
 
 export default function NewPatientForm() {
@@ -69,6 +81,8 @@ export default function NewPatientForm() {
       contato_emergencia_nome: '',
       contato_emergencia_telefone: '',
       valor_sessao: '' as any,
+      frequencia_pagamento: 'sessão',
+      dia_pagamento: '' as any,
     },
   })
 
@@ -93,6 +107,8 @@ export default function NewPatientForm() {
       contato_emergencia_nome: values.contato_emergencia_nome || null,
       contato_emergencia_telefone: values.contato_emergencia_telefone || null,
       valor_sessao: values.valor_sessao,
+      frequencia_pagamento: values.frequencia_pagamento,
+      dia_pagamento: values.dia_pagamento,
     }
     const { error } = await supabase.from('pacientes').insert(payload as any)
     setLoading(false)
@@ -118,6 +134,8 @@ export default function NewPatientForm() {
         contato_emergencia_nome: '',
         contato_emergencia_telefone: '',
         valor_sessao: '' as any,
+        frequencia_pagamento: 'sessão',
+        dia_pagamento: '' as any,
       })
     }
   }
@@ -198,19 +216,69 @@ export default function NewPatientForm() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="valor_sessao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Valor Padrão da Sessão (R$)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">
+                Configurações de Pagamento
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <FormField
+                  control={form.control}
+                  name="valor_sessao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Valor da Sessão (R$)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} value={field.value || ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="frequencia_pagamento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Frequência</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="sessão">Por Sessão</SelectItem>
+                          <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                          <SelectItem value="mensal">Mensal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="dia_pagamento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dia de Vencimento</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="31"
+                          placeholder="Ex: 5"
+                          {...field}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="pt-4 border-t border-slate-100">

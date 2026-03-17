@@ -7,6 +7,13 @@ import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const formSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
@@ -29,6 +36,12 @@ const formSchema = z.object({
     .optional()
     .nullable()
     .transform((v) => (v ? Number(v) : null)),
+  frequencia_pagamento: z.string().default('sessão'),
+  dia_pagamento: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((v) => (v ? Number(v) : null)),
 })
 
 export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
@@ -38,6 +51,8 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -58,6 +73,8 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
       contato_emergencia_nome: patient?.contato_emergencia_nome || '',
       contato_emergencia_telefone: patient?.contato_emergencia_telefone || '',
       valor_sessao: patient?.valor_sessao ? String(patient.valor_sessao) : '',
+      frequencia_pagamento: patient?.frequencia_pagamento || 'sessão',
+      dia_pagamento: patient?.dia_pagamento ? String(patient.dia_pagamento) : '',
     },
   })
 
@@ -91,6 +108,8 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
     </div>
   )
 
+  const freqPagamento = watch('frequencia_pagamento')
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
@@ -102,7 +121,32 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
         <Field id="cpf" label="CPF" />
         <Field id="telefone" label="Telefone" />
         <Field id="email" label="E-mail" type="email" />
-        <Field id="valor_sessao" label="Valor da Sessão (R$)" type="number" step="0.01" />
+      </div>
+
+      <div className="pt-2 border-t border-slate-100">
+        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
+          Pagamento
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <Field id="valor_sessao" label="Valor da Sessão (R$)" type="number" step="0.01" />
+          <div className="space-y-1.5">
+            <Label className="text-slate-600">Frequência</Label>
+            <Select
+              value={freqPagamento}
+              onValueChange={(val) => setValue('frequencia_pagamento', val)}
+            >
+              <SelectTrigger className="bg-slate-50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sessão">Por Sessão</SelectItem>
+                <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                <SelectItem value="mensal">Mensal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Field id="dia_pagamento" label="Dia de Vencimento" type="number" min="1" max="31" />
+        </div>
       </div>
 
       <div className="pt-2 border-t border-slate-100">

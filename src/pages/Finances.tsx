@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Legend } from 'recharts'
-import { ArrowDownRight, ArrowUpRight, Wallet, Plus, Coins } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Wallet, Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import {
@@ -33,7 +33,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { cn } from '@/lib/utils'
 
 const monthNames = [
   'Jan',
@@ -78,7 +77,6 @@ export default function Finances() {
   const [patients, setPatients] = useState<any[]>([])
   const [finances, setFinances] = useState<any[]>([])
   const [despesas, setDespesas] = useState<any[]>([])
-  const [appointments, setAppointments] = useState<any[]>([])
 
   const [isDespesaModalOpen, setIsDespesaModalOpen] = useState(false)
   const [newDespesa, setNewDespesa] = useState({
@@ -93,8 +91,11 @@ export default function Finances() {
     setLoading(true)
     const yearNum = parseInt(year)
 
-    const [patientsRes, financeRes, despesasRes, apptsRes] = await Promise.all([
-      supabase.from('pacientes').select('id, nome, valor_sessao').eq('usuario_id', user.id),
+    const [patientsRes, financeRes, despesasRes] = await Promise.all([
+      supabase
+        .from('pacientes')
+        .select('id, nome, valor_sessao, frequencia_pagamento, dia_pagamento')
+        .eq('usuario_id', user.id),
       supabase.from('financeiro').select('*').eq('usuario_id', user.id).eq('ano', yearNum),
       supabase
         .from('despesas')
@@ -102,18 +103,11 @@ export default function Finances() {
         .eq('usuario_id', user.id)
         .gte('data', `${yearNum}-01-01`)
         .lt('data', `${yearNum + 1}-01-01`),
-      supabase
-        .from('agendamentos')
-        .select('valor_sinal, sinal_pago, data_hora')
-        .eq('usuario_id', user.id)
-        .gte('data_hora', `${yearNum}-01-01T00:00:00Z`)
-        .lt('data_hora', `${yearNum + 1}-01-01T00:00:00Z`),
     ])
 
     if (patientsRes.data) setPatients(patientsRes.data)
     if (financeRes.data) setFinances(financeRes.data)
     if (despesasRes.data) setDespesas(despesasRes.data)
-    if (apptsRes.data) setAppointments(apptsRes.data)
     setLoading(false)
   }, [user, year])
 
@@ -121,26 +115,10 @@ export default function Finances() {
     fetchYearData()
   }, [fetchYearData])
 
-  const {
-    currentRecebido,
-    currentDespesas,
-    currentAReceber,
-    sinaisRecebidos,
-    sinaisPendentes,
-    chartData,
-    patientsSummary,
-  } = useMemo(() => {
+  const { currentRecebido, currentDespesas, chartData, patientsSummary } = useMemo(() => {
     const monthNum = parseInt(month)
     const monthFin = finances.filter((f) => f.mes === monthNum)
     const monthDesp = despesas.filter((d) => new Date(d.data).getMonth() + 1 === monthNum)
-    const monthAppts = appointments.filter((a) => new Date(a.data_hora).getMonth() + 1 === monthNum)
-
-    const sRecebidos = monthAppts
-      .filter((a) => a.sinal_pago)
-      .reduce((s, a) => s + Number(a.valor_sinal || 0), 0)
-    const sPendentes = monthAppts
-      .filter((a) => !a.sinal_pago)
-      .reduce((s, a) => s + Number(a.valor_sinal || 0), 0)
 
     const pSummary = patients
       .map((p) => {
@@ -157,9 +135,6 @@ export default function Finances() {
     return {
       currentRecebido: monthFin.reduce((sum, f) => sum + Number(f.valor_recebido), 0),
       currentDespesas: monthDesp.reduce((sum, d) => sum + Number(d.valor), 0),
-      currentAReceber: monthFin.reduce((sum, f) => sum + Number(f.valor_a_receber), 0),
-      sinaisRecebidos: sRecebidos,
-      sinaisPendentes: sPendentes,
       chartData: Array.from({ length: 12 }, (_, i) => {
         const finM = finances.filter((f) => f.mes === i + 1)
         const despM = despesas.filter((d) => new Date(d.data).getMonth() + 1 === i + 1)
@@ -171,7 +146,7 @@ export default function Finances() {
       }),
       patientsSummary: pSummary,
     }
-  }, [month, finances, despesas, patients, appointments])
+  }, [month, finances, despesas, patients])
 
   const handleAddDespesa = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -277,41 +252,10 @@ export default function Finances() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-100 text-indigo-600 rounded-full">
-                <Coins className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Sinais Recebidos (Entradas Ant.)
-                </p>
-                <p className="text-lg font-bold text-slate-900">{formatBRL(sinaisRecebidos)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-100 text-amber-600 rounded-full">
-                <Coins className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500">Sinais Pendentes (A Receber)</p>
-                <p className="text-lg font-bold text-slate-900">{formatBRL(sinaisPendentes)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Tabs defaultValue="fluxo" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="fluxo">Fluxo Anual</TabsTrigger>
-          <TabsTrigger value="receitas">Receitas (A Receber)</TabsTrigger>
+          <TabsTrigger value="receitas">Faturamento por Paciente</TabsTrigger>
           <TabsTrigger value="despesas">Despesas</TabsTrigger>
         </TabsList>
         <TabsContent value="fluxo">
@@ -362,6 +306,7 @@ export default function Finances() {
               <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead>Paciente</TableHead>
+                  <TableHead>Ciclo de Cobrança</TableHead>
                   <TableHead className="text-right">Recebido</TableHead>
                   <TableHead className="text-right">A Receber</TableHead>
                 </TableRow>
@@ -369,7 +314,7 @@ export default function Finances() {
               <TableBody>
                 {patientsSummary.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-6">
+                    <TableCell colSpan={4} className="text-center py-6">
                       Nenhum registro.
                     </TableCell>
                   </TableRow>
@@ -377,12 +322,15 @@ export default function Finances() {
                   patientsSummary.map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">
-                        {p.nome}{' '}
+                        {p.nome}
                         {p.valor_a_receber > 0 && (
                           <Badge variant="destructive" className="ml-2 text-[10px]">
                             Pendente
                           </Badge>
                         )}
+                      </TableCell>
+                      <TableCell className="text-slate-500 capitalize text-sm">
+                        {p.frequencia_pagamento} {p.dia_pagamento ? `(Dia ${p.dia_pagamento})` : ''}
                       </TableCell>
                       <TableCell className="text-right text-emerald-600 font-medium">
                         {formatBRL(p.valor_recebido)}

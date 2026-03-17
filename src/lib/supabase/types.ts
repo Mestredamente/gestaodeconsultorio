@@ -17,6 +17,7 @@ export type Database = {
           paciente_id: string
           sinal_pago: boolean | null
           status: string
+          status_nota_fiscal: string | null
           usuario_id: string
           valor_sinal: number | null
           valor_total: number | null
@@ -28,6 +29,7 @@ export type Database = {
           paciente_id: string
           sinal_pago?: boolean | null
           status?: string
+          status_nota_fiscal?: string | null
           usuario_id: string
           valor_sinal?: number | null
           valor_total?: number | null
@@ -39,6 +41,7 @@ export type Database = {
           paciente_id?: string
           sinal_pago?: boolean | null
           status?: string
+          status_nota_fiscal?: string | null
           usuario_id?: string
           valor_sinal?: number | null
           valor_total?: number | null
@@ -86,6 +89,48 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      avaliacoes: {
+        Row: {
+          agendamento_id: string | null
+          comentario: string | null
+          data_criacao: string
+          id: string
+          nota: number | null
+          paciente_id: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          comentario?: string | null
+          data_criacao?: string
+          id?: string
+          nota?: number | null
+          paciente_id: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          comentario?: string | null
+          data_criacao?: string
+          id?: string
+          nota?: number | null
+          paciente_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'avaliacoes_agendamento_id_fkey'
+            columns: ['agendamento_id']
+            isOneToOne: false
+            referencedRelation: 'agendamentos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'avaliacoes_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+        ]
       }
       despesas: {
         Row: {
@@ -333,6 +378,10 @@ export type Database = {
       pacientes: {
         Row: {
           anamnese: Json | null
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
           contato_emergencia_nome: string | null
           contato_emergencia_telefone: string | null
           cpf: string | null
@@ -340,15 +389,22 @@ export type Database = {
           data_nascimento: string | null
           email: string | null
           endereco: string | null
+          estado: string | null
           hash_anamnese: string | null
           id: string
           nome: string
+          numero: string | null
+          rua: string | null
           telefone: string | null
           usuario_id: string
           valor_sessao: number | null
         }
         Insert: {
           anamnese?: Json | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
           cpf?: string | null
@@ -356,15 +412,22 @@ export type Database = {
           data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
+          estado?: string | null
           hash_anamnese?: string | null
           id?: string
           nome: string
+          numero?: string | null
+          rua?: string | null
           telefone?: string | null
           usuario_id: string
           valor_sessao?: number | null
         }
         Update: {
           anamnese?: Json | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
           cpf?: string | null
@@ -372,9 +435,12 @@ export type Database = {
           data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
+          estado?: string | null
           hash_anamnese?: string | null
           id?: string
           nome?: string
+          numero?: string | null
+          rua?: string | null
           telefone?: string | null
           usuario_id?: string
           valor_sessao?: number | null
@@ -438,6 +504,7 @@ export type Database = {
           lembrete_whatsapp_ativo: boolean | null
           logo_url: string | null
           nome_consultorio: string | null
+          preferencias_dashboard: Json | null
           template_cobranca: string | null
           template_lembrete: string | null
         }
@@ -450,6 +517,7 @@ export type Database = {
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
           nome_consultorio?: string | null
+          preferencias_dashboard?: Json | null
           template_cobranca?: string | null
           template_lembrete?: string | null
         }
@@ -462,6 +530,7 @@ export type Database = {
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
           nome_consultorio?: string | null
+          preferencias_dashboard?: Json | null
           template_cobranca?: string | null
           template_lembrete?: string | null
         }
@@ -638,6 +707,7 @@ export const Constants = {
 //   valor_total: numeric (nullable, default: 0)
 //   valor_sinal: numeric (nullable, default: 0)
 //   sinal_pago: boolean (nullable, default: false)
+//   status_nota_fiscal: text (nullable, default: 'pendente'::text)
 // Table: appointments
 //   id: uuid (not null, default: gen_random_uuid())
 //   patient_name: text (not null)
@@ -645,6 +715,13 @@ export const Constants = {
 //   session_value: numeric (not null)
 //   status: text (not null, default: 'scheduled'::text)
 //   user_id: uuid (nullable)
+// Table: avaliacoes
+//   id: uuid (not null, default: gen_random_uuid())
+//   paciente_id: uuid (not null)
+//   agendamento_id: uuid (nullable)
+//   nota: integer (nullable)
+//   comentario: text (nullable)
+//   data_criacao: timestamp with time zone (not null, default: now())
 // Table: despesas
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -706,6 +783,13 @@ export const Constants = {
 //   contato_emergencia_telefone: text (nullable)
 //   anamnese: jsonb (nullable, default: '{}'::jsonb)
 //   hash_anamnese: uuid (nullable, default: gen_random_uuid())
+//   cep: text (nullable)
+//   rua: text (nullable)
+//   numero: text (nullable)
+//   complemento: text (nullable)
+//   bairro: text (nullable)
+//   cidade: text (nullable)
+//   estado: text (nullable)
 // Table: prontuarios
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)
@@ -723,6 +807,7 @@ export const Constants = {
 //   lembrete_whatsapp_ativo: boolean (nullable, default: false)
 //   template_lembrete: text (nullable, default: 'Olá [Nome], você tem uma consulta amanhã às [hora].'::text)
 //   especialidades_disponiveis: _text (nullable, default: '{}'::text[])
+//   preferencias_dashboard: jsonb (nullable, default: '{"show_agenda": true, "show_revenue": true, "show_birthdays": true}'::jsonb)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
@@ -733,6 +818,11 @@ export const Constants = {
 // Table: appointments
 //   PRIMARY KEY appointments_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY appointments_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: avaliacoes
+//   FOREIGN KEY avaliacoes_agendamento_id_fkey: FOREIGN KEY (agendamento_id) REFERENCES agendamentos(id) ON DELETE SET NULL
+//   CHECK avaliacoes_nota_check: CHECK (((nota >= 1) AND (nota <= 5)))
+//   FOREIGN KEY avaliacoes_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY avaliacoes_pkey: PRIMARY KEY (id)
 // Table: despesas
 //   PRIMARY KEY despesas_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY despesas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -783,6 +873,15 @@ export const Constants = {
 //   Policy "authenticated_update" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: avaliacoes
+//   Policy "anon_avaliacoes_insert" (INSERT, PERMISSIVE) roles={anon}
+//     WITH CHECK: true
+//   Policy "auth_avaliacoes_insert" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "avaliacoes_insert" (INSERT, PERMISSIVE) roles={public}
+//     WITH CHECK: true
+//   Policy "avaliacoes_select" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
 // Table: despesas
 //   Policy "despesas_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
@@ -888,6 +987,7 @@ export const Constants = {
 //       v_agendamentos jsonb;
 //       v_historico jsonb;
 //       v_clinica text;
+//       v_past_appointments jsonb;
 //   BEGIN
 //       -- Find patient by hash
 //       SELECT p.id, p.nome, p.usuario_id INTO v_paciente
@@ -917,6 +1017,21 @@ export const Constants = {
 //       WHERE a.paciente_id = v_paciente.id AND a.data_hora >= NOW()
 //       ORDER BY a.data_hora ASC;
 //
+//       -- Get past appointments for survey (status = 'compareceu', without evaluation)
+//       SELECT COALESCE(jsonb_agg(jsonb_build_object(
+//           'id', a.id,
+//           'data_hora', a.data_hora,
+//           'especialidade', a.especialidade
+//       )), '[]'::jsonb) INTO v_past_appointments
+//       FROM public.agendamentos a
+//       LEFT JOIN public.avaliacoes av ON a.id = av.agendamento_id
+//       WHERE a.paciente_id = v_paciente.id
+//         AND a.status = 'compareceu'
+//         AND a.data_hora < NOW()
+//         AND av.id IS NULL
+//       ORDER BY a.data_hora DESC
+//       LIMIT 1;
+//
 //       -- Get session history
 //       SELECT historico_sessoes INTO v_historico
 //       FROM public.prontuarios
@@ -924,10 +1039,12 @@ export const Constants = {
 //
 //       -- Build final response
 //       RETURN jsonb_build_object(
+//           'paciente_id', v_paciente.id,
 //           'paciente_nome', v_paciente.nome,
 //           'consultorio', v_clinica,
 //           'agendamentos', v_agendamentos,
-//           'historico', COALESCE(v_historico, '[]'::jsonb)
+//           'historico', COALESCE(v_historico, '[]'::jsonb),
+//           'pending_survey', v_past_appointments
 //       );
 //   END;
 //   $function$

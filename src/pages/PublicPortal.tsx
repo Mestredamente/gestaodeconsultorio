@@ -5,11 +5,31 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Clock, Download, ExternalLink, Activity, FileText, Star } from 'lucide-react'
+import {
+  Calendar,
+  Clock,
+  Download,
+  ExternalLink,
+  Activity,
+  FileText,
+  Star,
+  Scale,
+  Ban,
+  CheckCircle,
+} from 'lucide-react'
 import { formatGoogleCalendarLink, downloadIcs } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export default function PublicPortal() {
   const { hash } = useParams()
@@ -21,13 +41,18 @@ export default function PublicPortal() {
   const [comment, setComment] = useState('')
   const [ratingSubmitted, setRatingSubmitted] = useState(false)
 
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
+  const [cancelAptId, setCancelAptId] = useState<string | null>(null)
+  const [cancelJustification, setCancelJustification] = useState('')
+
+  const fetchPortalData = async () => {
+    if (!hash) return
+    const { data: res, error } = await supabase.rpc('get_patient_portal_data', { p_hash: hash })
+    if (!error && res && Object.keys(res).length > 0) setData(res)
+    setLoading(false)
+  }
+
   useEffect(() => {
-    const fetchPortalData = async () => {
-      if (!hash) return
-      const { data: res, error } = await supabase.rpc('get_patient_portal_data', { p_hash: hash })
-      if (!error && res && Object.keys(res).length > 0) setData(res)
-      setLoading(false)
-    }
     fetchPortalData()
   }, [hash])
 
@@ -41,6 +66,36 @@ export default function PublicPortal() {
     })
     setRatingSubmitted(true)
     toast({ title: 'Avaliação enviada com sucesso! Obrigado.' })
+  }
+
+  const handleAcceptContract = async () => {
+    if (!hash) return
+    const { error } = await supabase.rpc('accept_patient_contract', { p_hash: hash })
+    if (!error) {
+      toast({ title: 'Contrato aceito com sucesso.' })
+      fetchPortalData()
+    } else {
+      toast({ title: 'Erro ao aceitar contrato.', variant: 'destructive' })
+    }
+  }
+
+  const handleCancelAppointment = async () => {
+    if (!hash || !cancelAptId) return
+    const { error } = await supabase.rpc('cancel_appointment_portal', {
+      p_hash: hash,
+      p_agendamento_id: cancelAptId,
+      p_justificativa: cancelJustification,
+    })
+
+    if (!error) {
+      toast({ title: 'Consulta desmarcada.' })
+      setIsCancelDialogOpen(false)
+      setCancelAptId(null)
+      setCancelJustification('')
+      fetchPortalData()
+    } else {
+      toast({ title: 'Erro ao desmarcar consulta.', variant: 'destructive' })
+    }
   }
 
   if (loading)
@@ -58,9 +113,36 @@ export default function PublicPortal() {
       </div>
     )
 
+  const showLegalTab = data.texto_contrato || data.politica_cancelamento
+
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
       <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+        <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-left">
+            <h3 className="font-bold">Baixe nosso Aplicativo!</h3>
+            <p className="text-indigo-100 text-sm">
+              Acompanhe seus dados, pagamentos e agendamentos diretamente do celular.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="bg-white text-indigo-700 hover:bg-indigo-50"
+            >
+              iOS App Store
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="bg-white text-indigo-700 hover:bg-indigo-50"
+            >
+              Google Play
+            </Button>
+          </div>
+        </div>
+
         <Card className="shadow-sm border-slate-200 bg-white">
           <CardHeader className="pb-6 border-b border-slate-100 bg-slate-50/50 rounded-t-lg">
             <CardTitle className="text-2xl font-bold text-slate-900">Portal do Paciente</CardTitle>
@@ -110,13 +192,21 @@ export default function PublicPortal() {
         )}
 
         <Tabs defaultValue="agenda" className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="agenda" className="gap-2">
+          <TabsList className="mb-4 flex-wrap h-auto">
+            <TabsTrigger value="agenda" className="gap-2 py-2">
               <Calendar className="w-4 h-4" /> Meus Agendamentos
             </TabsTrigger>
-            <TabsTrigger value="historico" className="gap-2">
+            <TabsTrigger value="historico" className="gap-2 py-2">
               <Activity className="w-4 h-4" /> Meu Histórico
             </TabsTrigger>
+            {showLegalTab && (
+              <TabsTrigger value="juridico" className="gap-2 py-2 relative">
+                <Scale className="w-4 h-4" /> Contrato e Políticas
+                {!data.contrato_aceito && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                )}
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="agenda" className="space-y-4">
@@ -156,17 +246,12 @@ export default function PublicPortal() {
                         <h3 className="font-semibold text-lg text-slate-900">
                           {apt.especialidade || 'Consulta Geral'}
                         </h3>
-                        {apt.valor_sinal > 0 && !apt.sinal_pago && (
-                          <Badge variant="destructive" className="mt-1">
-                            Sinal Pendente
-                          </Badge>
-                        )}
                       </div>
-                      <div className="flex flex-col gap-2 min-w-[160px]">
+                      <div className="flex flex-col gap-2 min-w-[180px]">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-2"
+                          className="gap-2 justify-start"
                           onClick={() =>
                             window.open(
                               formatGoogleCalendarLink(title, details, apt.data_hora),
@@ -174,15 +259,18 @@ export default function PublicPortal() {
                             )
                           }
                         >
-                          <ExternalLink className="w-4 h-4" /> Google Calendar
+                          <ExternalLink className="w-4 h-4 shrink-0" /> Salvar na Agenda
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="gap-2"
-                          onClick={() => downloadIcs(title, details, apt.data_hora)}
+                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 justify-start"
+                          onClick={() => {
+                            setCancelAptId(apt.id)
+                            setIsCancelDialogOpen(true)
+                          }}
                         >
-                          <Download className="w-4 h-4" /> Outlook / Apple
+                          <Ban className="w-4 h-4 shrink-0" /> Solicitar Cancelamento
                         </Button>
                       </div>
                     </CardContent>
@@ -218,8 +306,116 @@ export default function PublicPortal() {
               </div>
             )}
           </TabsContent>
+
+          {showLegalTab && (
+            <TabsContent value="juridico" className="space-y-6">
+              {!data.contrato_aceito && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg flex items-start gap-3">
+                  <FileText className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Ação Necessária</p>
+                    <p className="text-sm mt-1">
+                      Por favor, leia e aceite os termos do contrato e política de cancelamento para
+                      continuar seu tratamento.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {data.texto_contrato && (
+                <Card className="shadow-sm">
+                  <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+                    <CardTitle className="text-lg">Contrato de Prestação de Serviços</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="bg-slate-50 p-4 rounded-md text-sm text-slate-700 whitespace-pre-wrap h-64 overflow-y-auto border border-slate-200">
+                      {data.texto_contrato}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {data.politica_cancelamento && (
+                <Card className="shadow-sm">
+                  <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+                    <CardTitle className="text-lg">Política de Cancelamento</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="bg-slate-50 p-4 rounded-md text-sm text-slate-700 whitespace-pre-wrap border border-slate-200">
+                      {data.politica_cancelamento}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                {data.contrato_aceito ? (
+                  <div className="flex items-center gap-3 text-emerald-700">
+                    <CheckCircle className="w-6 h-6" />
+                    <div>
+                      <p className="font-bold">Termos Aceitos</p>
+                      <p className="text-sm opacity-80">
+                        Você já concordou com as políticas da clínica.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="terms"
+                        className="mt-1"
+                        onCheckedChange={(checked) => {
+                          if (checked) handleAcceptContract()
+                        }}
+                      />
+                      <label
+                        htmlFor="terms"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Li e estou de acordo com os termos do contrato e a política de cancelamento
+                        estabelecida.
+                      </label>
+                    </div>
+                  </>
+                )}
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
+
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Solicitar Cancelamento</DialogTitle>
+            <DialogDescription>
+              Por favor, informe o motivo do cancelamento. Esta ação não poderá ser desfeita e está
+              sujeita às políticas da clínica.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Justificativa (obrigatório)"
+              value={cancelJustification}
+              onChange={(e) => setCancelJustification(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCancelDialogOpen(false)}>
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelAppointment}
+              disabled={!cancelJustification.trim()}
+            >
+              Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -5,13 +5,12 @@ import { Button } from '@/components/ui/button'
 import {
   Check,
   X,
-  FileText,
   Plus,
   ExternalLink,
-  Download,
   ChevronLeft,
   ChevronRight,
   Receipt,
+  CircleDollarSign,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -27,7 +26,6 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -35,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { formatGoogleCalendarLink, downloadIcs } from '@/lib/calendar'
+import { formatGoogleCalendarLink } from '@/lib/calendar'
 import {
   format,
   addDays,
@@ -75,8 +73,6 @@ export default function Agenda() {
     data_hora: '',
     especialidade: '',
     valor_total: '0',
-    valor_sinal: '0',
-    sinal_pago: false,
   })
 
   const { toast } = useToast()
@@ -101,7 +97,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, especialidade, valor_total, valor_sinal, sinal_pago, status_nota_fiscal, paciente_id, pacientes (id, nome, valor_sessao)`,
+        `id, data_hora, status, especialidade, valor_total, status_nota_fiscal, paciente_id, justificativa_falta, pacientes (id, nome, valor_sessao)`,
       )
       .eq('usuario_id', user.id)
       .gte('data_hora', s.toISOString())
@@ -175,8 +171,6 @@ export default function Agenda() {
         data_hora: isoDate,
         especialidade: formData.especialidade || null,
         valor_total: Number(formData.valor_total),
-        valor_sinal: Number(formData.valor_sinal),
-        sinal_pago: formData.sinal_pago,
         status: 'agendado',
       })
       .select()
@@ -186,41 +180,6 @@ export default function Agenda() {
       toast({ title: 'Erro ao agendar', description: error.message, variant: 'destructive' })
       setIsSubmitting(false)
       return
-    }
-
-    if (formData.sinal_pago && Number(formData.valor_sinal) > 0) {
-      const d = new Date(isoDate)
-      const mes = d.getMonth() + 1
-      const ano = d.getFullYear()
-      const ptId = formData.paciente_id
-      const { data: fin } = await supabase
-        .from('financeiro')
-        .select('*')
-        .eq('usuario_id', user.id)
-        .eq('paciente_id', ptId)
-        .eq('mes', mes)
-        .eq('ano', ano)
-        .maybeSingle()
-      if (fin) {
-        await supabase
-          .from('financeiro')
-          .update({
-            valor_recebido: Number(fin.valor_recebido) + Number(formData.valor_sinal),
-            valor_a_receber:
-              Number(fin.valor_a_receber) +
-              (Number(formData.valor_total) - Number(formData.valor_sinal)),
-          })
-          .eq('id', fin.id)
-      } else {
-        await supabase.from('financeiro').insert({
-          usuario_id: user.id,
-          paciente_id: ptId,
-          mes,
-          ano,
-          valor_recebido: Number(formData.valor_sinal),
-          valor_a_receber: Number(formData.valor_total) - Number(formData.valor_sinal),
-        })
-      }
     }
 
     // Trigger Notification
@@ -234,8 +193,6 @@ export default function Agenda() {
       data_hora: '',
       especialidade: '',
       valor_total: '0',
-      valor_sinal: '0',
-      sinal_pago: false,
     })
   }
 
@@ -250,10 +207,7 @@ export default function Agenda() {
       const mes = now.getMonth() + 1
       const ano = now.getFullYear()
       const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-      const valorSessao = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
-      const valorToAdd = apt.sinal_pago
-        ? Number(valorSessao) - Number(apt.valor_sinal)
-        : Number(valorSessao)
+      const valorToAdd = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
 
       if (valorToAdd > 0) {
         const { data: finData } = await supabase
@@ -268,7 +222,7 @@ export default function Agenda() {
           await supabase
             .from('financeiro')
             .update({
-              valor_a_receber: Number(finData.valor_a_receber) + valorToAdd,
+              valor_a_receber: Number(finData.valor_a_receber) + Number(valorToAdd),
               data_atualizacao: new Date().toISOString(),
             })
             .eq('id', finData.id)
@@ -285,13 +239,40 @@ export default function Agenda() {
     }
   }
 
-  const handleFaturar = async (aptId: string) => {
+  const handleRegistrarPagamento = async (apt: any) => {
+    if (!user) return
+    const now = new Date(apt.data_hora)
+    const mes = now.getMonth() + 1
+    const ano = now.getFullYear()
+    const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+    const valorSessao = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
+
+    // Atualiza Financeiro (move de a_receber para recebido)
+    const { data: finData } = await supabase
+      .from('financeiro')
+      .select('*')
+      .eq('usuario_id', user.id)
+      .eq('paciente_id', apt.paciente_id)
+      .eq('mes', mes)
+      .eq('ano', ano)
+      .maybeSingle()
+
+    if (finData) {
+      await supabase
+        .from('financeiro')
+        .update({
+          valor_recebido: Number(finData.valor_recebido) + Number(valorSessao),
+          valor_a_receber: Math.max(0, Number(finData.valor_a_receber) - Number(valorSessao)),
+        })
+        .eq('id', finData.id)
+    }
+
     try {
       const { error } = await supabase.functions.invoke('emitir_nota_fiscal', {
-        body: { agendamento_id: aptId },
+        body: { agendamento_id: apt.id, valor: valorSessao, paciente_nome: pacienteInfo?.nome },
       })
       if (error) throw error
-      toast({ title: 'Nota fiscal emitida com sucesso!' })
+      toast({ title: 'Pagamento registrado e Nota Fiscal emitida!' })
       fetchAppointments()
     } catch (e) {
       toast({ title: 'Erro ao emitir NF', variant: 'destructive' })
@@ -355,14 +336,21 @@ export default function Agenda() {
                     {apt.especialidade}
                   </Badge>
                 )}
-                {apt.valor_sinal > 0 && !apt.sinal_pago && (
-                  <Badge variant="destructive" className="text-[10px]">
-                    Sinal Pendente
+                {apt.status_nota_fiscal === 'emitida' && (
+                  <Badge
+                    variant="outline"
+                    className="bg-blue-50 text-blue-700 text-[10px] border-blue-200"
+                  >
+                    NF Emitida
                   </Badge>
                 )}
-                {apt.status_nota_fiscal === 'emitida' && (
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px]">
-                    NF Emitida
+                {apt.justificativa_falta && apt.status === 'desmarcou' && (
+                  <Badge
+                    variant="outline"
+                    className="bg-amber-50 text-amber-700 text-[10px] border-amber-200"
+                    title={apt.justificativa_falta}
+                  >
+                    Justificado pelo Portal
                   </Badge>
                 )}
               </div>
@@ -385,13 +373,12 @@ export default function Agenda() {
             </Button>
             {apt.status === 'compareceu' && apt.status_nota_fiscal !== 'emitida' && (
               <Button
-                size="icon"
                 variant="outline"
-                className="hover:bg-blue-50 hover:border-blue-200"
-                onClick={() => handleFaturar(apt.id)}
-                title="Emitir Nota Fiscal"
+                className="hover:bg-emerald-50 hover:border-emerald-200 text-emerald-600 gap-2"
+                onClick={() => handleRegistrarPagamento(apt)}
+                title="Registrar Pagamento e Emitir NF"
               >
-                <Receipt className="w-5 h-5 text-blue-500" />
+                <CircleDollarSign className="w-4 h-4" /> Pagar & NF
               </Button>
             )}
             <div className="w-px h-8 bg-slate-200 mx-1 hidden sm:block"></div>
@@ -639,39 +626,17 @@ export default function Agenda() {
                 </Select>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Valor Total (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.valor_total}
-                  onChange={(e) => setFormData({ ...formData, valor_total: e.target.value })}
-                  className="bg-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Sinal / Entrada (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.valor_sinal}
-                  onChange={(e) => setFormData({ ...formData, valor_sinal: e.target.value })}
-                  className="bg-white"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Valor da Sessão (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.valor_total}
+                onChange={(e) => setFormData({ ...formData, valor_total: e.target.value })}
+                className="bg-white"
+              />
             </div>
-            {Number(formData.valor_sinal) > 0 && (
-              <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-md">
-                <Label>Sinal já foi pago?</Label>
-                <Switch
-                  checked={formData.sinal_pago}
-                  onCheckedChange={(v) => setFormData({ ...formData, sinal_pago: v })}
-                />
-              </div>
-            )}
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setIsNewModalOpen(false)}>
                 Cancelar
