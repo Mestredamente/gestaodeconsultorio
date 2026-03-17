@@ -14,6 +14,7 @@ export type Database = {
           data_hora: string
           especialidade: string | null
           id: string
+          justificativa_falta: string | null
           paciente_id: string
           sinal_pago: boolean | null
           status: string
@@ -26,6 +27,7 @@ export type Database = {
           data_hora: string
           especialidade?: string | null
           id?: string
+          justificativa_falta?: string | null
           paciente_id: string
           sinal_pago?: boolean | null
           status?: string
@@ -38,6 +40,7 @@ export type Database = {
           data_hora?: string
           especialidade?: string | null
           id?: string
+          justificativa_falta?: string | null
           paciente_id?: string
           sinal_pago?: boolean | null
           status?: string
@@ -384,12 +387,16 @@ export type Database = {
           complemento: string | null
           contato_emergencia_nome: string | null
           contato_emergencia_telefone: string | null
+          contrato_aceito: boolean | null
           cpf: string | null
+          data_aceite_contrato: string | null
           data_criacao: string | null
           data_nascimento: string | null
+          dia_pagamento: number | null
           email: string | null
           endereco: string | null
           estado: string | null
+          frequencia_pagamento: string | null
           hash_anamnese: string | null
           id: string
           nome: string
@@ -407,12 +414,16 @@ export type Database = {
           complemento?: string | null
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
+          contrato_aceito?: boolean | null
           cpf?: string | null
+          data_aceite_contrato?: string | null
           data_criacao?: string | null
           data_nascimento?: string | null
+          dia_pagamento?: number | null
           email?: string | null
           endereco?: string | null
           estado?: string | null
+          frequencia_pagamento?: string | null
           hash_anamnese?: string | null
           id?: string
           nome: string
@@ -430,12 +441,16 @@ export type Database = {
           complemento?: string | null
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
+          contrato_aceito?: boolean | null
           cpf?: string | null
+          data_aceite_contrato?: string | null
           data_criacao?: string | null
           data_nascimento?: string | null
+          dia_pagamento?: number | null
           email?: string | null
           endereco?: string | null
           estado?: string | null
+          frequencia_pagamento?: string | null
           hash_anamnese?: string | null
           id?: string
           nome?: string
@@ -504,9 +519,11 @@ export type Database = {
           lembrete_whatsapp_ativo: boolean | null
           logo_url: string | null
           nome_consultorio: string | null
+          politica_cancelamento: string | null
           preferencias_dashboard: Json | null
           template_cobranca: string | null
           template_lembrete: string | null
+          texto_contrato: string | null
         }
         Insert: {
           anamnese_template?: Json | null
@@ -517,9 +534,11 @@ export type Database = {
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
           nome_consultorio?: string | null
+          politica_cancelamento?: string | null
           preferencias_dashboard?: Json | null
           template_cobranca?: string | null
           template_lembrete?: string | null
+          texto_contrato?: string | null
         }
         Update: {
           anamnese_template?: Json | null
@@ -530,9 +549,11 @@ export type Database = {
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
           nome_consultorio?: string | null
+          politica_cancelamento?: string | null
           preferencias_dashboard?: Json | null
           template_cobranca?: string | null
           template_lembrete?: string | null
+          texto_contrato?: string | null
         }
         Relationships: []
       }
@@ -541,6 +562,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_patient_contract: { Args: { p_hash: string }; Returns: boolean }
+      cancel_appointment_portal: {
+        Args: {
+          p_agendamento_id: string
+          p_hash: string
+          p_justificativa: string
+        }
+        Returns: boolean
+      }
       create_public_booking: {
         Args: {
           p_clinic_id: string
@@ -708,6 +738,7 @@ export const Constants = {
 //   valor_sinal: numeric (nullable, default: 0)
 //   sinal_pago: boolean (nullable, default: false)
 //   status_nota_fiscal: text (nullable, default: 'pendente'::text)
+//   justificativa_falta: text (nullable)
 // Table: appointments
 //   id: uuid (not null, default: gen_random_uuid())
 //   patient_name: text (not null)
@@ -790,6 +821,10 @@ export const Constants = {
 //   bairro: text (nullable)
 //   cidade: text (nullable)
 //   estado: text (nullable)
+//   frequencia_pagamento: text (nullable, default: 'sessão'::text)
+//   dia_pagamento: integer (nullable)
+//   contrato_aceito: boolean (nullable, default: false)
+//   data_aceite_contrato: timestamp with time zone (nullable)
 // Table: prontuarios
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)
@@ -808,6 +843,8 @@ export const Constants = {
 //   template_lembrete: text (nullable, default: 'Olá [Nome], você tem uma consulta amanhã às [hora].'::text)
 //   especialidades_disponiveis: _text (nullable, default: '{}'::text[])
 //   preferencias_dashboard: jsonb (nullable, default: '{"show_agenda": true, "show_revenue": true, "show_birthdays": true}'::jsonb)
+//   texto_contrato: text (nullable)
+//   politica_cancelamento: text (nullable)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
@@ -922,6 +959,44 @@ export const Constants = {
 //     WITH CHECK: (id = auth.uid())
 
 // --- DATABASE FUNCTIONS ---
+// FUNCTION accept_patient_contract(uuid)
+//   CREATE OR REPLACE FUNCTION public.accept_patient_contract(p_hash uuid)
+//    RETURNS boolean
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//       UPDATE public.pacientes
+//       SET contrato_aceito = true, data_aceite_contrato = NOW()
+//       WHERE hash_anamnese = p_hash;
+//       RETURN FOUND;
+//   END;
+//   $function$
+//
+// FUNCTION cancel_appointment_portal(uuid, uuid, text)
+//   CREATE OR REPLACE FUNCTION public.cancel_appointment_portal(p_hash uuid, p_agendamento_id uuid, p_justificativa text)
+//    RETURNS boolean
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//       v_paciente_id uuid;
+//   BEGIN
+//       -- Verifica autenticidade do paciente pelo hash
+//       SELECT id INTO v_paciente_id FROM public.pacientes WHERE hash_anamnese = p_hash LIMIT 1;
+//       IF v_paciente_id IS NULL THEN
+//           RETURN false;
+//       END IF;
+//
+//       -- Atualiza o status e a justificativa apenas se pertencer ao paciente e estiver agendado
+//       UPDATE public.agendamentos
+//       SET status = 'desmarcou', justificativa_falta = p_justificativa
+//       WHERE id = p_agendamento_id AND paciente_id = v_paciente_id AND status = 'agendado';
+//
+//       RETURN FOUND;
+//   END;
+//   $function$
+//
 // FUNCTION create_public_booking(uuid, text, text, timestamp with time zone)
 //   CREATE OR REPLACE FUNCTION public.create_public_booking(p_clinic_id uuid, p_nome text, p_telefone text, p_data_hora timestamp with time zone)
 //    RETURNS jsonb
@@ -986,11 +1061,11 @@ export const Constants = {
 //       v_paciente record;
 //       v_agendamentos jsonb;
 //       v_historico jsonb;
-//       v_clinica text;
+//       v_clinica record;
 //       v_past_appointments jsonb;
 //   BEGIN
-//       -- Find patient by hash
-//       SELECT p.id, p.nome, p.usuario_id INTO v_paciente
+//       -- Busca paciente pelo hash
+//       SELECT p.id, p.nome, p.usuario_id, p.contrato_aceito INTO v_paciente
 //       FROM public.pacientes p
 //       WHERE p.hash_anamnese = p_hash LIMIT 1;
 //
@@ -998,26 +1073,24 @@ export const Constants = {
 //           RETURN '{}'::jsonb;
 //       END IF;
 //
-//       -- Get clinic name
-//       SELECT nome_consultorio INTO v_clinica
+//       -- Busca informações da clínica (incluindo textos legais)
+//       SELECT nome_consultorio, texto_contrato, politica_cancelamento INTO v_clinica
 //       FROM public.usuarios
 //       WHERE id = v_paciente.usuario_id LIMIT 1;
 //
-//       -- Get upcoming appointments
+//       -- Busca agendamentos futuros
 //       SELECT COALESCE(jsonb_agg(jsonb_build_object(
 //           'id', a.id,
 //           'data_hora', a.data_hora,
 //           'status', a.status,
 //           'especialidade', a.especialidade,
-//           'valor_total', a.valor_total,
-//           'valor_sinal', a.valor_sinal,
-//           'sinal_pago', a.sinal_pago
+//           'valor_total', a.valor_total
 //       )), '[]'::jsonb) INTO v_agendamentos
 //       FROM public.agendamentos a
-//       WHERE a.paciente_id = v_paciente.id AND a.data_hora >= NOW()
+//       WHERE a.paciente_id = v_paciente.id AND a.data_hora >= NOW() AND a.status = 'agendado'
 //       ORDER BY a.data_hora ASC;
 //
-//       -- Get past appointments for survey (status = 'compareceu', without evaluation)
+//       -- Busca último agendamento passado para pesquisa de satisfação
 //       SELECT COALESCE(jsonb_agg(jsonb_build_object(
 //           'id', a.id,
 //           'data_hora', a.data_hora,
@@ -1032,16 +1105,19 @@ export const Constants = {
 //       ORDER BY a.data_hora DESC
 //       LIMIT 1;
 //
-//       -- Get session history
+//       -- Busca histórico de sessões
 //       SELECT historico_sessoes INTO v_historico
 //       FROM public.prontuarios
 //       WHERE paciente_id = v_paciente.id LIMIT 1;
 //
-//       -- Build final response
+//       -- Retorna o JSON final
 //       RETURN jsonb_build_object(
 //           'paciente_id', v_paciente.id,
 //           'paciente_nome', v_paciente.nome,
-//           'consultorio', v_clinica,
+//           'contrato_aceito', v_paciente.contrato_aceito,
+//           'consultorio', v_clinica.nome_consultorio,
+//           'texto_contrato', v_clinica.texto_contrato,
+//           'politica_cancelamento', v_clinica.politica_cancelamento,
 //           'agendamentos', v_agendamentos,
 //           'historico', COALESCE(v_historico, '[]'::jsonb),
 //           'pending_survey', v_past_appointments
