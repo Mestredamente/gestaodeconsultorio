@@ -9,8 +9,8 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
-  Receipt,
   CircleDollarSign,
+  Calendar as CalendarIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -56,6 +56,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function Agenda() {
   const [appointments, setAppointments] = useState<any[]>([])
+  const [externalEvents, setExternalEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [receiptData, setReceiptData] = useState<any>(null)
 
@@ -103,7 +104,35 @@ export default function Agenda() {
       .gte('data_hora', s.toISOString())
       .lt('data_hora', e.toISOString())
       .order('data_hora', { ascending: true })
+
     if (!error && data) setAppointments(data)
+
+    // Check Calendar Sync Status to Mock External Events
+    const { data: uData } = await supabase
+      .from('usuarios')
+      .select('sync_calendarios')
+      .eq('id', user.id)
+      .single()
+    if (uData?.sync_calendarios?.google || uData?.sync_calendarios?.outlook) {
+      const mockDate = new Date(currentDate)
+      mockDate.setHours(15, 0, 0, 0)
+      if (mockDate >= s && mockDate <= e) {
+        setExternalEvents([
+          {
+            id: 'ext-' + mockDate.getTime(),
+            data_hora: mockDate.toISOString(),
+            status: 'external',
+            titulo: 'Compromisso Externo (Sincronizado)',
+            pacientes: { nome: 'Bloqueio de Agenda' },
+          },
+        ])
+      } else {
+        setExternalEvents([])
+      }
+    } else {
+      setExternalEvents([])
+    }
+
     setLoading(false)
   }, [user, view, currentDate])
 
@@ -178,22 +207,15 @@ export default function Agenda() {
 
     if (error) {
       toast({ title: 'Erro ao agendar', description: error.message, variant: 'destructive' })
-      setIsSubmitting(false)
-      return
+    } else {
+      supabase.functions.invoke('enviar_lembrete_consulta', {
+        body: { agendamento_id: newAppt.id },
+      })
+      toast({ title: 'Agendamento salvo com sucesso!' })
+      setIsNewModalOpen(false)
+      setFormData({ paciente_id: '', data_hora: '', especialidade: '', valor_total: '0' })
     }
-
-    // Trigger Notification
-    supabase.functions.invoke('enviar_lembrete_consulta', { body: { agendamento_id: newAppt.id } })
-
-    toast({ title: 'Agendamento salvo com sucesso!' })
-    setIsNewModalOpen(false)
     setIsSubmitting(false)
-    setFormData({
-      paciente_id: '',
-      data_hora: '',
-      especialidade: '',
-      valor_total: '0',
-    })
   }
 
   const handleUpdateStatus = async (apt: any, newStatus: string) => {
@@ -204,8 +226,6 @@ export default function Agenda() {
 
     if (newStatus === 'compareceu' && user) {
       const now = new Date(apt.data_hora)
-      const mes = now.getMonth() + 1
-      const ano = now.getFullYear()
       const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
       const valorToAdd = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
 
@@ -215,8 +235,8 @@ export default function Agenda() {
           .select('*')
           .eq('usuario_id', user.id)
           .eq('paciente_id', apt.paciente_id)
-          .eq('mes', mes)
-          .eq('ano', ano)
+          .eq('mes', now.getMonth() + 1)
+          .eq('ano', now.getFullYear())
           .maybeSingle()
         if (finData)
           await supabase
@@ -227,61 +247,18 @@ export default function Agenda() {
             })
             .eq('id', finData.id)
         else
-          await supabase.from('financeiro').insert({
-            usuario_id: user.id,
-            paciente_id: apt.paciente_id,
-            mes,
-            ano,
-            valor_recebido: 0,
-            valor_a_receber: valorToAdd,
-          })
+          await supabase
+            .from('financeiro')
+            .insert({
+              usuario_id: user.id,
+              paciente_id: apt.paciente_id,
+              mes: now.getMonth() + 1,
+              ano: now.getFullYear(),
+              valor_recebido: 0,
+              valor_a_receber: valorToAdd,
+            })
       }
     }
-  }
-
-  const handleRegistrarPagamento = async (apt: any) => {
-    if (!user) return
-    const now = new Date(apt.data_hora)
-    const mes = now.getMonth() + 1
-    const ano = now.getFullYear()
-    const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-    const valorSessao = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
-
-    // Atualiza Financeiro (move de a_receber para recebido)
-    const { data: finData } = await supabase
-      .from('financeiro')
-      .select('*')
-      .eq('usuario_id', user.id)
-      .eq('paciente_id', apt.paciente_id)
-      .eq('mes', mes)
-      .eq('ano', ano)
-      .maybeSingle()
-
-    if (finData) {
-      await supabase
-        .from('financeiro')
-        .update({
-          valor_recebido: Number(finData.valor_recebido) + Number(valorSessao),
-          valor_a_receber: Math.max(0, Number(finData.valor_a_receber) - Number(valorSessao)),
-        })
-        .eq('id', finData.id)
-    }
-
-    try {
-      const { error } = await supabase.functions.invoke('emitir_nota_fiscal', {
-        body: { agendamento_id: apt.id, valor: valorSessao, paciente_nome: pacienteInfo?.nome },
-      })
-      if (error) throw error
-      toast({ title: 'Pagamento registrado e Nota Fiscal emitida!' })
-      fetchAppointments()
-    } catch (e) {
-      toast({ title: 'Erro ao emitir NF', variant: 'destructive' })
-    }
-  }
-
-  const handlePatientSelect = (pid: string) => {
-    const pt = patients.find((p) => p.id === pid)
-    setFormData({ ...formData, paciente_id: pid, valor_total: pt?.valor_sessao?.toString() || '0' })
   }
 
   const getDaysForView = () => {
@@ -302,12 +279,33 @@ export default function Agenda() {
       hour: '2-digit',
       minute: '2-digit',
     })
+
+    if (apt.status === 'external') {
+      return (
+        <Card
+          key={apt.id}
+          className="bg-slate-50 border-l-4 border-indigo-400 opacity-80 shadow-none border-t-0 border-r-0 border-b-0"
+        >
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="bg-slate-200 min-w-[70px] py-2 rounded-lg text-center border border-slate-300 shrink-0">
+              <span className="font-bold text-slate-600 text-lg">{timeStr}</span>
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-700">{apt.pacientes.nome}</h3>
+              <p className="text-xs font-medium text-slate-500 mt-1 flex items-center gap-1">
+                <CalendarIcon className="w-3 h-3" /> {apt.titulo}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
     const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
     const patientName = pacienteInfo?.nome || 'Paciente Desconhecido'
     const valueStr = Number(
       apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0,
     ).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-    const eventTitle = `Consulta: ${patientName} ${apt.especialidade ? `(${apt.especialidade})` : ''}`
     const statusColors: Record<string, string> = {
       agendado: 'border-l-slate-200',
       compareceu: 'border-l-emerald-500',
@@ -336,23 +334,6 @@ export default function Agenda() {
                     {apt.especialidade}
                   </Badge>
                 )}
-                {apt.status_nota_fiscal === 'emitida' && (
-                  <Badge
-                    variant="outline"
-                    className="bg-blue-50 text-blue-700 text-[10px] border-blue-200"
-                  >
-                    NF Emitida
-                  </Badge>
-                )}
-                {apt.justificativa_falta && apt.status === 'desmarcou' && (
-                  <Badge
-                    variant="outline"
-                    className="bg-amber-50 text-amber-700 text-[10px] border-amber-200"
-                    title={apt.justificativa_falta}
-                  >
-                    Justificado pelo Portal
-                  </Badge>
-                )}
               </div>
               <p className="text-sm text-slate-500 font-medium">Valor: {valueStr}</p>
             </div>
@@ -364,23 +345,13 @@ export default function Agenda() {
               className="text-slate-400 hover:text-primary"
               onClick={() =>
                 window.open(
-                  formatGoogleCalendarLink(eventTitle, clinicName, apt.data_hora),
+                  formatGoogleCalendarLink(`Consulta: ${patientName}`, clinicName, apt.data_hora),
                   '_blank',
                 )
               }
             >
               <ExternalLink className="w-4 h-4" />
             </Button>
-            {apt.status === 'compareceu' && apt.status_nota_fiscal !== 'emitida' && (
-              <Button
-                variant="outline"
-                className="hover:bg-emerald-50 hover:border-emerald-200 text-emerald-600 gap-2"
-                onClick={() => handleRegistrarPagamento(apt)}
-                title="Registrar Pagamento e Emitir NF"
-              >
-                <CircleDollarSign className="w-4 h-4" /> Pagar & NF
-              </Button>
-            )}
             <div className="w-px h-8 bg-slate-200 mx-1 hidden sm:block"></div>
             <Button
               size="icon"
@@ -450,31 +421,15 @@ export default function Agenda() {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-
           <Tabs
             value={view}
             onValueChange={(v) => setView(v as any)}
             className="bg-white border rounded-md shadow-sm"
           >
             <TabsList className="h-10 p-1 bg-transparent">
-              <TabsTrigger
-                value="daily"
-                className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-              >
-                Dia
-              </TabsTrigger>
-              <TabsTrigger
-                value="weekly"
-                className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-              >
-                Semana
-              </TabsTrigger>
-              <TabsTrigger
-                value="monthly"
-                className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
-              >
-                Mês
-              </TabsTrigger>
+              <TabsTrigger value="daily">Dia</TabsTrigger>
+              <TabsTrigger value="weekly">Semana</TabsTrigger>
+              <TabsTrigger value="monthly">Mês</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -503,7 +458,9 @@ export default function Agenda() {
                 <div key={`empty-${i}`} />
               ))}
               {days.map((d) => {
-                const dayAppts = appointments.filter((a) => isSameDay(new Date(a.data_hora), d))
+                const dayAppts = [...appointments, ...externalEvents].filter((a) =>
+                  isSameDay(new Date(a.data_hora), d),
+                )
                 return (
                   <div
                     key={d.toISOString()}
@@ -526,7 +483,13 @@ export default function Agenda() {
                     </div>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {dayAppts.slice(0, 3).map((a) => (
-                        <div key={a.id} className="w-2 h-2 rounded-full bg-primary" />
+                        <div
+                          key={a.id}
+                          className={cn(
+                            'w-2 h-2 rounded-full',
+                            a.status === 'external' ? 'bg-indigo-400' : 'bg-primary',
+                          )}
+                        />
                       ))}
                       {dayAppts.length > 3 && (
                         <span className="text-[10px] text-slate-500 font-medium">
@@ -541,7 +504,9 @@ export default function Agenda() {
           ) : (
             <div className="space-y-8">
               {days.map((d) => {
-                const dayAppts = appointments.filter((a) => isSameDay(new Date(a.data_hora), d))
+                const dayAppts = [...appointments, ...externalEvents]
+                  .filter((a) => isSameDay(new Date(a.data_hora), d))
+                  .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime())
                 if (dayAppts.length === 0) {
                   if (view === 'daily')
                     return (
@@ -549,7 +514,7 @@ export default function Agenda() {
                         key={d.toISOString()}
                         className="text-center p-12 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500"
                       >
-                        Nenhuma sessão agendada para esta data.
+                        Nenhuma sessão agendada.
                       </div>
                     )
                   return null
@@ -570,11 +535,6 @@ export default function Agenda() {
         </div>
       )}
 
-      <ReceiptDialog
-        {...receiptData}
-        onOpenChange={(val: boolean) => setReceiptData(val ? receiptData : null)}
-      />
-
       <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -583,7 +543,18 @@ export default function Agenda() {
           <form onSubmit={handleCreateAppointment} className="space-y-4 pt-4">
             <div className="space-y-2">
               <Label>Paciente</Label>
-              <Select value={formData.paciente_id} onValueChange={handlePatientSelect} required>
+              <Select
+                value={formData.paciente_id}
+                onValueChange={(v) => {
+                  const pt = patients.find((p) => p.id === v)
+                  setFormData({
+                    ...formData,
+                    paciente_id: v,
+                    valor_total: pt?.valor_sessao?.toString() || '0',
+                  })
+                }}
+                required
+              >
                 <SelectTrigger className="bg-white">
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>

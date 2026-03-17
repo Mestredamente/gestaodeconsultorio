@@ -16,6 +16,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { PrescriptionsList } from '@/components/PrescriptionsList'
 
 type HistoricoEntry = { id: string; date: string; content: string }
 
@@ -140,8 +142,7 @@ export default function PatientRecord() {
   return (
     <>
       <style media="print">{`body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; } html, body { background-color: white !important; min-height: 100%; } @page { size: auto; margin: 20mm; }`}</style>
-
-      <div className="space-y-8 animate-fade-in-up pb-10 max-w-5xl mx-auto">
+      <div className="space-y-8 animate-fade-in-up pb-10 max-w-5xl mx-auto print:hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <Button
@@ -149,7 +150,7 @@ export default function PatientRecord() {
               onClick={() => navigate(`/pacientes/${id}`)}
               className="gap-2 -ml-4 text-slate-500 mb-2"
             >
-              <ArrowLeft className="w-4 h-4" /> Voltar para Perfil
+              <ArrowLeft className="w-4 h-4" /> Voltar
             </Button>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
               <FileText className="w-6 h-6 text-primary" /> Prontuário Digital
@@ -183,8 +184,8 @@ export default function PatientRecord() {
                 <Textarea
                   value={queixa}
                   onChange={(e) => setQueixa(e.target.value)}
-                  placeholder="Descreva o motivo da consulta e a queixa principal do paciente..."
-                  className="min-h-[140px] bg-white border-slate-200 focus-visible:ring-primary/20 text-base leading-relaxed"
+                  placeholder="Descreva o motivo da consulta..."
+                  className="min-h-[140px] bg-white border-slate-200 text-base"
                 />
                 <div className="flex justify-end gap-3">
                   <Button variant="outline" onClick={() => setIsEditingQueixa(false)}>
@@ -196,70 +197,75 @@ export default function PatientRecord() {
                 </div>
               </div>
             ) : (
-              <div className="prose prose-slate max-w-none">
-                <p className="text-slate-700 whitespace-pre-wrap leading-relaxed text-base">
-                  {queixa || (
-                    <span className="text-slate-400 italic">
-                      Nenhuma anotação registrada. Adicione os objetivos terapêuticos aqui.
-                    </span>
-                  )}
-                </p>
-              </div>
+              <p className="text-slate-700 whitespace-pre-wrap leading-relaxed text-base">
+                {queixa || (
+                  <span className="text-slate-400 italic">
+                    Nenhuma anotação registrada. Adicione os objetivos terapêuticos aqui.
+                  </span>
+                )}
+              </p>
             )}
           </CardContent>
         </Card>
 
-        <div>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-            <h2 className="text-xl font-bold tracking-tight text-slate-800 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-slate-400" /> Histórico Clínico
-            </h2>
-            <Button
-              onClick={() => setIsEvolModalOpen(true)}
-              className="gap-2 rounded-full shadow-sm hover:shadow-md transition-all"
-            >
-              <Plus className="w-4 h-4" /> Registrar Sessão
-            </Button>
-          </div>
+        <Tabs defaultValue="historico" className="w-full">
+          <TabsList className="mb-6 h-auto p-1 bg-slate-100/50 border border-slate-200">
+            <TabsTrigger value="historico" className="gap-2 py-2.5 px-4">
+              <Clock className="w-4 h-4" /> Histórico Clínico
+            </TabsTrigger>
+            <TabsTrigger value="prescricoes" className="gap-2 py-2.5 px-4">
+              <FileText className="w-4 h-4" /> Prescrições
+            </TabsTrigger>
+          </TabsList>
 
-          {historico.length === 0 ? (
-            <div className="text-center p-12 bg-white border border-dashed border-slate-300 rounded-xl shadow-sm">
-              <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-slate-900">Nenhum registro</h3>
-              <p className="text-slate-500 mt-1">A evolução clínica do paciente aparecerá aqui.</p>
+          <TabsContent value="historico" className="space-y-6">
+            <div className="flex justify-end mb-4">
+              <Button
+                onClick={() => setIsEvolModalOpen(true)}
+                className="gap-2 rounded-full shadow-sm"
+              >
+                <Plus className="w-4 h-4" /> Registrar Sessão
+              </Button>
             </div>
-          ) : (
-            <div className="relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent space-y-8">
-              {historico.map((entry, index) => (
-                <div
-                  key={entry.id}
-                  className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active animate-fade-in-up"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-colors group-hover:bg-primary group-hover:text-white">
-                    <Calendar className="w-4 h-4" />
+            {historico.length === 0 ? (
+              <div className="text-center p-12 bg-white border border-dashed border-slate-300 rounded-xl shadow-sm">
+                <FileText className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-slate-900">Nenhum registro</h3>
+                <p className="text-slate-500 mt-1">
+                  A evolução clínica do paciente aparecerá aqui.
+                </p>
+              </div>
+            ) : (
+              <div className="relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent space-y-8">
+                {historico.map((entry, index) => (
+                  <div
+                    key={entry.id}
+                    className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group animate-fade-in-up"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-colors group-hover:bg-primary group-hover:text-white">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <Card className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] shadow-sm border-slate-200 hover:shadow-md transition-shadow">
+                      <CardHeader className="py-3 px-5 border-b border-slate-50 bg-slate-50/50">
+                        <span className="font-semibold text-slate-700 text-sm">
+                          Sessão de {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        </span>
+                      </CardHeader>
+                      <CardContent className="p-5 text-slate-700 whitespace-pre-wrap leading-relaxed text-[15px]">
+                        {entry.content}
+                      </CardContent>
+                    </Card>
                   </div>
-                  <Card className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] shadow-sm border-slate-200 hover:shadow-md transition-shadow">
-                    <CardHeader className="py-3 px-5 border-b border-slate-50 bg-slate-50/50">
-                      <span className="font-semibold text-slate-700 text-sm">
-                        Sessão de{' '}
-                        {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
-                      </span>
-                    </CardHeader>
-                    <CardContent className="p-5 text-slate-700 whitespace-pre-wrap leading-relaxed text-[15px]">
-                      {entry.content}
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="prescricoes">
+            <PrescriptionsList pacienteId={id} clinicInfo={clinicInfo} patientName={patient.nome} />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={isEvolModalOpen} onOpenChange={setIsEvolModalOpen}>
@@ -269,9 +275,7 @@ export default function PatientRecord() {
           </DialogHeader>
           <div className="p-6 space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="date" className="text-slate-600">
-                Data da Sessão
-              </Label>
+              <Label htmlFor="date">Data da Sessão</Label>
               <Input
                 id="date"
                 type="date"
@@ -281,13 +285,11 @@ export default function PatientRecord() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="content" className="text-slate-600">
-                Evolução Clínica
-              </Label>
+              <Label htmlFor="content">Evolução Clínica</Label>
               <Textarea
                 id="content"
-                placeholder="Descreva as observações, técnicas aplicadas e evolução do paciente..."
-                className="min-h-[250px] bg-white resize-y text-base leading-relaxed p-4"
+                placeholder="Descreva as observações e evolução..."
+                className="min-h-[250px] bg-white resize-y text-base p-4"
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
               />
@@ -326,29 +328,25 @@ export default function PatientRecord() {
             Queixa Principal
           </h2>
           <p className="whitespace-pre-wrap text-slate-800 text-[15px] leading-relaxed">
-            {queixa || 'Nenhuma queixa registrada no prontuário.'}
+            {queixa || 'Nenhuma queixa registrada.'}
           </p>
         </div>
         <div>
           <h2 className="text-xl font-bold border-b border-slate-300 mb-5 pb-1 uppercase">
             Histórico de Sessões
           </h2>
-          {historico.length === 0 ? (
-            <p className="text-slate-500 italic">Nenhum registro documentado.</p>
-          ) : (
-            <div className="space-y-8">
-              {historico.map((entry) => (
-                <div key={entry.id} className="break-inside-avoid">
-                  <p className="font-bold text-slate-900 bg-slate-100 inline-block px-3 py-1 rounded mb-2 border border-slate-200">
-                    Sessão: {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                  </p>
-                  <p className="whitespace-pre-wrap text-slate-800 text-[15px] leading-relaxed text-justify">
-                    {entry.content}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="space-y-8">
+            {historico.map((entry) => (
+              <div key={entry.id} className="break-inside-avoid">
+                <p className="font-bold text-slate-900 bg-slate-100 inline-block px-3 py-1 rounded mb-2 border border-slate-200">
+                  Sessão: {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                </p>
+                <p className="whitespace-pre-wrap text-slate-800 text-[15px] leading-relaxed text-justify">
+                  {entry.content}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </>

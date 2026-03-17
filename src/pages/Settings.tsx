@@ -14,10 +14,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { Save, Copy, Upload, ImageIcon, Trash2, Plus, Scale } from 'lucide-react'
+import { Save, Copy, Upload, ImageIcon, Trash2, Plus, Scale, Calendar } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { TemplatesManager } from '@/components/TemplatesManager'
 
 export default function Settings() {
   const { user } = useAuth()
@@ -41,6 +42,9 @@ export default function Settings() {
   )
   const [especialidades, setEspecialidades] = useState<string[]>([])
   const [novaEspecialidade, setNovaEspecialidade] = useState('')
+  const [metaConsultas, setMetaConsultas] = useState(50)
+  const [syncCals, setSyncCals] = useState({ google: false, outlook: false })
+  const [userTemplates, setUserTemplates] = useState<any[]>([])
 
   useEffect(() => {
     if (user) {
@@ -62,12 +66,19 @@ export default function Settings() {
             })
             setQuestions(data.anamnese_template || [])
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
-            setTemplateLembrete(
-              data.template_lembrete ||
-                'Olá [Nome], você tem uma consulta marcada conosco para [data] às [hora].',
-            )
+            setTemplateLembrete(data.template_lembrete || 'Olá [Nome]...')
             setEspecialidades(data.especialidades_disponiveis || [])
+            setMetaConsultas(data.meta_mensal_consultas || 50)
+            if (data.sync_calendarios) setSyncCals(data.sync_calendarios as any)
           }
+        })
+
+      supabase
+        .from('templates_documentos')
+        .select('id, titulo, conteudo')
+        .eq('usuario_id', user.id)
+        .then(({ data }) => {
+          if (data) setUserTemplates(data)
         })
     }
   }, [user])
@@ -82,6 +93,8 @@ export default function Settings() {
       lembrete_whatsapp_ativo: lembreteAtivo,
       template_lembrete: templateLembrete,
       especialidades_disponiveis: especialidades,
+      meta_mensal_consultas: metaConsultas,
+      sync_calendarios: syncCals,
     }
     const { error } = await supabase.from('usuarios').upsert(payload)
     setLoading(false)
@@ -122,7 +135,13 @@ export default function Settings() {
               value="juridico"
               className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
-              Jurídico & Contratos
+              Jurídico
+            </TabsTrigger>
+            <TabsTrigger
+              value="modelos"
+              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+            >
+              Modelos
             </TabsTrigger>
             <TabsTrigger
               value="anamnese"
@@ -131,10 +150,10 @@ export default function Settings() {
               Anamnese
             </TabsTrigger>
             <TabsTrigger
-              value="lembretes"
+              value="integracoes"
               className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
             >
-              Lembretes
+              Integrações
             </TabsTrigger>
           </TabsList>
 
@@ -190,7 +209,16 @@ export default function Settings() {
                       required
                     />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
+                  <div className="space-y-2">
+                    <Label>Meta Mensal de Atendimentos</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={metaConsultas}
+                      onChange={(e) => setMetaConsultas(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label>Chave PIX (Cobrança)</Label>
                     <Input
                       value={formData.chave_pix}
@@ -208,7 +236,6 @@ export default function Settings() {
               <Textarea
                 value={formData.template_cobranca}
                 onChange={(e) => setFormData({ ...formData, template_cobranca: e.target.value })}
-                className="resize-none"
               />
             </div>
           </TabsContent>
@@ -224,7 +251,7 @@ export default function Settings() {
               <Input
                 value={novaEspecialidade}
                 onChange={(e) => setNovaEspecialidade(e.target.value)}
-                placeholder="Ex: Terapia de Casal, Avaliação Neuropsicológica..."
+                placeholder="Ex: Terapia de Casal..."
                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addEspecialidade())}
               />
               <Button type="button" onClick={addEspecialidade} variant="secondary">
@@ -232,9 +259,6 @@ export default function Settings() {
               </Button>
             </div>
             <div className="space-y-2">
-              {especialidades.length === 0 && (
-                <p className="text-sm text-slate-400">Nenhuma especialidade cadastrada.</p>
-              )}
               {especialidades.map((esp, idx) => (
                 <div
                   key={idx}
@@ -261,37 +285,56 @@ export default function Settings() {
                 <Scale className="w-5 h-5 text-primary" /> Textos Legais e Políticas
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Estes textos serão exibidos no Portal do Paciente para leitura e aceite digital.
+                Textos exibidos no Portal do Paciente para leitura e aceite digital.
               </p>
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Contrato de Prestação de Serviços</Label>
-                <p className="text-xs text-slate-500">
-                  Insira as cláusulas de atendimento, honorários e confidencialidade.
-                </p>
+                <div className="flex justify-between items-end">
+                  <Label>Contrato de Prestação de Serviços</Label>
+                  {userTemplates.length > 0 && (
+                    <Select
+                      onValueChange={(val) => {
+                        const t = userTemplates.find((x) => x.id === val)
+                        if (t) setFormData({ ...formData, texto_contrato: t.conteudo })
+                      }}
+                    >
+                      <SelectTrigger className="w-[200px] h-8 text-xs bg-white border-slate-200">
+                        <SelectValue placeholder="Carregar Template da Biblioteca" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {userTemplates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.titulo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
                 <Textarea
                   value={formData.texto_contrato}
                   onChange={(e) => setFormData({ ...formData, texto_contrato: e.target.value })}
                   className="min-h-[150px]"
-                  placeholder="Termos e condições do tratamento psicológico..."
+                  placeholder="Termos do tratamento..."
                 />
               </div>
               <div className="space-y-2">
-                <Label>Política de Cancelamento e Faltas</Label>
-                <p className="text-xs text-slate-500">
-                  Regras sobre remarcações, prazos e cobranças em caso de falta.
-                </p>
+                <Label>Política de Cancelamento</Label>
                 <Textarea
                   value={formData.politica_cancelamento}
                   onChange={(e) =>
                     setFormData({ ...formData, politica_cancelamento: e.target.value })
                   }
                   className="min-h-[100px]"
-                  placeholder="Consultas desmarcadas com menos de 24h de antecedência..."
+                  placeholder="Regras sobre remarcações..."
                 />
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="modelos" className="p-6 m-0">
+            <TemplatesManager />
           </TabsContent>
 
           <TabsContent value="anamnese" className="p-6 m-0 space-y-5">
@@ -299,7 +342,7 @@ export default function Settings() {
               <div>
                 <h3 className="font-semibold text-slate-900">Campos do Formulário Público</h3>
                 <p className="text-sm text-slate-500">
-                  Crie as perguntas que os pacientes responderão antes da consulta.
+                  Perguntas que os pacientes responderão antes da consulta.
                 </p>
               </div>
               <Button
@@ -362,40 +405,82 @@ export default function Settings() {
                   </Button>
                 </div>
               ))}
-              {questions.length === 0 && (
-                <div className="text-center p-6 text-slate-500 border border-dashed rounded-lg">
-                  Nenhuma pergunta configurada.
+            </div>
+          </TabsContent>
+
+          <TabsContent value="integracoes" className="p-6 m-0 space-y-6">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" /> Integração de Calendários
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Sincronize sua agenda com serviços externos para evitar conflitos.
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="flex items-center gap-4">
+                  <img
+                    src="https://img.usecurling.com/i?q=google&color=multicolor"
+                    alt="Google"
+                    className="w-8 h-8 rounded"
+                  />
+                  <div>
+                    <p className="font-semibold text-slate-800">Google Calendar</p>
+                    <p className="text-xs text-slate-500">
+                      Sincronização bidirecional em tempo real.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={syncCals.google}
+                  onCheckedChange={(v) => setSyncCals({ ...syncCals, google: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="flex items-center gap-4">
+                  <img
+                    src="https://img.usecurling.com/i?q=microsoft&color=multicolor"
+                    alt="Outlook"
+                    className="w-8 h-8 rounded"
+                  />
+                  <div>
+                    <p className="font-semibold text-slate-800">Outlook Calendar</p>
+                    <p className="text-xs text-slate-500">
+                      Sincronização bidirecional em tempo real.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={syncCals.outlook}
+                  onCheckedChange={(v) => setSyncCals({ ...syncCals, outlook: v })}
+                />
+              </div>
+            </div>
+            <div className="pt-6 border-t border-slate-100">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <div>
+                  <Label className="text-base">Lembretes WhatsApp Automáticos</Label>
+                  <p className="text-sm text-slate-500">
+                    Envia WhatsApp 24h antes da consulta agendada.
+                  </p>
+                </div>
+                <Switch checked={lembreteAtivo} onCheckedChange={setLembreteAtivo} />
+              </div>
+              {lembreteAtivo && (
+                <div className="space-y-2 pt-4 pl-1">
+                  <Label>Mensagem do Lembrete</Label>
+                  <Textarea
+                    value={templateLembrete}
+                    onChange={(e) => setTemplateLembrete(e.target.value)}
+                    rows={3}
+                  />
                 </div>
               )}
             </div>
           </TabsContent>
 
-          <TabsContent value="lembretes" className="p-6 m-0 space-y-6">
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
-              <div>
-                <Label className="text-base">Lembretes Automáticos</Label>
-                <p className="text-sm text-slate-500">
-                  Envia WhatsApp 24h antes da consulta agendada.
-                </p>
-              </div>
-              <Switch checked={lembreteAtivo} onCheckedChange={setLembreteAtivo} />
-            </div>
-            {lembreteAtivo && (
-              <div className="space-y-2 pt-2">
-                <Label>Mensagem do Lembrete</Label>
-                <p className="text-xs text-slate-500">
-                  Variáveis dinâmicas: [Nome], [hora], [data]
-                </p>
-                <Textarea
-                  value={templateLembrete}
-                  onChange={(e) => setTemplateLembrete(e.target.value)}
-                  rows={4}
-                />
-              </div>
-            )}
-          </TabsContent>
-
-          <div className="p-6 pt-0 border-t border-slate-100 flex flex-col sm:flex-row gap-4 mt-6">
+          <div className="p-6 pt-0 flex flex-col sm:flex-row gap-4 mt-4">
             <Button type="submit" className="gap-2 flex-1 sm:flex-none" disabled={loading}>
               <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar Alterações'}
             </Button>

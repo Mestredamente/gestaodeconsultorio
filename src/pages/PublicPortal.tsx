@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge'
 import {
   Calendar,
   Clock,
-  Download,
   ExternalLink,
   Activity,
   FileText,
@@ -17,7 +16,7 @@ import {
   Ban,
   CheckCircle,
 } from 'lucide-react'
-import { formatGoogleCalendarLink, downloadIcs } from '@/lib/calendar'
+import { formatGoogleCalendarLink } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
@@ -56,6 +55,15 @@ export default function PublicPortal() {
     fetchPortalData()
   }, [hash])
 
+  const replaceVars = (text: string) => {
+    if (!text) return ''
+    return text
+      .replace(/\[Nome do Paciente\]/gi, data.paciente_nome || '')
+      .replace(/\[CPF\]/gi, data.paciente_cpf || 'Não informado')
+      .replace(/\[Nome do Consultório\]/gi, data.consultorio || '')
+      .replace(/\[Data da Consulta\]/gi, new Date().toLocaleDateString('pt-BR'))
+  }
+
   const handleRating = async () => {
     if (!data.pending_survey?.[0]) return
     await supabase.from('avaliacoes').insert({
@@ -86,7 +94,6 @@ export default function PublicPortal() {
       p_agendamento_id: cancelAptId,
       p_justificativa: cancelJustification,
     })
-
     if (!error) {
       toast({ title: 'Consulta desmarcada.' })
       setIsCancelDialogOpen(false)
@@ -114,15 +121,17 @@ export default function PublicPortal() {
     )
 
   const showLegalTab = data.texto_contrato || data.politica_cancelamento
+  const parsedContrato = replaceVars(data.texto_contrato)
+  const parsedPolitica = replaceVars(data.politica_cancelamento)
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4">
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+    <div className="min-h-screen bg-slate-50 py-10 px-4 animate-fade-in">
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left">
             <h3 className="font-bold">Baixe nosso Aplicativo!</h3>
             <p className="text-indigo-100 text-sm">
-              Acompanhe seus dados, pagamentos e agendamentos diretamente do celular.
+              Acompanhe seus dados e agendamentos diretamente do celular.
             </p>
           </div>
           <div className="flex gap-2">
@@ -201,7 +210,7 @@ export default function PublicPortal() {
             </TabsTrigger>
             {showLegalTab && (
               <TabsTrigger value="juridico" className="gap-2 py-2 relative">
-                <Scale className="w-4 h-4" /> Contrato e Políticas
+                <Scale className="w-4 h-4" /> Contratos e Políticas
                 {!data.contrato_aceito && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
                 )}
@@ -217,17 +226,7 @@ export default function PublicPortal() {
             ) : (
               data.agendamentos.map((apt: any) => {
                 const dateObj = new Date(apt.data_hora)
-                const dateStr = dateObj.toLocaleDateString('pt-BR', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                })
-                const timeStr = dateObj.toLocaleTimeString('pt-BR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
                 const title = `Consulta: ${data.paciente_nome} - ${apt.especialidade || 'Geral'}`
-                const details = `Clínica: ${data.consultorio}`
                 return (
                   <Card key={apt.id} className="shadow-sm border-slate-200">
                     <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
@@ -237,10 +236,18 @@ export default function PublicPortal() {
                             variant="outline"
                             className="bg-primary/5 text-primary border-primary/20 capitalize"
                           >
-                            {dateStr}
+                            {dateObj.toLocaleDateString('pt-BR', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long',
+                            })}
                           </Badge>
                           <Badge variant="secondary" className="gap-1">
-                            <Clock className="w-3 h-3" /> {timeStr}
+                            <Clock className="w-3 h-3" />{' '}
+                            {dateObj.toLocaleTimeString('pt-BR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
                           </Badge>
                         </div>
                         <h3 className="font-semibold text-lg text-slate-900">
@@ -254,7 +261,11 @@ export default function PublicPortal() {
                           className="gap-2 justify-start"
                           onClick={() =>
                             window.open(
-                              formatGoogleCalendarLink(title, details, apt.data_hora),
+                              formatGoogleCalendarLink(
+                                title,
+                                `Clínica: ${data.consultorio}`,
+                                apt.data_hora,
+                              ),
                               '_blank',
                             )
                           }
@@ -292,7 +303,7 @@ export default function PublicPortal() {
                     <div className="absolute w-4 h-4 bg-primary/20 rounded-full -left-[9px] top-1 ring-4 ring-slate-50" />
                     <div className="mb-2">
                       <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md text-sm font-semibold inline-flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-primary" />
+                        <FileText className="w-4 h-4 text-primary" />{' '}
                         {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
                       </span>
                     </div>
@@ -329,7 +340,7 @@ export default function PublicPortal() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="bg-slate-50 p-4 rounded-md text-sm text-slate-700 whitespace-pre-wrap h-64 overflow-y-auto border border-slate-200">
-                      {data.texto_contrato}
+                      {parsedContrato}
                     </div>
                   </CardContent>
                 </Card>
@@ -342,7 +353,7 @@ export default function PublicPortal() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="bg-slate-50 p-4 rounded-md text-sm text-slate-700 whitespace-pre-wrap border border-slate-200">
-                      {data.politica_cancelamento}
+                      {parsedPolitica}
                     </div>
                   </CardContent>
                 </Card>
@@ -360,24 +371,19 @@ export default function PublicPortal() {
                     </div>
                   </div>
                 ) : (
-                  <>
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id="terms"
-                        className="mt-1"
-                        onCheckedChange={(checked) => {
-                          if (checked) handleAcceptContract()
-                        }}
-                      />
-                      <label
-                        htmlFor="terms"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Li e estou de acordo com os termos do contrato e a política de cancelamento
-                        estabelecida.
-                      </label>
-                    </div>
-                  </>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="terms"
+                      className="mt-1"
+                      onCheckedChange={(c) => c && handleAcceptContract()}
+                    />
+                    <label
+                      htmlFor="terms"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Li e estou de acordo com os termos do contrato e a política de cancelamento.
+                    </label>
+                  </div>
                 )}
               </div>
             </TabsContent>
@@ -390,8 +396,8 @@ export default function PublicPortal() {
           <DialogHeader>
             <DialogTitle>Solicitar Cancelamento</DialogTitle>
             <DialogDescription>
-              Por favor, informe o motivo do cancelamento. Esta ação não poderá ser desfeita e está
-              sujeita às políticas da clínica.
+              Informe o motivo do cancelamento. Esta ação não poderá ser desfeita e está sujeita às
+              políticas da clínica.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">

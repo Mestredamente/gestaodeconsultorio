@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { ServiceGoalTracker } from '@/components/ServiceGoalTracker'
 
 export default function Index() {
   const { user, signOut } = useAuth()
@@ -177,7 +178,7 @@ export default function Index() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {prefs.show_agenda && (
-          <Card className="lg:col-span-2 shadow-sm border-slate-200">
+          <Card className="lg:col-span-2 shadow-sm border-slate-200 h-fit">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" /> Sessões de Hoje
@@ -257,6 +258,8 @@ export default function Index() {
         )}
 
         <div className="space-y-6">
+          <ServiceGoalTracker />
+
           {prefs.show_revenue && (
             <Card className="shadow-sm border-slate-200 h-fit">
               <CardHeader className="border-b border-slate-100 bg-emerald-50/50 pb-4">
