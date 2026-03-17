@@ -58,8 +58,14 @@ export default function Auth() {
       let description = error?.message || 'Ocorreu um erro inesperado.'
 
       if (isRateLimit) {
-        title = 'Limite de tentativas excedido'
-        description = 'Muitas requisições. Aguarde alguns minutos antes de tentar novamente.'
+        if (action === 'signup') {
+          title = 'Limite de envios atingido'
+          description =
+            'Por favor, aguarde alguns instantes antes de tentar realizar o cadastro novamente.'
+        } else {
+          title = 'Limite de tentativas excedido'
+          description = 'Muitas requisições. Aguarde alguns minutos antes de tentar novamente.'
+        }
       } else if (isInvalidCredentials) {
         title = 'Acesso negado'
         description = 'E-mail ou senha inválidos. Por favor, tente novamente.'
