@@ -16,6 +16,8 @@ import Stock from './pages/Stock'
 import PublicBooking from './pages/PublicBooking'
 import NotFound from './pages/NotFound'
 import Auth from './pages/Auth'
+import ResetPassword from './pages/ResetPassword'
+import UpdatePassword from './pages/UpdatePassword'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth()
@@ -33,6 +35,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => (
   <Routes>
     <Route path="/auth" element={<Auth />} />
+    <Route path="/recuperar-senha" element={<ResetPassword />} />
+    <Route path="/atualizar-senha" element={<UpdatePassword />} />
     <Route path="/login" element={<Navigate to="/auth" replace />} />
     <Route path="/agendar/:clinicId" element={<PublicBooking />} />
     <Route
@@ -52,6 +56,7 @@ const AppRoutes = () => (
       <Route path="/relatorios" element={<Reports />} />
       <Route path="/estoque" element={<Stock />} />
       <Route path="/configuracoes" element={<Settings />} />
+      <Route path="/perfil" element={<Navigate to="/configuracoes" replace />} />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>

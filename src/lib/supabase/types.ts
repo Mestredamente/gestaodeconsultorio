@@ -646,9 +646,15 @@ export const Constants = {
 //    SECURITY DEFINER
 //   AS $function$
 //   BEGIN
-//     INSERT INTO public.usuarios (id, email)
-//     VALUES (new.id, new.email)
-//     ON CONFLICT (id) DO NOTHING;
+//     INSERT INTO public.usuarios (id, email, nome_consultorio)
+//     VALUES (
+//       new.id,
+//       new.email,
+//       new.raw_user_meta_data->>'nome_consultorio'
+//     )
+//     ON CONFLICT (id) DO UPDATE SET
+//       email = EXCLUDED.email,
+//       nome_consultorio = COALESCE(EXCLUDED.nome_consultorio, public.usuarios.nome_consultorio);
 //     RETURN new;
 //   END;
 //   $function$
