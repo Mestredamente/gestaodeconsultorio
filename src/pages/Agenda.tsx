@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,50 +13,149 @@ export default function Agenda() {
   const { toast } = useToast()
   const { user } = useAuth()
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      if (!user) return
+  const fetchAppointments = useCallback(async () => {
+    if (!user) return
 
-      // Obter o intervalo do dia atual para filtrar agendamentos de hoje
-      const startOfDay = new Date()
-      startOfDay.setHours(0, 0, 0, 0)
+    const startOfDay = new Date()
+    startOfDay.setHours(0, 0, 0, 0)
 
-      const endOfDay = new Date(startOfDay)
-      endOfDay.setDate(endOfDay.getDate() + 1)
+    const endOfDay = new Date(startOfDay)
+    endOfDay.setDate(endOfDay.getDate() + 1)
 
-      const { data, error } = await supabase
-        .from('agendamentos')
-        .select(`
+    const { data, error } = await supabase
+      .from('agendamentos')
+      .select(`
+        id,
+        data_hora,
+        status,
+        paciente_id,
+        pacientes (
           id,
-          data_hora,
-          status,
-          pacientes (
-            nome,
-            valor_sessao
-          )
-        `)
-        .eq('usuario_id', user.id)
-        .gte('data_hora', startOfDay.toISOString())
-        .lt('data_hora', endOfDay.toISOString())
-        .order('data_hora', { ascending: true })
+          nome,
+          valor_sessao
+        )
+      `)
+      .eq('usuario_id', user.id)
+      .gte('data_hora', startOfDay.toISOString())
+      .lt('data_hora', endOfDay.toISOString())
+      .order('data_hora', { ascending: true })
 
-      if (!error && data) {
-        setAppointments(data)
-      }
-      setLoading(false)
+    if (!error && data) {
+      setAppointments(data)
     }
-
-    fetchAppointments()
+    setLoading(false)
   }, [user])
 
-  const updateStatus = async (id: string, status: string) => {
-    const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
+  useEffect(() => {
+    fetchAppointments()
 
-    if (!error) {
-      setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
-      toast({ title: 'Status atualizado com sucesso!' })
-    } else {
+    if (!user) return
+
+    const subscription = supabase
+      .channel('agendamentos_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agendamentos', filter: `usuario_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            setAppointments((prev) => prev.filter((a) => a.id !== payload.old.id))
+          } else if (payload.eventType === 'UPDATE') {
+            setAppointments((prev) =>
+              prev.map((a) =>
+                a.id === payload.new.id
+                  ? { ...a, status: payload.new.status, data_hora: payload.new.data_hora }
+                  : a,
+              ),
+            )
+          } else if (payload.eventType === 'INSERT') {
+            fetchAppointments()
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [user, fetchAppointments])
+
+  const handleCompareceu = async (apt: any) => {
+    if (apt.status === 'compareceu') return
+
+    // Optimistic UI Update
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === apt.id ? { ...a, status: 'compareceu' } : a)),
+    )
+
+    const { error: aptError } = await supabase
+      .from('agendamentos')
+      .update({ status: 'compareceu' })
+      .eq('id', apt.id)
+
+    if (aptError) {
       toast({ title: 'Erro ao atualizar', variant: 'destructive' })
+      return
+    }
+
+    if (!user) return
+
+    const now = new Date()
+    const mes = now.getMonth() + 1
+    const ano = now.getFullYear()
+
+    const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+    const valorSessao = pacienteInfo?.valor_sessao || 0
+    const pacienteId = apt.paciente_id
+
+    const { data: finData } = await supabase
+      .from('financeiro')
+      .select('*')
+      .eq('usuario_id', user.id)
+      .eq('paciente_id', pacienteId)
+      .eq('mes', mes)
+      .eq('ano', ano)
+      .maybeSingle()
+
+    if (finData) {
+      await supabase
+        .from('financeiro')
+        .update({
+          valor_a_receber: Number(finData.valor_a_receber) + Number(valorSessao),
+          data_atualizacao: new Date().toISOString(),
+        })
+        .eq('id', finData.id)
+    } else {
+      await supabase.from('financeiro').insert({
+        usuario_id: user.id,
+        paciente_id: pacienteId,
+        mes,
+        ano,
+        valor_recebido: 0,
+        valor_a_receber: Number(valorSessao),
+      })
+    }
+
+    toast({ title: 'Status atualizado: Compareceu' })
+  }
+
+  const handleFaltou = async (apt: any) => {
+    if (apt.status === 'faltou') return
+
+    setAppointments((prev) => prev.map((a) => (a.id === apt.id ? { ...a, status: 'faltou' } : a)))
+    const { error } = await supabase
+      .from('agendamentos')
+      .update({ status: 'faltou' })
+      .eq('id', apt.id)
+    if (!error) {
+      toast({ title: 'Status atualizado: Faltou' })
+    }
+  }
+
+  const handleDesmarcou = async (apt: any) => {
+    setAppointments((prev) => prev.filter((a) => a.id !== apt.id))
+    const { error } = await supabase.from('agendamentos').delete().eq('id', apt.id)
+    if (!error) {
+      toast({ title: 'Sessão desmarcada' })
     }
   }
 
@@ -101,7 +200,6 @@ export default function Agenda() {
               minute: '2-digit',
             })
 
-            // Garantir extração segura caso seja array (embora deva ser um objeto com foreign key correta)
             const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
             const patientName = pacienteInfo?.nome || 'Paciente Desconhecido'
             const sessionValue = pacienteInfo?.valor_sessao || 0
@@ -139,7 +237,7 @@ export default function Agenda() {
                         apt.status === 'compareceu' &&
                           'bg-emerald-50 text-emerald-600 border-emerald-200',
                       )}
-                      onClick={() => updateStatus(apt.id, 'compareceu')}
+                      onClick={() => handleCompareceu(apt)}
                       title="Compareceu"
                     >
                       <Check className="w-5 h-5 text-emerald-500" />
@@ -151,7 +249,7 @@ export default function Agenda() {
                         'hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors',
                         apt.status === 'faltou' && 'bg-red-50 text-red-600 border-red-200',
                       )}
-                      onClick={() => updateStatus(apt.id, 'faltou')}
+                      onClick={() => handleFaltou(apt)}
                       title="Faltou"
                     >
                       <X className="w-5 h-5 text-red-500" />
@@ -163,7 +261,7 @@ export default function Agenda() {
                         'hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 transition-colors font-bold text-lg text-amber-500',
                         apt.status === 'desmarcou' && 'bg-amber-50 text-amber-600 border-amber-200',
                       )}
-                      onClick={() => updateStatus(apt.id, 'desmarcou')}
+                      onClick={() => handleDesmarcou(apt)}
                       title="Desmarcou"
                     >
                       D

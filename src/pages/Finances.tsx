@@ -1,3 +1,4 @@
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { mockFinanceChartData, mockTransactions } from '@/lib/mock-data'
@@ -6,9 +7,58 @@ import { LineChart, Line, XAxis, CartesianGrid, ResponsiveContainer } from 'rech
 import { ArrowUpRight, ArrowDownRight, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Finances() {
   const { toast } = useToast()
+  const { user } = useAuth()
+  const [faturamento, setFaturamento] = useState(0)
+  const [aReceber, setAReceber] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  const fetchFinanceiro = useCallback(async () => {
+    if (!user) return
+    const now = new Date()
+    const mes = now.getMonth() + 1
+    const ano = now.getFullYear()
+
+    const { data, error } = await supabase
+      .from('financeiro')
+      .select('valor_recebido, valor_a_receber')
+      .eq('usuario_id', user.id)
+      .eq('mes', mes)
+      .eq('ano', ano)
+
+    if (data && !error) {
+      const totalRecebido = data.reduce((acc, curr) => acc + Number(curr.valor_recebido), 0)
+      const totalAReceber = data.reduce((acc, curr) => acc + Number(curr.valor_a_receber), 0)
+      setFaturamento(totalRecebido)
+      setAReceber(totalAReceber)
+    }
+    setLoading(false)
+  }, [user])
+
+  useEffect(() => {
+    fetchFinanceiro()
+
+    if (!user) return
+
+    const subscription = supabase
+      .channel('financeiro_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'financeiro', filter: `usuario_id=eq.${user.id}` },
+        () => {
+          fetchFinanceiro()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [user, fetchFinanceiro])
 
   const handleInvoice = () => {
     toast({ title: 'Nota fiscal gerada', description: 'O documento foi enviado ao paciente.' })
@@ -23,8 +73,17 @@ export default function Finances() {
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-primary-foreground/80 font-medium text-sm">Faturamento (Mês)</p>
-                <h3 className="text-3xl font-bold mt-1">R$ 8.450,00</h3>
+                <p className="text-primary-foreground/80 font-medium text-sm">
+                  A Receber (Mês Atual)
+                </p>
+                <h3 className="text-3xl font-bold mt-1">
+                  {loading
+                    ? '...'
+                    : `R$ ${aReceber.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`}
+                </h3>
               </div>
               <div className="p-2 bg-white/20 rounded-full">
                 <ArrowUpRight className="w-5 h-5" />
@@ -36,11 +95,18 @@ export default function Finances() {
           <CardContent className="p-6">
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-slate-500 font-medium text-sm">Despesas (Mês)</p>
-                <h3 className="text-3xl font-bold mt-1 text-slate-800">R$ 1.500,00</h3>
+                <p className="text-slate-500 font-medium text-sm">Recebido (Mês Atual)</p>
+                <h3 className="text-3xl font-bold mt-1 text-slate-800">
+                  {loading
+                    ? '...'
+                    : `R$ ${faturamento.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`}
+                </h3>
               </div>
-              <div className="p-2 bg-red-100 text-red-600 rounded-full">
-                <ArrowDownRight className="w-5 h-5" />
+              <div className="p-2 bg-emerald-100 text-emerald-600 rounded-full">
+                <ArrowDownRight className="w-5 h-5 transform rotate-180" />
               </div>
             </div>
           </CardContent>
@@ -95,7 +161,7 @@ export default function Finances() {
 
       <Card className="shadow-sm">
         <div className="p-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h2 className="font-semibold text-lg">Transações</h2>
+          <h2 className="font-semibold text-lg">Transações Recentes</h2>
           <Tabs defaultValue="todos">
             <TabsList className="bg-slate-100">
               <TabsTrigger value="todos">Todos</TabsTrigger>

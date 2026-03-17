@@ -9,6 +9,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      agendamentos: {
+        Row: {
+          data_hora: string
+          id: string
+          paciente_id: string
+          status: string
+          usuario_id: string
+        }
+        Insert: {
+          data_hora: string
+          id?: string
+          paciente_id: string
+          status?: string
+          usuario_id: string
+        }
+        Update: {
+          data_hora?: string
+          id?: string
+          paciente_id?: string
+          status?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'agendamentos_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'agendamentos_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       appointments: {
         Row: {
           appointment_time: string
@@ -33,6 +72,71 @@ export type Database = {
           session_value?: number
           status?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      pacientes: {
+        Row: {
+          cpf: string | null
+          data_criacao: string | null
+          email: string | null
+          endereco: string | null
+          id: string
+          nome: string
+          telefone: string | null
+          usuario_id: string
+          valor_sessao: number | null
+        }
+        Insert: {
+          cpf?: string | null
+          data_criacao?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          nome: string
+          telefone?: string | null
+          usuario_id: string
+          valor_sessao?: number | null
+        }
+        Update: {
+          cpf?: string | null
+          data_criacao?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          nome?: string
+          telefone?: string | null
+          usuario_id?: string
+          valor_sessao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'pacientes_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      usuarios: {
+        Row: {
+          chave_pix: string | null
+          email: string | null
+          id: string
+          nome_consultorio: string | null
+        }
+        Insert: {
+          chave_pix?: string | null
+          email?: string | null
+          id: string
+          nome_consultorio?: string | null
+        }
+        Update: {
+          chave_pix?: string | null
+          email?: string | null
+          id?: string
+          nome_consultorio?: string | null
         }
         Relationships: []
       }
@@ -183,6 +287,12 @@ export const Constants = {
 // --- COLUMN TYPES (actual PostgreSQL types) ---
 // Use this to know the real database type when writing migrations.
 // "string" in TypeScript types above may be uuid, text, varchar, timestamptz, etc.
+// Table: agendamentos
+//   id: uuid (not null, default: gen_random_uuid())
+//   paciente_id: uuid (not null)
+//   usuario_id: uuid (not null)
+//   data_hora: timestamp with time zone (not null)
+//   status: text (not null, default: 'agendado'::text)
 // Table: appointments
 //   id: uuid (not null, default: gen_random_uuid())
 //   patient_name: text (not null)
@@ -190,13 +300,43 @@ export const Constants = {
 //   session_value: numeric (not null)
 //   status: text (not null, default: 'scheduled'::text)
 //   user_id: uuid (nullable)
+// Table: pacientes
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   nome: text (not null)
+//   cpf: text (nullable)
+//   telefone: text (nullable)
+//   email: text (nullable)
+//   endereco: text (nullable)
+//   valor_sessao: numeric (nullable)
+//   data_criacao: timestamp with time zone (nullable, default: now())
+// Table: usuarios
+//   id: uuid (not null)
+//   email: text (nullable)
+//   nome_consultorio: text (nullable)
+//   chave_pix: text (nullable)
 
 // --- CONSTRAINTS ---
+// Table: agendamentos
+//   FOREIGN KEY agendamentos_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY agendamentos_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY agendamentos_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+//   CHECK valid_status: CHECK ((status = ANY (ARRAY['agendado'::text, 'compareceu'::text, 'faltou'::text, 'desmarcou'::text])))
 // Table: appointments
 //   PRIMARY KEY appointments_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY appointments_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: pacientes
+//   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: usuarios
+//   FOREIGN KEY usuarios_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+//   PRIMARY KEY usuarios_pkey: PRIMARY KEY (id)
 
 // --- ROW LEVEL SECURITY POLICIES ---
+// Table: agendamentos
+//   Policy "agendamentos_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
 // Table: appointments
 //   Policy "authenticated_delete" (DELETE, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -207,8 +347,30 @@ export const Constants = {
 //   Policy "authenticated_update" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: pacientes
+//   Policy "pacientes_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: usuarios
+//   Policy "usuarios_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (id = auth.uid())
+//     WITH CHECK: (id = auth.uid())
 
 // --- DATABASE FUNCTIONS ---
+// FUNCTION handle_new_user()
+//   CREATE OR REPLACE FUNCTION public.handle_new_user()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//     INSERT INTO public.usuarios (id, email)
+//     VALUES (new.id, new.email)
+//     ON CONFLICT (id) DO NOTHING;
+//     RETURN new;
+//   END;
+//   $function$
+//
 // FUNCTION rls_auto_enable()
 //   CREATE OR REPLACE FUNCTION public.rls_auto_enable()
 //    RETURNS event_trigger
