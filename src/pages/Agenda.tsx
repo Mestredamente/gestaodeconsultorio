@@ -74,7 +74,7 @@ export default function Agenda() {
     data_hora: '',
     especialidade: '',
     valor_total: '0',
-    recorrencia: 'único'
+    recorrencia: 'único',
   })
 
   const { toast } = useToast()
@@ -99,7 +99,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, especialidade, valor_total, status_nota_fiscal, paciente_id, justificativa_falta, pacientes (id, nome, valor_sessao)`
+        `id, data_hora, status, especialidade, valor_total, status_nota_fiscal, paciente_id, justificativa_falta, pacientes (id, nome, valor_sessao)`,
       )
       .eq('usuario_id', user.id)
       .gte('data_hora', s.toISOString())
@@ -195,23 +195,28 @@ export default function Agenda() {
     if (!user) return
     setIsSubmitting(true)
 
-    const baseDate = new Date(formData.data_hora);
-    const appointmentsToInsert = [];
-    
-    const count = formData.recorrencia === 'semanal' ? 12 : 
-                  formData.recorrencia === 'quinzenal' ? 6 : 
-                  formData.recorrencia === 'mensal' ? 3 : 1;
+    const baseDate = new Date(formData.data_hora)
+    const appointmentsToInsert = []
+
+    const count =
+      formData.recorrencia === 'semanal'
+        ? 12
+        : formData.recorrencia === 'quinzenal'
+          ? 6
+          : formData.recorrencia === 'mensal'
+            ? 3
+            : 1
 
     for (let i = 0; i < count; i++) {
-      let nextDate = new Date(baseDate);
+      let nextDate = new Date(baseDate)
       if (formData.recorrencia === 'semanal') {
-        nextDate.setDate(baseDate.getDate() + (i * 7));
+        nextDate.setDate(baseDate.getDate() + i * 7)
       } else if (formData.recorrencia === 'quinzenal') {
-        nextDate.setDate(baseDate.getDate() + (i * 14));
+        nextDate.setDate(baseDate.getDate() + i * 14)
       } else if (formData.recorrencia === 'mensal') {
-        nextDate.setMonth(baseDate.getMonth() + i);
+        nextDate.setMonth(baseDate.getMonth() + i)
       }
-      
+
       appointmentsToInsert.push({
         usuario_id: user.id,
         paciente_id: formData.paciente_id,
@@ -219,7 +224,7 @@ export default function Agenda() {
         especialidade: formData.especialidade || null,
         valor_total: Number(formData.valor_total),
         status: 'agendado',
-      });
+      })
     }
 
     const { data: inserted, error } = await supabase
@@ -235,9 +240,18 @@ export default function Agenda() {
           body: { agendamento_id: inserted[0].id },
         })
       }
-      toast({ title: count > 1 ? `${count} sessões agendadas com sucesso!` : 'Agendamento salvo com sucesso!' })
+      toast({
+        title:
+          count > 1 ? `${count} sessões agendadas com sucesso!` : 'Agendamento salvo com sucesso!',
+      })
       setIsNewModalOpen(false)
-      setFormData({ paciente_id: '', data_hora: '', especialidade: '', valor_total: '0', recorrencia: 'único' })
+      setFormData({
+        paciente_id: '',
+        data_hora: '',
+        especialidade: '',
+        valor_total: '0',
+        recorrencia: 'único',
+      })
     }
     setIsSubmitting(false)
   }
@@ -549,7 +563,7 @@ export default function Agenda() {
                   <div key={d.toISOString()} className="space-y-4">
                     {view === 'weekly' && (
                       <h3 className="font-bold text-slate-700 border-b border-slate-200 pb-2 capitalize">
-                        {format(d, 'EEEE, dd/MM/yyyy', { locale: ptBR })
+                        {format(d, 'EEEE, dd/MM/yyyy', { locale: ptBR })}
                       </h3>
                     )}
                     {dayAppts.map((apt) => renderAppointmentCard(apt))}
@@ -664,4 +678,3 @@ export default function Agenda() {
     </div>
   )
 }
-
