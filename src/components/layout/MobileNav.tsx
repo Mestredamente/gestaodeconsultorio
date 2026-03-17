@@ -4,8 +4,8 @@ import { cn } from '@/lib/utils'
 
 export function MobileNav() {
   const location = useLocation()
-  // Only show first 4 items on mobile to prevent crowding
-  const mobileItems = navItems.slice(0, 4)
+  // Show up to 5 items on mobile navigation
+  const mobileItems = navItems.slice(0, 5)
 
   return (
     <nav className="fixed bottom-0 inset-x-0 bg-card border-t flex items-center justify-around p-2 pb-safe md:hidden z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
@@ -23,7 +23,9 @@ export function MobileNav() {
             )}
           >
             <item.icon className={cn('w-6 h-6 mb-1', isActive && 'fill-primary/10')} />
-            <span className="text-[10px] font-medium">{item.name}</span>
+            <span className="text-[10px] font-medium truncate max-w-[60px] text-center">
+              {item.name}
+            </span>
           </Link>
         )
       })}

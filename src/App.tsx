@@ -10,6 +10,7 @@ import Patients from './pages/Patients'
 import PatientDetail from './pages/PatientDetail'
 import PatientRecord from './pages/PatientRecord'
 import Finances from './pages/Finances'
+import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
 import Auth from './pages/Auth'
@@ -45,6 +46,7 @@ const AppRoutes = () => (
       <Route path="/pacientes/:id/prontuario" element={<PatientRecord />} />
       <Route path="/carteira" element={<Finances />} />
       <Route path="/financeiro" element={<Navigate to="/carteira" replace />} />
+      <Route path="/relatorios" element={<Reports />} />
       <Route path="/configuracoes" element={<Settings />} />
     </Route>
     <Route path="*" element={<NotFound />} />
