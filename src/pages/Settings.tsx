@@ -43,6 +43,7 @@ export default function Settings() {
     logo_url: '',
     texto_contrato: '',
     politica_cancelamento: '',
+    agendamento_publico_ativo: false,
   })
 
   const [questions, setQuestions] = useState<any[]>([])
@@ -73,6 +74,7 @@ export default function Settings() {
               logo_url: data.logo_url || '',
               texto_contrato: data.texto_contrato || '',
               politica_cancelamento: data.politica_cancelamento || '',
+              agendamento_publico_ativo: data.agendamento_publico_ativo || false,
             })
             setQuestions(data.anamnese_template || [])
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
@@ -134,7 +136,6 @@ export default function Settings() {
 
       const { data } = supabase.storage.from('logos').getPublicUrl(path)
 
-      // Update local state and immediately persist the photo
       setFormData((prev) => ({ ...prev, logo_url: data.publicUrl }))
       await supabase.from('usuarios').update({ logo_url: data.publicUrl }).eq('id', user.id)
 
@@ -517,6 +518,22 @@ export default function Settings() {
             <div className="pt-6 border-t border-slate-100">
               <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
                 <div>
+                  <Label className="text-base">Agendamento Público Online</Label>
+                  <p className="text-sm text-slate-500">
+                    Permite que pacientes agendem sozinhos pelos horários disponíveis na sua agenda.
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.agendamento_publico_ativo}
+                  onCheckedChange={(v) =>
+                    setFormData({ ...formData, agendamento_publico_ativo: v })
+                  }
+                />
+              </div>
+            </div>
+            <div className="pt-6 border-t border-slate-100">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <div>
                   <Label className="text-base">Lembretes WhatsApp Automáticos</Label>
                   <p className="text-sm text-slate-500">
                     Envia WhatsApp 24h antes da consulta agendada.
@@ -547,7 +564,7 @@ export default function Settings() {
               className="gap-2 flex-1 sm:flex-none"
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/agendar/${user?.id}`)
-                toast({ title: 'Link copiado!' })
+                toast({ title: 'Link de agendamento copiado!' })
               }}
             >
               <Copy className="w-4 h-4" /> Link de Agendamento

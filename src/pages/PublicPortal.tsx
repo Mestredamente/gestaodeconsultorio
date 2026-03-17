@@ -103,6 +103,17 @@ export default function PublicPortal() {
     } else toast({ title: 'Erro ao desmarcar consulta.', variant: 'destructive' })
   }
 
+  const handleRequestRecord = async () => {
+    if (!hash) return
+    const { data: success, error } = await supabase.rpc('request_medical_record', { p_hash: hash })
+    if (success && !error)
+      toast({
+        title: 'Prontuário solicitado',
+        description: 'O profissional foi notificado do seu pedido.',
+      })
+    else toast({ title: 'Erro ao solicitar', variant: 'destructive' })
+  }
+
   const isToday = (d: Date) => {
     const today = new Date()
     return (
@@ -318,9 +329,53 @@ export default function PublicPortal() {
             )}
           </TabsContent>
 
-          <TabsContent value="historico" className="space-y-4">
+          <TabsContent value="historico" className="space-y-6">
+            <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+              <div>
+                <h3 className="font-semibold text-slate-800">Prontuário Médico</h3>
+                <p className="text-sm text-slate-500">Solicite acesso ao seu registro detalhado.</p>
+              </div>
+              <Button onClick={handleRequestRecord} variant="outline" className="gap-2">
+                <FileText className="w-4 h-4" /> Solicitar
+              </Button>
+            </div>
+
+            <h3 className="font-semibold text-slate-800 mt-6 mb-3">Sessões Realizadas</h3>
+            {!data.past_sessions || data.past_sessions.length === 0 ? (
+              <Card className="p-8 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                Nenhuma sessão realizada ainda.
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {data.past_sessions.map((apt: any) => (
+                  <Card key={apt.id} className="shadow-sm border-slate-200">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-full">
+                          <CheckCircle className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">
+                            {new Date(apt.data_hora).toLocaleDateString('pt-BR')}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}{' '}
+                            - {apt.especialidade || 'Consulta Geral'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            <h3 className="font-semibold text-slate-800 mt-8 mb-3">Histórico Clínico</h3>
             {!data.historico || data.historico.length === 0 ? (
-              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none">
+              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
                 Nenhum histórico registrado ainda.
               </Card>
             ) : (

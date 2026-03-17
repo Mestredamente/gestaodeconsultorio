@@ -1,18 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import {
-  Calendar,
-  Check,
-  X,
-  RefreshCw,
-  Cake,
-  LogOut,
-  Settings2,
-  Coins,
-  Package,
-  AlertTriangle,
-} from 'lucide-react'
+import { Calendar, Check, X, LogOut, Settings2, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -27,21 +16,19 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { ServiceGoalTracker } from '@/components/ServiceGoalTracker'
+import { PerformanceDashboard } from '@/components/PerformanceDashboard'
 import { measurePerformance } from '@/lib/performance'
 
 export default function Index() {
   const { user, signOut } = useAuth()
   const { toast } = useToast()
   const [appointments, setAppointments] = useState<any[]>([])
-  const [birthdays, setBirthdays] = useState<any[]>([])
-  const [revenue, setRevenue] = useState(0)
   const [lowStockCount, setLowStockCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [prefs, setPrefs] = useState({
     show_agenda: true,
-    show_birthdays: true,
-    show_revenue: true,
+    show_dashboard: true,
     show_stock_alert: true,
   })
 
@@ -51,13 +38,13 @@ export default function Index() {
     month: 'long',
   }).format(new Date())
 
-  const fetchDashboardData = useCallback(async () => {
+  const fetchIndexData = useCallback(async () => {
     if (!user) return
     setLoading(true)
     setError(false)
 
     try {
-      await measurePerformance('dashboard_data', async () => {
+      await measurePerformance('index_data', async () => {
         const { data: u, error: uError } = await supabase
           .from('usuarios')
           .select('preferencias_dashboard')
@@ -70,7 +57,7 @@ export default function Index() {
         const endOfDay = new Date(startOfDay)
         endOfDay.setDate(endOfDay.getDate() + 1)
 
-        const [apptsRes, patsRes, finRes, stockRes] = await Promise.all([
+        const [apptsRes, stockRes] = await Promise.all([
           supabase
             .from('agendamentos')
             .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
@@ -78,13 +65,6 @@ export default function Index() {
             .gte('data_hora', startOfDay.toISOString())
             .lt('data_hora', endOfDay.toISOString())
             .order('data_hora', { ascending: true }),
-          supabase.from('pacientes').select('id, nome, data_nascimento').eq('usuario_id', user.id),
-          supabase
-            .from('financeiro')
-            .select('valor_recebido')
-            .eq('usuario_id', user.id)
-            .eq('mes', new Date().getMonth() + 1)
-            .eq('ano', new Date().getFullYear()),
           supabase
             .from('estoque')
             .select('quantidade, quantidade_minima')
@@ -92,24 +72,13 @@ export default function Index() {
         ])
 
         if (apptsRes.data) setAppointments(apptsRes.data)
-        if (patsRes.data) {
-          const currentMonth = new Date().getMonth() + 1
-          setBirthdays(
-            patsRes.data.filter(
-              (p) =>
-                p.data_nascimento && parseInt(p.data_nascimento.split('-')[1]) === currentMonth,
-            ),
-          )
-        }
-        if (finRes.data)
-          setRevenue(finRes.data.reduce((s, f) => s + Number(f.valor_recebido), 0) || 0)
         if (stockRes.data)
           setLowStockCount(
             stockRes.data.filter((s) => s.quantidade <= (s.quantidade_minima || 0)).length,
           )
       })
     } catch (err) {
-      console.error('Error fetching dashboard data:', err)
+      console.error('Error fetching index data:', err)
       setError(true)
     } finally {
       setLoading(false)
@@ -117,8 +86,8 @@ export default function Index() {
   }, [user])
 
   useEffect(() => {
-    fetchDashboardData()
-  }, [fetchDashboardData])
+    fetchIndexData()
+  }, [fetchIndexData])
 
   const updateStatus = async (id: string, status: string) => {
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
@@ -128,7 +97,7 @@ export default function Index() {
       else throw error
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-      fetchDashboardData()
+      fetchIndexData()
     }
   }
 
@@ -139,7 +108,7 @@ export default function Index() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
+    <div className="space-y-8 animate-fade-in pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a)!</h1>
@@ -158,17 +127,17 @@ export default function Index() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="flex items-center justify-between">
-                  <Label>Mostrar Agenda Hoje</Label>
+                  <Label>Mostrar Dashboard de Performance</Label>
                   <Switch
-                    checked={prefs.show_agenda}
-                    onCheckedChange={(v) => savePrefs({ show_agenda: v })}
+                    checked={prefs.show_dashboard !== false}
+                    onCheckedChange={(v) => savePrefs({ show_dashboard: v })}
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label>Mostrar Receita Mês</Label>
+                  <Label>Mostrar Agenda de Hoje</Label>
                   <Switch
-                    checked={prefs.show_revenue}
-                    onCheckedChange={(v) => savePrefs({ show_revenue: v })}
+                    checked={prefs.show_agenda !== false}
+                    onCheckedChange={(v) => savePrefs({ show_agenda: v })}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -176,13 +145,6 @@ export default function Index() {
                   <Switch
                     checked={prefs.show_stock_alert !== false}
                     onCheckedChange={(v) => savePrefs({ show_stock_alert: v })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Mostrar Aniversariantes</Label>
-                  <Switch
-                    checked={prefs.show_birthdays}
-                    onCheckedChange={(v) => savePrefs({ show_birthdays: v })}
                   />
                 </div>
               </div>
@@ -197,14 +159,34 @@ export default function Index() {
       {error && (
         <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex justify-between">
           <p className="text-red-600 text-sm">Alguns dados não puderam ser carregados.</p>
-          <Button variant="outline" size="sm" onClick={fetchDashboardData}>
+          <Button variant="outline" size="sm" onClick={fetchIndexData}>
             Tentar novamente
           </Button>
         </div>
       )}
 
+      {prefs.show_dashboard !== false && <PerformanceDashboard />}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {prefs.show_agenda && (
+        <div className="space-y-6">
+          <ServiceGoalTracker />
+
+          {prefs.show_stock_alert !== false && lowStockCount > 0 && (
+            <Card className="shadow-sm border-amber-200 h-fit bg-amber-50/50">
+              <CardHeader className="border-b border-amber-100/50 pb-4">
+                <CardTitle className="text-lg flex items-center gap-2 text-amber-800">
+                  <AlertTriangle className="w-5 h-5" /> Alertas de Estoque
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 text-center">
+                <h2 className="text-4xl font-bold text-amber-600">{lowStockCount}</h2>
+                <p className="text-amber-800 font-medium text-sm mt-1">Itens em nível crítico</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {prefs.show_agenda !== false && (
           <Card className="lg:col-span-2 shadow-sm border-slate-200 h-fit">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -219,7 +201,7 @@ export default function Index() {
               ) : appointments.length === 0 ? (
                 <div className="p-8 text-center text-slate-500">Nenhuma sessão para hoje.</div>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
                   {appointments.map((apt) => {
                     const pInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
                     const time = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
@@ -281,39 +263,6 @@ export default function Index() {
             </CardContent>
           </Card>
         )}
-
-        <div className="space-y-6">
-          <ServiceGoalTracker />
-
-          {prefs.show_stock_alert !== false && lowStockCount > 0 && (
-            <Card className="shadow-sm border-amber-200 h-fit bg-amber-50/50">
-              <CardHeader className="border-b border-amber-100/50 pb-4">
-                <CardTitle className="text-lg flex items-center gap-2 text-amber-800">
-                  <AlertTriangle className="w-5 h-5" /> Alertas de Estoque
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 text-center">
-                <h2 className="text-4xl font-bold text-amber-600">{lowStockCount}</h2>
-                <p className="text-amber-800 font-medium text-sm mt-1">Itens em nível crítico</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {prefs.show_revenue && (
-            <Card className="shadow-sm border-slate-200 h-fit">
-              <CardHeader className="border-b border-slate-100 bg-emerald-50/50 pb-4">
-                <CardTitle className="text-lg flex items-center gap-2 text-emerald-700">
-                  <Coins className="w-5 h-5" /> Receita do Mês
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 text-center">
-                <h2 className="text-3xl font-bold text-emerald-900">
-                  {revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </h2>
-              </CardContent>
-            </Card>
-          )}
-        </div>
       </div>
     </div>
   )
