@@ -125,8 +125,11 @@ export type Database = {
       }
       pacientes: {
         Row: {
+          contato_emergencia_nome: string | null
+          contato_emergencia_telefone: string | null
           cpf: string | null
           data_criacao: string | null
+          data_nascimento: string | null
           email: string | null
           endereco: string | null
           id: string
@@ -136,8 +139,11 @@ export type Database = {
           valor_sessao: number | null
         }
         Insert: {
+          contato_emergencia_nome?: string | null
+          contato_emergencia_telefone?: string | null
           cpf?: string | null
           data_criacao?: string | null
+          data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
           id?: string
@@ -147,8 +153,11 @@ export type Database = {
           valor_sessao?: number | null
         }
         Update: {
+          contato_emergencia_nome?: string | null
+          contato_emergencia_telefone?: string | null
           cpf?: string | null
           data_criacao?: string | null
+          data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
           id?: string
@@ -367,6 +376,9 @@ export const Constants = {
 //   endereco: text (nullable)
 //   valor_sessao: numeric (nullable)
 //   data_criacao: timestamp with time zone (nullable, default: now())
+//   data_nascimento: date (nullable)
+//   contato_emergencia_nome: text (nullable)
+//   contato_emergencia_telefone: text (nullable)
 // Table: usuarios
 //   id: uuid (not null)
 //   email: text (nullable)

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -17,6 +16,10 @@ import { Search, Plus, Phone, ArrowLeft, Users } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import NewPatientForm from '@/components/NewPatientForm'
+
+const formatBRL = (value: number) => {
+  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
 
 export default function Patients() {
   const navigate = useNavigate()
@@ -38,9 +41,7 @@ export default function Patients() {
       if (data) setPatients(data)
       setLoading(false)
     }
-    if (view === 'list') {
-      fetchPatients()
-    }
+    if (view === 'list') fetchPatients()
   }, [user, view])
 
   if (view === 'new') {
@@ -100,19 +101,26 @@ export default function Patients() {
                 className="cursor-pointer hover:shadow-md transition active:scale-95"
                 onClick={() => navigate(`/pacientes/${p.id}`)}
               >
-                <CardContent className="p-4 flex items-center gap-4">
-                  <Avatar className="w-12 h-12">
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                      {p.nome.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900">{p.nome}</h3>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                      <Phone className="w-3 h-3" /> {p.telefone || 'Sem telefone'}
-                    </p>
+                <CardContent className="p-4 flex flex-col gap-3">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-12 h-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {p.nome.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-slate-900">{p.nome}</h3>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                        <Phone className="w-3 h-3" /> {p.telefone || 'Sem telefone'}
+                      </p>
+                    </div>
                   </div>
-                  <Badge className="bg-emerald-500 hover:bg-emerald-600">Ativo</Badge>
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-50">
+                    <span className="text-sm text-slate-500 font-medium">Valor da Sessão</span>
+                    <span className="font-semibold text-emerald-700">
+                      {p.valor_sessao ? formatBRL(p.valor_sessao) : '-'}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -120,19 +128,20 @@ export default function Patients() {
 
           <Card className="hidden md:block shadow-sm overflow-hidden border-slate-200">
             <Table>
-              <TableHeader className="bg-slate-50">
+              <TableHeader className="bg-slate-50/50">
                 <TableRow>
-                  <TableHead>Paciente</TableHead>
-                  <TableHead>Contato</TableHead>
-                  <TableHead>E-mail</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="font-semibold text-slate-600">Nome</TableHead>
+                  <TableHead className="font-semibold text-slate-600">Telefone</TableHead>
+                  <TableHead className="text-right font-semibold text-slate-600">
+                    Valor da Sessão
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((p) => (
                   <TableRow
                     key={p.id}
-                    className="cursor-pointer hover:bg-slate-50"
+                    className="cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => navigate(`/pacientes/${p.id}`)}
                   >
                     <TableCell className="flex items-center gap-3">
@@ -144,9 +153,8 @@ export default function Patients() {
                       <span className="font-medium text-slate-900">{p.nome}</span>
                     </TableCell>
                     <TableCell className="text-slate-600">{p.telefone || '-'}</TableCell>
-                    <TableCell className="text-slate-600">{p.email || '-'}</TableCell>
-                    <TableCell>
-                      <Badge className="bg-emerald-500 hover:bg-emerald-600">Ativo</Badge>
+                    <TableCell className="text-right font-medium text-emerald-700">
+                      {p.valor_sessao ? formatBRL(p.valor_sessao) : '-'}
                     </TableCell>
                   </TableRow>
                 ))}

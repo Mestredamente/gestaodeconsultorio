@@ -8,6 +8,7 @@ import Index from './pages/Index'
 import Agenda from './pages/Agenda'
 import Patients from './pages/Patients'
 import PatientDetail from './pages/PatientDetail'
+import PatientRecord from './pages/PatientRecord'
 import Finances from './pages/Finances'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
@@ -41,6 +42,7 @@ const AppRoutes = () => (
       <Route path="/agenda" element={<Agenda />} />
       <Route path="/pacientes" element={<Patients />} />
       <Route path="/pacientes/:id" element={<PatientDetail />} />
+      <Route path="/pacientes/:id/prontuario" element={<PatientRecord />} />
       <Route path="/carteira" element={<Finances />} />
       <Route path="/financeiro" element={<Navigate to="/carteira" replace />} />
       <Route path="/configuracoes" element={<Settings />} />
