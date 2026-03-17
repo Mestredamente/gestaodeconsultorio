@@ -212,16 +212,14 @@ export default function Agenda() {
           })
           .eq('id', fin.id)
       } else {
-        await supabase
-          .from('financeiro')
-          .insert({
-            usuario_id: user.id,
-            paciente_id: ptId,
-            mes,
-            ano,
-            valor_recebido: Number(formData.valor_sinal),
-            valor_a_receber: Number(formData.valor_total) - Number(formData.valor_sinal),
-          })
+        await supabase.from('financeiro').insert({
+          usuario_id: user.id,
+          paciente_id: ptId,
+          mes,
+          ano,
+          valor_recebido: Number(formData.valor_sinal),
+          valor_a_receber: Number(formData.valor_total) - Number(formData.valor_sinal),
+        })
       }
     }
 
@@ -275,16 +273,14 @@ export default function Agenda() {
             })
             .eq('id', finData.id)
         else
-          await supabase
-            .from('financeiro')
-            .insert({
-              usuario_id: user.id,
-              paciente_id: apt.paciente_id,
-              mes,
-              ano,
-              valor_recebido: 0,
-              valor_a_receber: valorToAdd,
-            })
+          await supabase.from('financeiro').insert({
+            usuario_id: user.id,
+            paciente_id: apt.paciente_id,
+            mes,
+            ano,
+            valor_recebido: 0,
+            valor_a_receber: valorToAdd,
+          })
       }
     }
   }
