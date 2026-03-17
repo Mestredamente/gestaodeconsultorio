@@ -200,6 +200,86 @@ export type Database = {
           },
         ]
       }
+      logs_auditoria: {
+        Row: {
+          acao: string
+          data_criacao: string
+          detalhes: Json
+          id: string
+          registro_id: string
+          tabela_afetada: string
+          usuario_id: string
+        }
+        Insert: {
+          acao: string
+          data_criacao?: string
+          detalhes?: Json
+          id?: string
+          registro_id: string
+          tabela_afetada: string
+          usuario_id: string
+        }
+        Update: {
+          acao?: string
+          data_criacao?: string
+          detalhes?: Json
+          id?: string
+          registro_id?: string
+          tabela_afetada?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'logs_auditoria_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      movimentacao_estoque: {
+        Row: {
+          data_movimentacao: string
+          id: string
+          item_id: string
+          quantidade_mudanca: number
+          tipo: string
+          usuario_id: string
+        }
+        Insert: {
+          data_movimentacao?: string
+          id?: string
+          item_id: string
+          quantidade_mudanca: number
+          tipo: string
+          usuario_id: string
+        }
+        Update: {
+          data_movimentacao?: string
+          id?: string
+          item_id?: string
+          quantidade_mudanca?: number
+          tipo?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'movimentacao_estoque_item_id_fkey'
+            columns: ['item_id']
+            isOneToOne: false
+            referencedRelation: 'estoque'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'movimentacao_estoque_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       pacientes: {
         Row: {
           contato_emergencia_nome: string | null
@@ -510,6 +590,21 @@ export const Constants = {
 //   valor_cobrado: numeric (not null)
 //   mes_referencia: integer (not null)
 //   ano_referencia: integer (not null)
+// Table: logs_auditoria
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   acao: text (not null)
+//   tabela_afetada: text (not null)
+//   registro_id: uuid (not null)
+//   detalhes: jsonb (not null, default: '{}'::jsonb)
+//   data_criacao: timestamp with time zone (not null, default: now())
+// Table: movimentacao_estoque
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   item_id: uuid (not null)
+//   quantidade_mudanca: integer (not null)
+//   tipo: text (not null)
+//   data_movimentacao: timestamp with time zone (not null, default: now())
 // Table: pacientes
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -558,6 +653,14 @@ export const Constants = {
 //   FOREIGN KEY historico_cobrancas_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY historico_cobrancas_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY historico_cobrancas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: logs_auditoria
+//   PRIMARY KEY logs_auditoria_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY logs_auditoria_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: movimentacao_estoque
+//   FOREIGN KEY movimentacao_estoque_item_id_fkey: FOREIGN KEY (item_id) REFERENCES estoque(id) ON DELETE CASCADE
+//   PRIMARY KEY movimentacao_estoque_pkey: PRIMARY KEY (id)
+//   CHECK movimentacao_estoque_tipo_check: CHECK ((tipo = ANY (ARRAY['entrada'::text, 'saida'::text])))
+//   FOREIGN KEY movimentacao_estoque_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: pacientes
 //   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -595,6 +698,14 @@ export const Constants = {
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: historico_cobrancas
 //   Policy "historico_cobrancas_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: logs_auditoria
+//   Policy "logs_auditoria_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: movimentacao_estoque
+//   Policy "movimentacao_estoque_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: pacientes
@@ -663,6 +774,78 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION log_audit_action()
+//   CREATE OR REPLACE FUNCTION public.log_audit_action()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_user_id UUID;
+//     v_details JSONB;
+//   BEGIN
+//     v_user_id := auth.uid();
+//     IF v_user_id IS NULL AND TG_OP != 'DELETE' THEN
+//       v_user_id := NEW.usuario_id;
+//     ELSIF v_user_id IS NULL AND TG_OP = 'DELETE' THEN
+//       v_user_id := OLD.usuario_id;
+//     END IF;
+//
+//     IF v_user_id IS NULL THEN
+//       RETURN NULL;
+//     END IF;
+//
+//     IF TG_OP = 'INSERT' THEN
+//       v_details := jsonb_build_object('new', row_to_json(NEW));
+//       INSERT INTO public.logs_auditoria (usuario_id, acao, tabela_afetada, registro_id, detalhes)
+//       VALUES (v_user_id, TG_OP, TG_TABLE_NAME, NEW.id, v_details);
+//       RETURN NEW;
+//     ELSIF TG_OP = 'UPDATE' THEN
+//       v_details := jsonb_build_object('old', row_to_json(OLD), 'new', row_to_json(NEW));
+//       INSERT INTO public.logs_auditoria (usuario_id, acao, tabela_afetada, registro_id, detalhes)
+//       VALUES (v_user_id, TG_OP, TG_TABLE_NAME, NEW.id, v_details);
+//       RETURN NEW;
+//     ELSIF TG_OP = 'DELETE' THEN
+//       v_details := jsonb_build_object('old', row_to_json(OLD));
+//       INSERT INTO public.logs_auditoria (usuario_id, acao, tabela_afetada, registro_id, detalhes)
+//       VALUES (v_user_id, TG_OP, TG_TABLE_NAME, OLD.id, v_details);
+//       RETURN OLD;
+//     END IF;
+//     RETURN NULL;
+//   END;
+//   $function$
+//
+// FUNCTION log_stock_movement()
+//   CREATE OR REPLACE FUNCTION public.log_stock_movement()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     diff INTEGER;
+//     m_tipo TEXT;
+//   BEGIN
+//     IF TG_OP = 'INSERT' THEN
+//       IF NEW.quantidade > 0 THEN
+//         INSERT INTO public.movimentacao_estoque (usuario_id, item_id, quantidade_mudanca, tipo)
+//         VALUES (NEW.usuario_id, NEW.id, NEW.quantidade, 'entrada');
+//       END IF;
+//     ELSIF TG_OP = 'UPDATE' THEN
+//       diff := NEW.quantidade - OLD.quantidade;
+//       IF diff > 0 THEN
+//         m_tipo := 'entrada';
+//         INSERT INTO public.movimentacao_estoque (usuario_id, item_id, quantidade_mudanca, tipo)
+//         VALUES (NEW.usuario_id, NEW.id, diff, m_tipo);
+//       ELSIF diff < 0 THEN
+//         m_tipo := 'saida';
+//         INSERT INTO public.movimentacao_estoque (usuario_id, item_id, quantidade_mudanca, tipo)
+//         VALUES (NEW.usuario_id, NEW.id, abs(diff), m_tipo);
+//       END IF;
+//     END IF;
+//     RETURN NEW;
+//   END;
+//   $function$
+//
 // FUNCTION rls_auto_enable()
 //   CREATE OR REPLACE FUNCTION public.rls_auto_enable()
 //    RETURNS event_trigger
@@ -694,6 +877,14 @@ export const Constants = {
 //   END;
 //   $function$
 //
+
+// --- TRIGGERS ---
+// Table: agendamentos
+//   audit_agendamentos_trigger: CREATE TRIGGER audit_agendamentos_trigger AFTER INSERT OR DELETE OR UPDATE ON public.agendamentos FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+// Table: estoque
+//   stock_movement_trigger: CREATE TRIGGER stock_movement_trigger AFTER INSERT OR UPDATE ON public.estoque FOR EACH ROW EXECUTE FUNCTION log_stock_movement()
+// Table: financeiro
+//   audit_financeiro_trigger: CREATE TRIGGER audit_financeiro_trigger AFTER INSERT OR DELETE OR UPDATE ON public.financeiro FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 
 // --- INDEXES ---
 // Table: financeiro
