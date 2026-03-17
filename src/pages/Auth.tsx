@@ -100,11 +100,21 @@ export default function Auth() {
         error?.status === 429 || error?.message?.toLowerCase().includes('rate limit')
       const isInvalidCreds =
         error?.message?.toLowerCase().includes('invalid') || error?.code === 'invalid_credentials'
+      const isEmailDisabled =
+        error?.code === 'email_provider_disabled' ||
+        (error?.status === 422 && error?.message?.toLowerCase().includes('email')) ||
+        error?.message?.toLowerCase().includes('email provider is disabled') ||
+        error?.message?.toLowerCase().includes('email logins are disabled') ||
+        error?.message?.toLowerCase().includes('signups not allowed')
 
       let title = 'Erro na autenticação'
       let description = error?.message || 'Ocorreu um erro inesperado.'
 
-      if (isRateLimit) {
+      if (isEmailDisabled) {
+        title = 'Serviço Indisponível'
+        description =
+          'O login por e-mail está atualmente desativado na configuração do sistema. Por favor, contate o administrador.'
+      } else if (isRateLimit) {
         title = action === 'signup' ? 'Limite atingido' : 'Limite excedido'
         description = 'Aguarde alguns minutos antes de tentar novamente.'
       } else if (isInvalidCreds) {
