@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -24,19 +23,13 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from '@/components/ui/chart'
-import { Pie, PieChart, Cell, Bar, BarChart, XAxis, CartesianGrid } from 'recharts'
-import {
-  Download,
-  FileBarChart,
-  DollarSign,
-  AlertCircle,
-  TrendingUp,
-  Calendar as CalendarIcon,
-} from 'lucide-react'
+import { Pie, PieChart, Bar, BarChart, XAxis, CartesianGrid } from 'recharts'
+import { AlertCircle, TrendingUp, Calendar as CalendarIcon, Package } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { ConsumptionExpensesTab } from '@/components/reports/ConsumptionExpensesTab'
 
 const months = [
   { value: '1', label: 'Janeiro' },
@@ -58,10 +51,8 @@ interface ReportRow {
   patientName: string
   totalSessions: number
   faltas: number
-  desmarcacoes: number
   valorRecebido: number
   valorAReceber: number
-  attendanceRate: number
   frequencia: string
   diaPagamento: number | null
   delinquent: boolean
@@ -78,6 +69,7 @@ export default function Reports() {
   const [data, setData] = useState<ReportRow[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const [clinicName, setClinicName] = useState('Clínica')
 
   const years = useMemo(
     () => Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 2 + i),
@@ -94,7 +86,7 @@ export default function Reports() {
       const endDate = new Date(yearNum, monthNum, 1).toISOString()
 
       try {
-        const [patientsRes, appointmentsRes, financeRes] = await Promise.all([
+        const [patientsRes, appointmentsRes, financeRes, userRes] = await Promise.all([
           supabase
             .from('pacientes')
             .select('id, nome, frequencia_pagamento, dia_pagamento')
@@ -111,7 +103,10 @@ export default function Reports() {
             .eq('usuario_id', user.id)
             .eq('mes', monthNum)
             .eq('ano', yearNum),
+          supabase.from('usuarios').select('nome_consultorio').eq('id', user.id).single(),
         ])
+
+        if (userRes.data?.nome_consultorio) setClinicName(userRes.data.nome_consultorio)
 
         if (patientsRes.data) {
           const selectedDate = new Date(yearNum, monthNum - 1, 1)
@@ -125,12 +120,9 @@ export default function Reports() {
             const patientApps = appointmentsRes.data?.filter((a) => a.paciente_id === p.id) || []
             const totalSessions = patientApps.length
             const faltas = patientApps.filter((a) => a.status === 'faltou').length
-            const compareceu = patientApps.filter((a) => a.status === 'compareceu').length
             const fin = financeRes.data?.find((f) => f.paciente_id === p.id)
             const valorRecebido = Number(fin?.valor_recebido || 0)
             const valorAReceber = Number(fin?.valor_a_receber || 0)
-            const attendanceBase = compareceu + faltas
-            const attendanceRate = attendanceBase > 0 ? (compareceu / attendanceBase) * 100 : 0
 
             let delinquent = false
             if (valorAReceber > 0) {
@@ -144,10 +136,8 @@ export default function Reports() {
               patientName: p.nome,
               totalSessions,
               faltas,
-              desmarcacoes: patientApps.filter((a) => a.status === 'desmarcou').length,
               valorRecebido,
               valorAReceber,
-              attendanceRate,
               frequencia: p.frequencia_pagamento?.toLowerCase() || 'sessão',
               diaPagamento: p.dia_pagamento,
               delinquent,
@@ -202,22 +192,20 @@ export default function Reports() {
     { name: 'Pendente', valor: totalExpected, fill: chartConfig['Pendente'].color },
   ]
 
-  const handleExportCSV = () => {
-    /* Logic hidden for brevity but retained if needed, replacing original if strictly necessary. Since 150 lines limit, omitted to save space, but keeping the button disabled or minimal */
-  }
-
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <FileBarChart className="w-6 h-6 text-primary" /> Inteligência e Relatórios
+            <TrendingUp className="w-6 h-6 text-primary" /> Inteligência e Relatórios
           </h1>
-          <p className="text-slate-500 mt-1">Acompanhe métricas financeiras e inadimplência</p>
+          <p className="text-slate-500 mt-1">
+            Acompanhe métricas financeiras, consumo e inadimplência
+          </p>
         </div>
       </div>
 
-      <Card className="shadow-sm border-slate-200">
+      <Card className="shadow-sm border-slate-200 print:hidden">
         <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 items-end sm:items-center">
           <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
             <div className="flex-1 space-y-1.5">
@@ -260,7 +248,7 @@ export default function Reports() {
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-slate-100/50 border border-slate-200 p-1 w-full sm:w-auto overflow-x-auto justify-start h-12">
+          <TabsList className="bg-slate-100/50 border border-slate-200 p-1 w-full sm:w-auto overflow-x-auto justify-start h-12 print:hidden">
             <TabsTrigger value="overview" className="gap-2">
               <TrendingUp className="w-4 h-4" /> Visão Geral
             </TabsTrigger>
@@ -268,7 +256,10 @@ export default function Reports() {
               <AlertCircle className="w-4 h-4" /> Inadimplência
             </TabsTrigger>
             <TabsTrigger value="details" className="gap-2">
-              <CalendarIcon className="w-4 h-4" /> Detalhamento
+              <CalendarIcon className="w-4 h-4" /> Receitas
+            </TabsTrigger>
+            <TabsTrigger value="consumo" className="gap-2">
+              <Package className="w-4 h-4" /> Consumo e Despesas
             </TabsTrigger>
           </TabsList>
 
@@ -338,7 +329,7 @@ export default function Reports() {
               </Card>
               <Card className="shadow-sm border-slate-200">
                 <CardHeader>
-                  <CardTitle className="text-lg">Fluxo de Caixa</CardTitle>
+                  <CardTitle className="text-lg">Fluxo de Caixa (Receitas)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ChartContainer config={chartConfig} className="h-[280px] w-full">
@@ -445,6 +436,10 @@ export default function Reports() {
                 </TableBody>
               </Table>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="consumo" className="animate-fade-in-up">
+            <ConsumptionExpensesTab month={month} year={year} clinicName={clinicName} />
           </TabsContent>
         </Tabs>
       )}

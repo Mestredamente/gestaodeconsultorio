@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { Megaphone, RefreshCw, Send, History } from 'lucide-react'
+import { Megaphone, RefreshCw, Send, History, FileText } from 'lucide-react'
 import { measurePerformance } from '@/lib/performance'
 import {
   Table,
@@ -18,37 +18,51 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { TemplatesManager } from '@/components/TemplatesManager'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 export default function Marketing() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [campaigns, setCampaigns] = useState<any[]>([])
+  const [marketingTemplates, setMarketingTemplates] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   const [formData, setFormData] = useState({ titulo: '', conteudo: '', tipo: 'newsletter' })
   const [sending, setSending] = useState(false)
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
 
-  const fetchCampaigns = useCallback(async () => {
+  const fetchCampaignsAndTemplates = useCallback(async () => {
     if (!user) return
     setError(false)
     setLoading(true)
 
-    const cacheKey = `marketing_${user.id}`
-    const cached = localStorage.getItem(cacheKey)
-    if (cached) setCampaigns(JSON.parse(cached))
-
     try {
-      await measurePerformance('fetchCampaigns', async () => {
-        const { data, error } = await supabase
-          .from('comunicacoes_campanhas')
-          .select('*')
-          .eq('usuario_id', user.id)
-          .order('data_envio', { ascending: false })
+      await measurePerformance('fetchMarketing', async () => {
+        const [campsRes, tmplRes] = await Promise.all([
+          supabase
+            .from('comunicacoes_campanhas')
+            .select('*')
+            .eq('usuario_id', user.id)
+            .order('data_envio', { ascending: false }),
+          supabase
+            .from('templates_documentos')
+            .select('*')
+            .eq('usuario_id', user.id)
+            .eq('tipo', 'email_marketing')
+            .order('data_criacao', { ascending: false }),
+        ])
 
-        if (error) throw error
-        setCampaigns(data || [])
-        localStorage.setItem(cacheKey, JSON.stringify(data || []))
+        if (campsRes.error) throw campsRes.error
+        setCampaigns(campsRes.data || [])
+        setMarketingTemplates(tmplRes.data || [])
       })
     } catch (e) {
       console.error(e)
@@ -59,8 +73,8 @@ export default function Marketing() {
   }, [user])
 
   useEffect(() => {
-    fetchCampaigns()
-  }, [fetchCampaigns])
+    fetchCampaignsAndTemplates()
+  }, [fetchCampaignsAndTemplates])
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,7 +89,7 @@ export default function Marketing() {
         description: `Processado para ${data.count} paciente(s).`,
       })
       setFormData({ titulo: '', conteudo: '', tipo: 'newsletter' })
-      fetchCampaigns()
+      fetchCampaignsAndTemplates()
     } catch (e: any) {
       toast({ title: 'Erro ao enviar', description: e.message, variant: 'destructive' })
     } finally {
@@ -87,8 +101,8 @@ export default function Marketing() {
     return (
       <Card className="shadow-sm">
         <CardContent className="p-10 text-center">
-          <p className="text-slate-500 mb-4">Falha ao carregar campanhas.</p>
-          <Button onClick={fetchCampaigns}>
+          <p className="text-slate-500 mb-4">Falha ao carregar dados.</p>
+          <Button onClick={fetchCampaignsAndTemplates}>
             <RefreshCw className="w-4 h-4 mr-2" /> Tentar Novamente
           </Button>
         </CardContent>
@@ -108,12 +122,15 @@ export default function Marketing() {
       </div>
 
       <Tabs defaultValue="nova" className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="nova" className="gap-2">
+        <TabsList className="mb-4 h-auto flex-wrap p-1">
+          <TabsTrigger value="nova" className="gap-2 py-2">
             <Send className="w-4 h-4" /> Nova Campanha
           </TabsTrigger>
-          <TabsTrigger value="historico" className="gap-2">
+          <TabsTrigger value="historico" className="gap-2 py-2">
             <History className="w-4 h-4" /> Histórico de Envios
+          </TabsTrigger>
+          <TabsTrigger value="templates" className="gap-2 py-2">
+            <FileText className="w-4 h-4" /> Modelos de Email
           </TabsTrigger>
         </TabsList>
 
@@ -137,7 +154,49 @@ export default function Marketing() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Conteúdo da Mensagem</Label>
+                  <div className="flex justify-between items-end">
+                    <Label>Conteúdo da Mensagem</Label>
+                    <Dialog open={isTemplateModalOpen} onOpenChange={setIsTemplateModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="outline" size="sm" className="h-8">
+                          Carregar Template
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Selecionar Modelo</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3 mt-4 max-h-[400px] overflow-y-auto pr-1">
+                          {marketingTemplates.length === 0 && (
+                            <p className="text-sm text-slate-500 text-center py-4">
+                              Nenhum template encontrado.
+                            </p>
+                          )}
+                          {marketingTemplates.map((t) => (
+                            <Card
+                              key={t.id}
+                              className="cursor-pointer hover:border-primary hover:shadow-sm transition-all"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  conteudo: t.conteudo,
+                                  titulo: t.titulo,
+                                })
+                                setIsTemplateModalOpen(false)
+                              }}
+                            >
+                              <CardContent className="p-4">
+                                <p className="font-semibold text-slate-800">{t.titulo}</p>
+                                <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                                  {t.conteudo}
+                                </p>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   <Textarea
                     required
                     placeholder="Escreva sua mensagem aqui..."
@@ -199,6 +258,14 @@ export default function Marketing() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="templates">
+          <TemplatesManager
+            defaultTipo="email_marketing"
+            title="Modelos de Email"
+            description="Crie layouts padrão para suas campanhas de marketing e comunicados."
+          />
         </TabsContent>
       </Tabs>
     </div>

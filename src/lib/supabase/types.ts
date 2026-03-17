@@ -135,6 +135,41 @@ export type Database = {
           },
         ]
       }
+      comunicacoes_campanhas: {
+        Row: {
+          conteudo: string
+          data_envio: string
+          id: string
+          tipo: string
+          titulo: string
+          usuario_id: string
+        }
+        Insert: {
+          conteudo: string
+          data_envio?: string
+          id?: string
+          tipo?: string
+          titulo: string
+          usuario_id: string
+        }
+        Update: {
+          conteudo?: string
+          data_envio?: string
+          id?: string
+          tipo?: string
+          titulo?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'comunicacoes_campanhas_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       despesas: {
         Row: {
           categoria: string | null
@@ -179,6 +214,7 @@ export type Database = {
           id: string
           nome_item: string
           quantidade: number
+          quantidade_minima: number
           usuario_id: string
         }
         Insert: {
@@ -186,6 +222,7 @@ export type Database = {
           id?: string
           nome_item: string
           quantidade?: number
+          quantidade_minima?: number
           usuario_id: string
         }
         Update: {
@@ -193,6 +230,7 @@ export type Database = {
           id?: string
           nome_item?: string
           quantidade?: number
+          quantidade_minima?: number
           usuario_id?: string
         }
         Relationships: [
@@ -857,6 +895,13 @@ export const Constants = {
 //   nota: integer (nullable)
 //   comentario: text (nullable)
 //   data_criacao: timestamp with time zone (not null, default: now())
+// Table: comunicacoes_campanhas
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   titulo: text (not null)
+//   conteudo: text (not null)
+//   data_envio: timestamp with time zone (not null, default: now())
+//   tipo: text (not null, default: 'newsletter'::text)
 // Table: despesas
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -871,6 +916,7 @@ export const Constants = {
 //   nome_item: text (not null)
 //   quantidade: integer (not null, default: 0)
 //   data_atualizacao: timestamp with time zone (nullable, default: now())
+//   quantidade_minima: integer (not null, default: 0)
 // Table: financeiro
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -987,6 +1033,9 @@ export const Constants = {
 //   CHECK avaliacoes_nota_check: CHECK (((nota >= 1) AND (nota <= 5)))
 //   FOREIGN KEY avaliacoes_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY avaliacoes_pkey: PRIMARY KEY (id)
+// Table: comunicacoes_campanhas
+//   PRIMARY KEY comunicacoes_campanhas_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY comunicacoes_campanhas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: despesas
 //   PRIMARY KEY despesas_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY despesas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -1056,6 +1105,10 @@ export const Constants = {
 //     WITH CHECK: true
 //   Policy "avaliacoes_select" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
+// Table: comunicacoes_campanhas
+//   Policy "campanhas_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
 // Table: despesas
 //   Policy "despesas_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
@@ -1153,6 +1206,21 @@ export const Constants = {
 //       WHERE id = p_agendamento_id AND paciente_id = v_paciente_id AND status = 'agendado';
 //
 //       RETURN FOUND;
+//   END;
+//   $function$
+//
+// FUNCTION check_low_stock()
+//   CREATE OR REPLACE FUNCTION public.check_low_stock()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//     IF NEW.quantidade <= NEW.quantidade_minima AND (OLD.quantidade > OLD.quantidade_minima OR TG_OP = 'INSERT') THEN
+//       INSERT INTO public.notificacoes (usuario_id, titulo, mensagem)
+//       VALUES (NEW.usuario_id, 'Alerta de Estoque Baixo', 'O item ' || NEW.nome_item || ' atingiu o nível crítico (' || NEW.quantidade || '/' || NEW.quantidade_minima || ').');
+//     END IF;
+//     RETURN NEW;
 //   END;
 //   $function$
 //
@@ -1451,6 +1519,7 @@ export const Constants = {
 //   audit_agendamentos_trigger: CREATE TRIGGER audit_agendamentos_trigger AFTER INSERT OR DELETE OR UPDATE ON public.agendamentos FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: estoque
 //   stock_movement_trigger: CREATE TRIGGER stock_movement_trigger AFTER INSERT OR UPDATE ON public.estoque FOR EACH ROW EXECUTE FUNCTION log_stock_movement()
+//   trigger_check_low_stock: CREATE TRIGGER trigger_check_low_stock AFTER INSERT OR UPDATE OF quantidade, quantidade_minima ON public.estoque FOR EACH ROW EXECUTE FUNCTION check_low_stock()
 // Table: financeiro
 //   audit_financeiro_trigger: CREATE TRIGGER audit_financeiro_trigger AFTER INSERT OR DELETE OR UPDATE ON public.financeiro FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 

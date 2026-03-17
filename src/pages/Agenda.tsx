@@ -246,16 +246,14 @@ export default function Agenda() {
             })
             .eq('id', finData.id)
         else
-          await supabase
-            .from('financeiro')
-            .insert({
-              usuario_id: user.id,
-              paciente_id: apt.paciente_id,
-              mes: now.getMonth() + 1,
-              ano: now.getFullYear(),
-              valor_recebido: 0,
-              valor_a_receber: valorToAdd,
-            })
+          await supabase.from('financeiro').insert({
+            usuario_id: user.id,
+            paciente_id: apt.paciente_id,
+            mes: now.getMonth() + 1,
+            ano: now.getFullYear(),
+            valor_recebido: 0,
+            valor_a_receber: valorToAdd,
+          })
       }
     }
   }

@@ -9,7 +9,17 @@ import { Card, CardContent } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { Trash2, Plus, FileText, ArrowLeft, Save } from 'lucide-react'
 
-export function TemplatesManager() {
+interface TemplatesManagerProps {
+  defaultTipo?: string
+  title?: string
+  description?: string
+}
+
+export function TemplatesManager({
+  defaultTipo = 'contrato',
+  title = 'Biblioteca de Documentos',
+  description = 'Crie modelos padronizados de contratos e termos de consentimento.',
+}: TemplatesManagerProps) {
   const { user } = useAuth()
   const { toast } = useToast()
   const [templates, setTemplates] = useState<any[]>([])
@@ -21,13 +31,14 @@ export function TemplatesManager() {
       .from('templates_documentos')
       .select('*')
       .eq('usuario_id', user.id)
+      .eq('tipo', defaultTipo)
       .order('data_criacao', { ascending: false })
     if (data) setTemplates(data)
   }
 
   useEffect(() => {
     fetchTemplates()
-  }, [user])
+  }, [user, defaultTipo])
 
   const handleSave = async () => {
     if (!editing.titulo || !editing.conteudo) {
@@ -60,7 +71,7 @@ export function TemplatesManager() {
 
   if (editing) {
     return (
-      <div className="space-y-5 animate-fade-in bg-white p-5 rounded-lg border border-slate-200">
+      <div className="space-y-5 animate-fade-in bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <Button
@@ -84,7 +95,7 @@ export function TemplatesManager() {
           <Input
             value={editing.titulo}
             onChange={(e) => setEditing({ ...editing, titulo: e.target.value })}
-            placeholder="Ex: Contrato de Terapia Padrão"
+            placeholder="Ex: Título do Template"
             className="bg-slate-50 font-medium"
           />
         </div>
@@ -100,7 +111,7 @@ export function TemplatesManager() {
             value={editing.conteudo}
             onChange={(e) => setEditing({ ...editing, conteudo: e.target.value })}
             className="min-h-[350px] bg-slate-50 leading-relaxed"
-            placeholder="Cole o texto do seu contrato ou política aqui..."
+            placeholder="Escreva o texto do seu template aqui..."
           />
         </div>
       </div>
@@ -111,13 +122,11 @@ export function TemplatesManager() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
         <div>
-          <h3 className="font-semibold text-slate-900">Biblioteca de Documentos</h3>
-          <p className="text-sm text-slate-500">
-            Crie modelos padronizados de contratos e termos de consentimento.
-          </p>
+          <h3 className="font-semibold text-slate-900">{title}</h3>
+          <p className="text-sm text-slate-500">{description}</p>
         </div>
         <Button
-          onClick={() => setEditing({ titulo: '', conteudo: '', tipo: 'contrato' })}
+          onClick={() => setEditing({ titulo: '', conteudo: '', tipo: defaultTipo })}
           className="gap-2 shadow-sm"
         >
           <Plus className="w-4 h-4" /> Criar Modelo
