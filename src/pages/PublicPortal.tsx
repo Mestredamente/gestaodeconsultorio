@@ -5,35 +5,51 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Clock, Download, ExternalLink, Activity, FileText } from 'lucide-react'
+import { Calendar, Clock, Download, ExternalLink, Activity, FileText, Star } from 'lucide-react'
 import { formatGoogleCalendarLink, downloadIcs } from '@/lib/calendar'
+import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 
 export default function PublicPortal() {
   const { hash } = useParams()
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
+
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState('')
+  const [ratingSubmitted, setRatingSubmitted] = useState(false)
 
   useEffect(() => {
     const fetchPortalData = async () => {
       if (!hash) return
       const { data: res, error } = await supabase.rpc('get_patient_portal_data', { p_hash: hash })
-      if (!error && res && Object.keys(res).length > 0) {
-        setData(res)
-      }
+      if (!error && res && Object.keys(res).length > 0) setData(res)
       setLoading(false)
     }
     fetchPortalData()
   }, [hash])
 
-  if (loading) {
+  const handleRating = async () => {
+    if (!data.pending_survey?.[0]) return
+    await supabase.from('avaliacoes').insert({
+      paciente_id: data.paciente_id,
+      agendamento_id: data.pending_survey[0].id,
+      nota: rating,
+      comentario: comment,
+    })
+    setRatingSubmitted(true)
+    toast({ title: 'Avaliação enviada com sucesso! Obrigado.' })
+  }
+
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
-  }
-
-  if (!data || !data.paciente_nome) {
+  if (!data || !data.paciente_nome)
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
         <Card className="max-w-md w-full p-8 text-center text-slate-500 shadow-sm">
@@ -41,7 +57,6 @@ export default function PublicPortal() {
         </Card>
       </div>
     )
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
@@ -56,6 +71,43 @@ export default function PublicPortal() {
             </CardDescription>
           </CardHeader>
         </Card>
+
+        {!ratingSubmitted && data.pending_survey && data.pending_survey.length > 0 && (
+          <Card className="bg-primary/5 border-primary/20 shadow-sm">
+            <CardContent className="p-6">
+              <h3 className="font-bold text-lg mb-2 text-slate-800">
+                Avalie sua última consulta (
+                {new Date(data.pending_survey[0].data_hora).toLocaleDateString('pt-BR')})
+              </h3>
+              <p className="text-sm text-slate-600 mb-4">
+                Sua opinião é muito importante para melhorarmos nosso atendimento.
+              </p>
+              <div className="flex gap-2 mb-4">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Star
+                    key={n}
+                    className={cn(
+                      'w-8 h-8 cursor-pointer transition-colors',
+                      rating >= n
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'text-slate-300 hover:text-amber-200',
+                    )}
+                    onClick={() => setRating(n)}
+                  />
+                ))}
+              </div>
+              <Textarea
+                placeholder="Deixe um comentário (opcional)"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                className="mb-4 bg-white"
+              />
+              <Button onClick={handleRating} disabled={rating === 0}>
+                Enviar Avaliação
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs defaultValue="agenda" className="w-full">
           <TabsList className="mb-4">
@@ -86,7 +138,6 @@ export default function PublicPortal() {
                 })
                 const title = `Consulta: ${data.paciente_nome} - ${apt.especialidade || 'Geral'}`
                 const details = `Clínica: ${data.consultorio}`
-
                 return (
                   <Card key={apt.id} className="shadow-sm border-slate-200">
                     <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">

@@ -2,7 +2,17 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Check, X, FileText, Plus, ExternalLink, Download } from 'lucide-react'
+import {
+  Check,
+  X,
+  FileText,
+  Plus,
+  ExternalLink,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Receipt,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
@@ -26,11 +36,33 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatGoogleCalendarLink, downloadIcs } from '@/lib/calendar'
+import {
+  format,
+  addDays,
+  subDays,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  startOfDay,
+  endOfDay,
+  eachDayOfInterval,
+  isSameDay,
+  addMonths,
+  subMonths,
+} from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function Agenda() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [receiptData, setReceiptData] = useState<any>(null)
+
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [view, setView] = useState<'daily' | 'weekly' | 'monthly'>('daily')
 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [patients, setPatients] = useState<any[]>([])
@@ -52,24 +84,32 @@ export default function Agenda() {
 
   const fetchAppointments = useCallback(async () => {
     if (!user) return
+    setLoading(true)
 
-    const startOfDay = new Date()
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(startOfDay)
-    endOfDay.setDate(endOfDay.getDate() + 1)
+    let s, e
+    if (view === 'monthly') {
+      s = startOfMonth(currentDate)
+      e = endOfMonth(currentDate)
+    } else if (view === 'weekly') {
+      s = startOfWeek(currentDate, { weekStartsOn: 0 })
+      e = endOfWeek(currentDate, { weekStartsOn: 0 })
+    } else {
+      s = startOfDay(currentDate)
+      e = endOfDay(currentDate)
+    }
 
     const { data, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, especialidade, valor_total, valor_sinal, sinal_pago, paciente_id, pacientes (id, nome, valor_sessao)`,
+        `id, data_hora, status, especialidade, valor_total, valor_sinal, sinal_pago, status_nota_fiscal, paciente_id, pacientes (id, nome, valor_sessao)`,
       )
       .eq('usuario_id', user.id)
-      .gte('data_hora', startOfDay.toISOString())
-      .lt('data_hora', endOfDay.toISOString())
+      .gte('data_hora', s.toISOString())
+      .lt('data_hora', e.toISOString())
       .order('data_hora', { ascending: true })
     if (!error && data) setAppointments(data)
     setLoading(false)
-  }, [user])
+  }, [user, view, currentDate])
 
   const fetchInitialData = useCallback(async () => {
     if (!user) return
@@ -96,7 +136,6 @@ export default function Agenda() {
     fetchAppointments()
     fetchInitialData()
     if (!user) return
-
     const subscription = supabase
       .channel('agendamentos_changes')
       .on(
@@ -105,35 +144,29 @@ export default function Agenda() {
         () => fetchAppointments(),
       )
       .subscribe()
-
     return () => {
       supabase.removeChannel(subscription)
     }
   }, [user, fetchAppointments, fetchInitialData])
+
+  const nextPeriod = () => {
+    if (view === 'monthly') setCurrentDate(addMonths(currentDate, 1))
+    else if (view === 'weekly') setCurrentDate(addDays(currentDate, 7))
+    else setCurrentDate(addDays(currentDate, 1))
+  }
+
+  const prevPeriod = () => {
+    if (view === 'monthly') setCurrentDate(subMonths(currentDate, 1))
+    else if (view === 'weekly') setCurrentDate(subDays(currentDate, 7))
+    else setCurrentDate(subDays(currentDate, 1))
+  }
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
     setIsSubmitting(true)
 
-    // Check conflicts
-    const { data: conflict } = await supabase
-      .from('agendamentos')
-      .select('id')
-      .eq('usuario_id', user.id)
-      .eq('data_hora', new Date(formData.data_hora).toISOString())
-
-    if (conflict && conflict.length > 0) {
-      toast({
-        title: 'Este horário já está ocupado. Por favor, escolha outro.',
-        variant: 'destructive',
-      })
-      setIsSubmitting(false)
-      return
-    }
-
     const isoDate = new Date(formData.data_hora).toISOString()
-
     const { data: newAppt, error } = await supabase
       .from('agendamentos')
       .insert({
@@ -155,13 +188,11 @@ export default function Agenda() {
       return
     }
 
-    // Handle financial integration for prepayments
     if (formData.sinal_pago && Number(formData.valor_sinal) > 0) {
       const d = new Date(isoDate)
       const mes = d.getMonth() + 1
       const ano = d.getFullYear()
       const ptId = formData.paciente_id
-
       const { data: fin } = await supabase
         .from('financeiro')
         .select('*')
@@ -170,7 +201,6 @@ export default function Agenda() {
         .eq('mes', mes)
         .eq('ano', ano)
         .maybeSingle()
-
       if (fin) {
         await supabase
           .from('financeiro')
@@ -182,16 +212,21 @@ export default function Agenda() {
           })
           .eq('id', fin.id)
       } else {
-        await supabase.from('financeiro').insert({
-          usuario_id: user.id,
-          paciente_id: ptId,
-          mes,
-          ano,
-          valor_recebido: Number(formData.valor_sinal),
-          valor_a_receber: Number(formData.valor_total) - Number(formData.valor_sinal),
-        })
+        await supabase
+          .from('financeiro')
+          .insert({
+            usuario_id: user.id,
+            paciente_id: ptId,
+            mes,
+            ano,
+            valor_recebido: Number(formData.valor_sinal),
+            valor_a_receber: Number(formData.valor_total) - Number(formData.valor_sinal),
+          })
       }
     }
+
+    // Trigger Notification
+    supabase.functions.invoke('enviar_lembrete_consulta', { body: { agendamento_id: newAppt.id } })
 
     toast({ title: 'Agendamento salvo com sucesso!' })
     setIsNewModalOpen(false)
@@ -206,104 +241,64 @@ export default function Agenda() {
     })
   }
 
-  const handleCompareceu = async (apt: any) => {
-    if (apt.status === 'compareceu') return
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === apt.id ? { ...a, status: 'compareceu' } : a)),
-    )
-    await supabase.from('agendamentos').update({ status: 'compareceu' }).eq('id', apt.id)
+  const handleUpdateStatus = async (apt: any, newStatus: string) => {
+    if (apt.status === newStatus) return
+    setAppointments((prev) => prev.map((a) => (a.id === apt.id ? { ...a, status: newStatus } : a)))
+    await supabase.from('agendamentos').update({ status: newStatus }).eq('id', apt.id)
+    toast({ title: `Status atualizado: ${newStatus}` })
 
-    if (!user) return
-    const now = new Date(apt.data_hora)
-    const mes = now.getMonth() + 1
-    const ano = now.getFullYear()
+    if (newStatus === 'compareceu' && user) {
+      const now = new Date(apt.data_hora)
+      const mes = now.getMonth() + 1
+      const ano = now.getFullYear()
+      const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+      const valorSessao = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
+      const valorToAdd = apt.sinal_pago
+        ? Number(valorSessao) - Number(apt.valor_sinal)
+        : Number(valorSessao)
 
-    // Use appointment's valor_total if specified, else fallback to patient's default
-    const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-    const valorSessao = apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0
-
-    // If sign was already paid, we only need to add the remainder to valor_a_receber
-    // The signal was already added to financeiro during creation.
-    const valorToAdd = apt.sinal_pago
-      ? Number(valorSessao) - Number(apt.valor_sinal)
-      : Number(valorSessao)
-
-    if (valorToAdd > 0) {
-      const { data: finData } = await supabase
-        .from('financeiro')
-        .select('*')
-        .eq('usuario_id', user.id)
-        .eq('paciente_id', apt.paciente_id)
-        .eq('mes', mes)
-        .eq('ano', ano)
-        .maybeSingle()
-
-      if (finData) {
-        await supabase
+      if (valorToAdd > 0) {
+        const { data: finData } = await supabase
           .from('financeiro')
-          .update({
-            valor_a_receber: Number(finData.valor_a_receber) + valorToAdd,
-            data_atualizacao: new Date().toISOString(),
-          })
-          .eq('id', finData.id)
-      } else {
-        await supabase.from('financeiro').insert({
-          usuario_id: user.id,
-          paciente_id: apt.paciente_id,
-          mes,
-          ano,
-          valor_recebido: 0,
-          valor_a_receber: valorToAdd,
-        })
+          .select('*')
+          .eq('usuario_id', user.id)
+          .eq('paciente_id', apt.paciente_id)
+          .eq('mes', mes)
+          .eq('ano', ano)
+          .maybeSingle()
+        if (finData)
+          await supabase
+            .from('financeiro')
+            .update({
+              valor_a_receber: Number(finData.valor_a_receber) + valorToAdd,
+              data_atualizacao: new Date().toISOString(),
+            })
+            .eq('id', finData.id)
+        else
+          await supabase
+            .from('financeiro')
+            .insert({
+              usuario_id: user.id,
+              paciente_id: apt.paciente_id,
+              mes,
+              ano,
+              valor_recebido: 0,
+              valor_a_receber: valorToAdd,
+            })
       }
     }
-    toast({ title: 'Status atualizado: Compareceu' })
   }
 
-  const handleFaltou = async (apt: any) => {
-    if (apt.status === 'faltou') return
-    setAppointments((prev) => prev.map((a) => (a.id === apt.id ? { ...a, status: 'faltou' } : a)))
-    await supabase.from('agendamentos').update({ status: 'faltou' }).eq('id', apt.id)
-    toast({ title: 'Status atualizado: Faltou' })
-  }
-
-  const handleDesmarcou = async (apt: any) => {
-    setAppointments((prev) => prev.filter((a) => a.id !== apt.id))
-    await supabase.from('agendamentos').delete().eq('id', apt.id)
-    toast({ title: 'Sessão desmarcada' })
-  }
-
-  const handleViewReceipt = async (apt: any) => {
-    if (!user) return
-    const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-    const now = new Date(apt.data_hora)
-    const mes = now.getMonth() + 1
-    const ano = now.getFullYear()
-
-    const { data: fin } = await supabase
-      .from('financeiro')
-      .select('valor_recebido')
-      .eq('usuario_id', user.id)
-      .eq('paciente_id', apt.paciente_id)
-      .eq('mes', mes)
-      .eq('ano', ano)
-      .maybeSingle()
-
-    if (fin && fin.valor_recebido > 0) {
-      setReceiptData({
-        open: true,
-        patientName: pacienteInfo.nome,
-        amount: fin.valor_recebido,
-        dateStr: new Date().toLocaleDateString('pt-BR'),
-        referencia: `${String(mes).padStart(2, '0')}/${ano}`,
+  const handleFaturar = async (aptId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('emitir_nota_fiscal', {
+        body: { agendamento_id: aptId },
       })
-    } else {
-      toast({
-        title: 'Pagamento pendente',
-        description:
-          'O paciente ainda não possui pagamentos registrados para emitir recibo neste mês.',
-        variant: 'destructive',
-      })
+      if (error) throw error
+      toast({ title: 'Nota fiscal emitida com sucesso!' })
+      fetchAppointments()
+    } catch (e) {
+      toast({ title: 'Erro ao emitir NF', variant: 'destructive' })
     }
   }
 
@@ -312,169 +307,285 @@ export default function Agenda() {
     setFormData({ ...formData, paciente_id: pid, valor_total: pt?.valor_sessao?.toString() || '0' })
   }
 
-  if (loading)
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+  const getDaysForView = () => {
+    if (view === 'daily') return [currentDate]
+    if (view === 'weekly')
+      return eachDayOfInterval({
+        start: startOfWeek(currentDate, { weekStartsOn: 0 }),
+        end: endOfWeek(currentDate, { weekStartsOn: 0 }),
+      })
+    if (view === 'monthly')
+      return eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) })
+    return []
+  }
+  const days = getDaysForView()
 
-  const todayStr = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date())
-  const statusColors: Record<string, string> = {
-    agendado: 'border-l-slate-200',
-    compareceu: 'border-l-emerald-500',
-    faltou: 'border-l-red-500',
-    desmarcou: 'border-l-amber-500',
+  const renderAppointmentCard = (apt: any) => {
+    const timeStr = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+    const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+    const patientName = pacienteInfo?.nome || 'Paciente Desconhecido'
+    const valueStr = Number(
+      apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0,
+    ).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    const eventTitle = `Consulta: ${patientName} ${apt.especialidade ? `(${apt.especialidade})` : ''}`
+    const statusColors: Record<string, string> = {
+      agendado: 'border-l-slate-200',
+      compareceu: 'border-l-emerald-500',
+      faltou: 'border-l-red-500',
+      desmarcou: 'border-l-amber-500',
+    }
+
+    return (
+      <Card
+        key={apt.id}
+        className={cn(
+          'bg-white shadow-sm transition-all border-l-4 border-t-0 border-r-0 border-b-0',
+          statusColors[apt.status] || statusColors.agendado,
+        )}
+      >
+        <CardContent className="p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="flex items-start lg:items-center gap-5 w-full lg:w-auto">
+            <div className="bg-slate-50 min-w-[70px] py-2 rounded-lg text-center border border-slate-100 shrink-0">
+              <span className="font-bold text-slate-700 text-lg">{timeStr}</span>
+            </div>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-lg text-slate-900">{patientName}</h3>
+                {apt.especialidade && (
+                  <Badge variant="secondary" className="text-xs">
+                    {apt.especialidade}
+                  </Badge>
+                )}
+                {apt.valor_sinal > 0 && !apt.sinal_pago && (
+                  <Badge variant="destructive" className="text-[10px]">
+                    Sinal Pendente
+                  </Badge>
+                )}
+                {apt.status_nota_fiscal === 'emitida' && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px]">
+                    NF Emitida
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-slate-500 font-medium">Valor: {valueStr}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto justify-start lg:justify-end">
+            <Button
+              size="icon"
+              variant="outline"
+              className="text-slate-400 hover:text-primary"
+              onClick={() =>
+                window.open(
+                  formatGoogleCalendarLink(eventTitle, clinicName, apt.data_hora),
+                  '_blank',
+                )
+              }
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Button>
+            {apt.status === 'compareceu' && apt.status_nota_fiscal !== 'emitida' && (
+              <Button
+                size="icon"
+                variant="outline"
+                className="hover:bg-blue-50 hover:border-blue-200"
+                onClick={() => handleFaturar(apt.id)}
+                title="Emitir Nota Fiscal"
+              >
+                <Receipt className="w-5 h-5 text-blue-500" />
+              </Button>
+            )}
+            <div className="w-px h-8 bg-slate-200 mx-1 hidden sm:block"></div>
+            <Button
+              size="icon"
+              variant="outline"
+              className={cn(
+                'hover:bg-emerald-50 hover:border-emerald-200',
+                apt.status === 'compareceu' && 'bg-emerald-50 border-emerald-200',
+              )}
+              onClick={() => handleUpdateStatus(apt, 'compareceu')}
+            >
+              <Check className="w-5 h-5 text-emerald-500" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className={cn(
+                'hover:bg-red-50 hover:border-red-200',
+                apt.status === 'faltou' && 'bg-red-50 border-red-200',
+              )}
+              onClick={() => handleUpdateStatus(apt, 'faltou')}
+            >
+              <X className="w-5 h-5 text-red-500" />
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className={cn(
+                'hover:bg-amber-50 hover:border-amber-200 font-bold text-lg text-amber-500',
+                apt.status === 'desmarcou' && 'bg-amber-50 border-amber-200',
+              )}
+              onClick={() => handleUpdateStatus(apt, 'desmarcou')}
+            >
+              D
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-10">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight capitalize">
-            {todayStr}
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium">Sua agenda de hoje</p>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex items-center gap-1 bg-white border rounded-md shadow-sm p-1">
+            <Button variant="ghost" size="icon" onClick={prevPeriod} className="h-8 w-8">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" className="h-8 min-w-[140px] font-medium px-2 capitalize">
+                  {view === 'monthly'
+                    ? format(currentDate, 'MMM yyyy', { locale: ptBR })
+                    : format(currentDate, 'dd/MM/yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={currentDate}
+                  onSelect={(d) => d && setCurrentDate(d)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Button variant="ghost" size="icon" onClick={nextPeriod} className="h-8 w-8">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <Tabs
+            value={view}
+            onValueChange={(v) => setView(v as any)}
+            className="bg-white border rounded-md shadow-sm"
+          >
+            <TabsList className="h-10 p-1 bg-transparent">
+              <TabsTrigger
+                value="daily"
+                className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+              >
+                Dia
+              </TabsTrigger>
+              <TabsTrigger
+                value="weekly"
+                className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+              >
+                Semana
+              </TabsTrigger>
+              <TabsTrigger
+                value="monthly"
+                className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary"
+              >
+                Mês
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
-        <Button onClick={() => setIsNewModalOpen(true)} className="gap-2 rounded-full">
+        <Button onClick={() => setIsNewModalOpen(true)} className="gap-2 rounded-full shadow-sm">
           <Plus className="w-4 h-4" /> Novo Agendamento
         </Button>
       </header>
 
-      <div className="flex flex-col gap-4">
-        {appointments.length === 0 ? (
-          <div className="text-center p-12 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500">
-            Nenhuma sessão agendada para hoje.
-          </div>
-        ) : (
-          appointments.map((apt) => {
-            const timeStr = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-            const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-            const patientName = pacienteInfo?.nome || 'Paciente Desconhecido'
-            const valueStr = Number(
-              apt.valor_total > 0 ? apt.valor_total : pacienteInfo?.valor_sessao || 0,
-            ).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-
-            const eventTitle = `Consulta: ${patientName} ${apt.especialidade ? `(${apt.especialidade})` : ''}`
-
-            return (
-              <Card
-                key={apt.id}
-                className={cn(
-                  'bg-white shadow-sm transition-all border-l-4 border-t-0 border-r-0 border-b-0',
-                  statusColors[apt.status] || statusColors.agendado,
-                )}
-              >
-                <CardContent className="p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                  <div className="flex items-start lg:items-center gap-5 w-full lg:w-auto">
-                    <div className="bg-slate-50 min-w-[70px] py-2 rounded-lg text-center border border-slate-100 shrink-0">
-                      <span className="font-bold text-slate-700 text-lg">{timeStr}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-lg text-slate-900">{patientName}</h3>
-                        {apt.especialidade && (
-                          <Badge variant="secondary" className="text-xs">
-                            {apt.especialidade}
-                          </Badge>
-                        )}
-                        {apt.valor_sinal > 0 && !apt.sinal_pago && (
-                          <Badge variant="destructive" className="text-[10px]">
-                            Sinal Pendente
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-slate-500 font-medium">Valor: {valueStr}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 w-full lg:w-auto justify-start lg:justify-end">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="text-slate-400 hover:text-primary"
-                      title="Google Calendar"
-                      onClick={() =>
-                        window.open(
-                          formatGoogleCalendarLink(eventTitle, clinicName, apt.data_hora),
-                          '_blank',
-                        )
-                      }
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="text-slate-400 hover:text-primary"
-                      title="Exportar ICS"
-                      onClick={() => downloadIcs(eventTitle, clinicName, apt.data_hora)}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                    <div className="w-px h-8 bg-slate-200 mx-1 hidden sm:block"></div>
-                    {apt.status === 'compareceu' && (
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                        onClick={() => handleViewReceipt(apt)}
-                        title="Gerar Recibo"
-                      >
-                        <FileText className="w-5 h-5 text-blue-500" />
-                      </Button>
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {view === 'monthly' ? (
+            <div className="grid grid-cols-7 gap-2">
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((wd) => (
+                <div
+                  key={wd}
+                  className="text-center font-bold text-xs text-slate-400 py-2 uppercase"
+                >
+                  {wd}
+                </div>
+              ))}
+              {Array.from({ length: startOfMonth(currentDate).getDay() }).map((_, i) => (
+                <div key={`empty-${i}`} />
+              ))}
+              {days.map((d) => {
+                const dayAppts = appointments.filter((a) => isSameDay(new Date(a.data_hora), d))
+                return (
+                  <div
+                    key={d.toISOString()}
+                    onClick={() => {
+                      setCurrentDate(d)
+                      setView('daily')
+                    }}
+                    className={cn(
+                      'border border-slate-200 rounded-lg p-2 min-h-[80px] bg-white cursor-pointer hover:bg-slate-50 transition-colors',
+                      isSameDay(d, new Date()) && 'ring-2 ring-primary ring-offset-1',
                     )}
-                    <Button
-                      size="icon"
-                      variant="outline"
+                  >
+                    <div
                       className={cn(
-                        'hover:bg-emerald-50 hover:border-emerald-200',
-                        apt.status === 'compareceu' && 'bg-emerald-50 border-emerald-200',
+                        'font-bold text-sm text-right',
+                        isSameDay(d, new Date()) ? 'text-primary' : 'text-slate-700',
                       )}
-                      onClick={() => handleCompareceu(apt)}
-                      title="Compareceu"
                     >
-                      <Check className="w-5 h-5 text-emerald-500" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className={cn(
-                        'hover:bg-red-50 hover:border-red-200',
-                        apt.status === 'faltou' && 'bg-red-50 border-red-200',
+                      {format(d, 'd')}
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {dayAppts.slice(0, 3).map((a) => (
+                        <div key={a.id} className="w-2 h-2 rounded-full bg-primary" />
+                      ))}
+                      {dayAppts.length > 3 && (
+                        <span className="text-[10px] text-slate-500 font-medium">
+                          +{dayAppts.length - 3}
+                        </span>
                       )}
-                      onClick={() => handleFaltou(apt)}
-                      title="Faltou"
-                    >
-                      <X className="w-5 h-5 text-red-500" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className={cn(
-                        'hover:bg-amber-50 hover:border-amber-200 font-bold text-lg text-amber-500',
-                        apt.status === 'desmarcou' && 'bg-amber-50 border-amber-200',
-                      )}
-                      onClick={() => handleDesmarcou(apt)}
-                      title="Desmarcou"
-                    >
-                      D
-                    </Button>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )
-          })
-        )}
-      </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {days.map((d) => {
+                const dayAppts = appointments.filter((a) => isSameDay(new Date(a.data_hora), d))
+                if (dayAppts.length === 0) {
+                  if (view === 'daily')
+                    return (
+                      <div
+                        key={d.toISOString()}
+                        className="text-center p-12 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500"
+                      >
+                        Nenhuma sessão agendada para esta data.
+                      </div>
+                    )
+                  return null
+                }
+                return (
+                  <div key={d.toISOString()} className="space-y-4">
+                    {view === 'weekly' && (
+                      <h3 className="font-bold text-slate-700 border-b border-slate-200 pb-2 capitalize">
+                        {format(d, 'EEEE, dd/MM/yyyy', { locale: ptBR })}
+                      </h3>
+                    )}
+                    {dayAppts.map((apt) => renderAppointmentCard(apt))}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <ReceiptDialog
         {...receiptData}
@@ -502,7 +613,6 @@ export default function Agenda() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Data e Hora</Label>
               <Input
@@ -513,7 +623,6 @@ export default function Agenda() {
                 className="bg-white"
               />
             </div>
-
             {especialidades.length > 0 && (
               <div className="space-y-2">
                 <Label>Especialidade</Label>
@@ -534,7 +643,6 @@ export default function Agenda() {
                 </Select>
               </div>
             )}
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Valor Total (R$)</Label>
@@ -559,7 +667,6 @@ export default function Agenda() {
                 />
               </div>
             </div>
-
             {Number(formData.valor_sinal) > 0 && (
               <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-md">
                 <Label>Sinal já foi pago?</Label>
@@ -569,7 +676,6 @@ export default function Agenda() {
                 />
               </div>
             )}
-
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setIsNewModalOpen(false)}>
                 Cancelar

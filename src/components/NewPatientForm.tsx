@@ -30,6 +30,13 @@ const formSchema = z.object({
     .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'E-mail inválido')
     .optional(),
   endereco: z.string().optional(),
+  cep: z.string().optional(),
+  rua: z.string().optional(),
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
+  bairro: z.string().optional(),
+  cidade: z.string().optional(),
+  estado: z.string().optional(),
   contato_emergencia_nome: z.string().optional(),
   contato_emergencia_telefone: z.string().optional(),
   valor_sessao: z
@@ -52,6 +59,13 @@ export default function NewPatientForm() {
       telefone: '',
       email: '',
       endereco: '',
+      cep: '',
+      rua: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
       contato_emergencia_nome: '',
       contato_emergencia_telefone: '',
       valor_sessao: '' as any,
@@ -61,7 +75,6 @@ export default function NewPatientForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) return
     setLoading(true)
-
     const payload = {
       usuario_id: user.id,
       nome: values.nome,
@@ -70,17 +83,23 @@ export default function NewPatientForm() {
       telefone: values.telefone || null,
       email: values.email || null,
       endereco: values.endereco || null,
+      cep: values.cep || null,
+      rua: values.rua || null,
+      numero: values.numero || null,
+      complemento: values.complemento || null,
+      bairro: values.bairro || null,
+      cidade: values.cidade || null,
+      estado: values.estado || null,
       contato_emergencia_nome: values.contato_emergencia_nome || null,
       contato_emergencia_telefone: values.contato_emergencia_telefone || null,
       valor_sessao: values.valor_sessao,
     }
-
     const { error } = await supabase.from('pacientes').insert(payload as any)
     setLoading(false)
 
-    if (error) {
+    if (error)
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
-    } else {
+    else {
       toast({ title: 'Paciente cadastrado com sucesso!' })
       form.reset({
         nome: '',
@@ -89,6 +108,13 @@ export default function NewPatientForm() {
         telefone: '',
         email: '',
         endereco: '',
+        cep: '',
+        rua: '',
+        numero: '',
+        complemento: '',
+        bairro: '',
+        cidade: '',
+        estado: '',
         contato_emergencia_nome: '',
         contato_emergencia_telefone: '',
         valor_sessao: '' as any,
@@ -185,29 +211,102 @@ export default function NewPatientForm() {
                   </FormItem>
                 )}
               />
-              <div className="md:col-span-2">
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">Endereço Completo</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <FormField
                   control={form.control}
-                  name="endereco"
+                  name="cep"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Endereço Completo</FormLabel>
+                      <FormLabel>CEP</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="Rua Exemplo, 123, Bairro, Cidade - UF"
-                          {...field}
-                          value={field.value || ''}
-                        />
+                        <Input {...field} value={field.value || ''} />
                       </FormControl>
-                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="md:col-span-3">
+                  <FormField
+                    control={form.control}
+                    name="rua"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Rua</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="numero"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Número</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ''} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="complemento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Complemento</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ''} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="bairro"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bairro</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ''} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cidade"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cidade</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ''} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="estado"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado</FormLabel>
+                      <FormControl>
+                        <Input {...field} value={field.value || ''} />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
               </div>
             </div>
 
-            <div className="pt-4">
-              <h3 className="text-lg font-medium text-slate-800 border-b border-slate-100 pb-2 mb-4">
+            <div className="pt-4 border-t border-slate-100">
+              <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">
                 Contato de Emergência
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

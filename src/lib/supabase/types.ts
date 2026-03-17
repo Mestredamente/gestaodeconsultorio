@@ -12,24 +12,36 @@ export type Database = {
       agendamentos: {
         Row: {
           data_hora: string
+          especialidade: string | null
           id: string
           paciente_id: string
+          sinal_pago: boolean | null
           status: string
           usuario_id: string
+          valor_sinal: number | null
+          valor_total: number | null
         }
         Insert: {
           data_hora: string
+          especialidade?: string | null
           id?: string
           paciente_id: string
+          sinal_pago?: boolean | null
           status?: string
           usuario_id: string
+          valor_sinal?: number | null
+          valor_total?: number | null
         }
         Update: {
           data_hora?: string
+          especialidade?: string | null
           id?: string
           paciente_id?: string
+          sinal_pago?: boolean | null
           status?: string
           usuario_id?: string
+          valor_sinal?: number | null
+          valor_total?: number | null
         }
         Relationships: [
           {
@@ -421,6 +433,7 @@ export type Database = {
           anamnese_template: Json | null
           chave_pix: string | null
           email: string | null
+          especialidades_disponiveis: string[] | null
           id: string
           lembrete_whatsapp_ativo: boolean | null
           logo_url: string | null
@@ -432,6 +445,7 @@ export type Database = {
           anamnese_template?: Json | null
           chave_pix?: string | null
           email?: string | null
+          especialidades_disponiveis?: string[] | null
           id: string
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
@@ -443,6 +457,7 @@ export type Database = {
           anamnese_template?: Json | null
           chave_pix?: string | null
           email?: string | null
+          especialidades_disponiveis?: string[] | null
           id?: string
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
@@ -467,6 +482,7 @@ export type Database = {
         Returns: Json
       }
       get_anamnese_data: { Args: { p_hash: string }; Returns: Json }
+      get_patient_portal_data: { Args: { p_hash: string }; Returns: Json }
       update_anamnese: {
         Args: { p_anamnese: Json; p_hash: string }
         Returns: Json
@@ -618,6 +634,10 @@ export const Constants = {
 //   usuario_id: uuid (not null)
 //   data_hora: timestamp with time zone (not null)
 //   status: text (not null, default: 'agendado'::text)
+//   especialidade: text (nullable)
+//   valor_total: numeric (nullable, default: 0)
+//   valor_sinal: numeric (nullable, default: 0)
+//   sinal_pago: boolean (nullable, default: false)
 // Table: appointments
 //   id: uuid (not null, default: gen_random_uuid())
 //   patient_name: text (not null)
@@ -702,6 +722,7 @@ export const Constants = {
 //   anamnese_template: jsonb (nullable, default: '[]'::jsonb)
 //   lembrete_whatsapp_ativo: boolean (nullable, default: false)
 //   template_lembrete: text (nullable, default: 'Olá [Nome], você tem uma consulta amanhã às [hora].'::text)
+//   especialidades_disponiveis: _text (nullable, default: '{}'::text[])
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
@@ -852,6 +873,62 @@ export const Constants = {
 //     WHERE p.hash_anamnese = p_hash LIMIT 1;
 //
 //     RETURN COALESCE(v_result, '{}'::jsonb);
+//   END;
+//   $function$
+//
+// FUNCTION get_patient_portal_data(uuid)
+//   CREATE OR REPLACE FUNCTION public.get_patient_portal_data(p_hash uuid)
+//    RETURNS jsonb
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//       v_result jsonb;
+//       v_paciente record;
+//       v_agendamentos jsonb;
+//       v_historico jsonb;
+//       v_clinica text;
+//   BEGIN
+//       -- Find patient by hash
+//       SELECT p.id, p.nome, p.usuario_id INTO v_paciente
+//       FROM public.pacientes p
+//       WHERE p.hash_anamnese = p_hash LIMIT 1;
+//
+//       IF v_paciente.id IS NULL THEN
+//           RETURN '{}'::jsonb;
+//       END IF;
+//
+//       -- Get clinic name
+//       SELECT nome_consultorio INTO v_clinica
+//       FROM public.usuarios
+//       WHERE id = v_paciente.usuario_id LIMIT 1;
+//
+//       -- Get upcoming appointments
+//       SELECT COALESCE(jsonb_agg(jsonb_build_object(
+//           'id', a.id,
+//           'data_hora', a.data_hora,
+//           'status', a.status,
+//           'especialidade', a.especialidade,
+//           'valor_total', a.valor_total,
+//           'valor_sinal', a.valor_sinal,
+//           'sinal_pago', a.sinal_pago
+//       )), '[]'::jsonb) INTO v_agendamentos
+//       FROM public.agendamentos a
+//       WHERE a.paciente_id = v_paciente.id AND a.data_hora >= NOW()
+//       ORDER BY a.data_hora ASC;
+//
+//       -- Get session history
+//       SELECT historico_sessoes INTO v_historico
+//       FROM public.prontuarios
+//       WHERE paciente_id = v_paciente.id LIMIT 1;
+//
+//       -- Build final response
+//       RETURN jsonb_build_object(
+//           'paciente_nome', v_paciente.nome,
+//           'consultorio', v_clinica,
+//           'agendamentos', v_agendamentos,
+//           'historico', COALESCE(v_historico, '[]'::jsonb)
+//       );
 //   END;
 //   $function$
 //

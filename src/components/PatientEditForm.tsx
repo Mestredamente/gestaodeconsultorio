@@ -15,6 +15,13 @@ const formSchema = z.object({
   telefone: z.string().optional().nullable(),
   email: z.string().email('E-mail inválido').optional().or(z.literal('')).nullable(),
   endereco: z.string().optional().nullable(),
+  cep: z.string().optional().nullable(),
+  rua: z.string().optional().nullable(),
+  numero: z.string().optional().nullable(),
+  complemento: z.string().optional().nullable(),
+  bairro: z.string().optional().nullable(),
+  cidade: z.string().optional().nullable(),
+  estado: z.string().optional().nullable(),
   contato_emergencia_nome: z.string().optional().nullable(),
   contato_emergencia_telefone: z.string().optional().nullable(),
   valor_sessao: z
@@ -41,6 +48,13 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
       telefone: patient?.telefone || '',
       email: patient?.email || '',
       endereco: patient?.endereco || '',
+      cep: patient?.cep || '',
+      rua: patient?.rua || '',
+      numero: patient?.numero || '',
+      complemento: patient?.complemento || '',
+      bairro: patient?.bairro || '',
+      cidade: patient?.cidade || '',
+      estado: patient?.estado || '',
       contato_emergencia_nome: patient?.contato_emergencia_nome || '',
       contato_emergencia_telefone: patient?.contato_emergencia_telefone || '',
       valor_sessao: patient?.valor_sessao ? String(patient.valor_sessao) : '',
@@ -55,9 +69,9 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
       .eq('id', patient.id)
     setLoading(false)
 
-    if (error) {
+    if (error)
       toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' })
-    } else {
+    else {
       toast({ title: 'Paciente atualizado com sucesso!' })
       onSuccess()
     }
@@ -89,13 +103,27 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
         <Field id="telefone" label="Telefone" />
         <Field id="email" label="E-mail" type="email" />
         <Field id="valor_sessao" label="Valor da Sessão (R$)" type="number" step="0.01" />
-        <div className="md:col-span-2">
-          <Field id="endereco" label="Endereço Completo" />
+      </div>
+
+      <div className="pt-2 border-t border-slate-100">
+        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
+          Endereço
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+          <Field id="cep" label="CEP" />
+          <div className="md:col-span-3">
+            <Field id="rua" label="Rua" />
+          </div>
+          <Field id="numero" label="Número" />
+          <Field id="complemento" label="Complemento" />
+          <Field id="bairro" label="Bairro" />
+          <Field id="cidade" label="Cidade" />
+          <Field id="estado" label="Estado" />
         </div>
       </div>
 
-      <div className="pt-2">
-        <h3 className="text-sm font-bold text-slate-800 border-b border-slate-100 pb-2 mb-4 uppercase tracking-wider">
+      <div className="pt-2 border-t border-slate-100">
+        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
           Contato de Emergência
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
