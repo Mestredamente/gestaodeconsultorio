@@ -13,6 +13,7 @@ import Finances from './pages/Finances'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Stock from './pages/Stock'
+import Logs from './pages/Logs'
 import PublicBooking from './pages/PublicBooking'
 import NotFound from './pages/NotFound'
 import Auth from './pages/Auth'
@@ -55,6 +56,7 @@ const AppRoutes = () => (
       <Route path="/financeiro" element={<Navigate to="/carteira" replace />} />
       <Route path="/relatorios" element={<Reports />} />
       <Route path="/estoque" element={<Stock />} />
+      <Route path="/logs" element={<Logs />} />
       <Route path="/configuracoes" element={<Settings />} />
       <Route path="/perfil" element={<Navigate to="/configuracoes" replace />} />
     </Route>

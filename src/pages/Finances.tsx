@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, LineChart, Line, XAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
-import { ArrowDownRight, Wallet, AlertCircle } from 'lucide-react'
+import { ArrowDownRight, Wallet, AlertCircle, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import {
@@ -23,7 +23,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import ReceiptDialog from '@/components/ReceiptDialog'
 
 const monthNames = [
   'Jan',
@@ -55,16 +59,12 @@ const fullMonthNames = [
 ]
 const months = fullMonthNames.map((label, i) => ({ value: String(i + 1), label }))
 
-const formatBRL = (value: number) => {
-  return value.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 2,
-  })
-}
+const formatBRL = (value: number) =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })
 
 export default function Finances() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const currentDate = new Date()
   const [month, setMonth] = useState<string>(String(currentDate.getMonth() + 1))
   const [year, setYear] = useState<string>(String(currentDate.getFullYear()))
@@ -75,42 +75,44 @@ export default function Finances() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [selectedPatient, setSelectedPatient] = useState<any | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [receiptData, setReceiptData] = useState<any>(null)
 
-  const years = useMemo(() => {
-    const current = new Date().getFullYear()
-    return Array.from({ length: 5 }, (_, i) => current - 2 + i)
-  }, [])
+  const years = useMemo(
+    () => Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 2 + i),
+    [],
+  )
+
+  const fetchYearData = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
+    const yearNum = parseInt(year)
+
+    const [patientsRes, financeRes, apptsRes] = await Promise.all([
+      supabase.from('pacientes').select('id, nome, valor_sessao').eq('usuario_id', user.id),
+      supabase
+        .from('financeiro')
+        .select('id, paciente_id, mes, ano, valor_recebido, valor_a_receber')
+        .eq('usuario_id', user.id)
+        .eq('ano', yearNum),
+      supabase
+        .from('agendamentos')
+        .select('data_hora, status')
+        .eq('usuario_id', user.id)
+        .gte('data_hora', `${yearNum}-01-01T00:00:00Z`)
+        .lt('data_hora', `${yearNum + 1}-01-01T00:00:00Z`),
+    ])
+
+    if (patientsRes.data) setPatients(patientsRes.data)
+    if (financeRes.data) setFinances(financeRes.data)
+    if (apptsRes.data) setAppointments(apptsRes.data)
+
+    setLoading(false)
+  }, [user, year])
 
   useEffect(() => {
-    const fetchYearData = async () => {
-      if (!user) return
-      setLoading(true)
-      const yearNum = parseInt(year)
-
-      const [patientsRes, financeRes, apptsRes] = await Promise.all([
-        supabase.from('pacientes').select('id, nome, valor_sessao').eq('usuario_id', user.id),
-        supabase
-          .from('financeiro')
-          .select('paciente_id, mes, ano, valor_recebido, valor_a_receber')
-          .eq('usuario_id', user.id)
-          .eq('ano', yearNum),
-        supabase
-          .from('agendamentos')
-          .select('data_hora, status')
-          .eq('usuario_id', user.id)
-          .gte('data_hora', `${yearNum}-01-01T00:00:00Z`)
-          .lt('data_hora', `${yearNum + 1}-01-01T00:00:00Z`),
-      ])
-
-      if (patientsRes.data) setPatients(patientsRes.data)
-      if (financeRes.data) setFinances(financeRes.data)
-      if (apptsRes.data) setAppointments(apptsRes.data)
-
-      setLoading(false)
-    }
-
     fetchYearData()
-  }, [user, year])
+  }, [fetchYearData])
 
   const {
     currentMonthRecebido,
@@ -121,58 +123,65 @@ export default function Finances() {
     totalGrandAReceber,
   } = useMemo(() => {
     const monthNum = parseInt(month)
-
     const monthFin = finances.filter((f) => f.mes === monthNum)
-    const currentMonthRecebido = monthFin.reduce((sum, f) => sum + Number(f.valor_recebido), 0)
-    const currentMonthAReceber = monthFin.reduce((sum, f) => sum + Number(f.valor_a_receber), 0)
-    const faturamentoTotal = currentMonthRecebido + currentMonthAReceber
-
-    const chartData = Array.from({ length: 12 }, (_, i) => {
-      const m = i + 1
-      const finM = finances.filter((f) => f.mes === m)
-      const recebido = finM.reduce((sum, f) => sum + Number(f.valor_recebido), 0)
-
-      const apptsM = appointments.filter((a) => new Date(a.data_hora).getMonth() + 1 === m)
-      const comp = apptsM.filter((a) => a.status === 'compareceu').length
-      const faltas = apptsM.filter((a) => a.status === 'faltou').length
-      const taxa = comp + faltas > 0 ? (comp / (comp + faltas)) * 100 : 0
-
-      return {
-        month: monthNames[i],
-        recebido,
-        taxaComparecimento: Number(taxa.toFixed(1)),
-      }
-    })
 
     const patientsSummary = patients
       .map((p) => {
         const f = monthFin.find((fin) => fin.paciente_id === p.id)
-        const valor_recebido = f ? Number(f.valor_recebido) : 0
-        const valor_a_receber = f ? Number(f.valor_a_receber) : 0
         return {
           ...p,
-          valor_recebido,
-          valor_a_receber,
+          fin_id: f?.id,
+          valor_recebido: f ? Number(f.valor_recebido) : 0,
+          valor_a_receber: f ? Number(f.valor_a_receber) : 0,
         }
       })
       .filter((p) => p.valor_recebido > 0 || p.valor_a_receber > 0)
       .sort((a, b) => b.valor_a_receber - a.valor_a_receber)
 
-    const totalGrandAReceber = patientsSummary.reduce((acc, curr) => acc + curr.valor_a_receber, 0)
-
     return {
-      currentMonthRecebido,
-      currentMonthAReceber,
-      faturamentoTotal,
-      chartData,
+      currentMonthRecebido: monthFin.reduce((sum, f) => sum + Number(f.valor_recebido), 0),
+      currentMonthAReceber: monthFin.reduce((sum, f) => sum + Number(f.valor_a_receber), 0),
+      faturamentoTotal: monthFin.reduce(
+        (sum, f) => sum + Number(f.valor_recebido) + Number(f.valor_a_receber),
+        0,
+      ),
+      chartData: Array.from({ length: 12 }, (_, i) => {
+        const m = i + 1
+        const finM = finances.filter((f) => f.mes === m)
+        const apptsM = appointments.filter((a) => new Date(a.data_hora).getMonth() + 1 === m)
+        const comp = apptsM.filter((a) => a.status === 'compareceu').length
+        const faltas = apptsM.filter((a) => a.status === 'faltou').length
+        return {
+          month: monthNames[i],
+          recebido: finM.reduce((s, f) => s + Number(f.valor_recebido), 0),
+          taxaComparecimento: Number(
+            (comp + faltas > 0 ? (comp / (comp + faltas)) * 100 : 0).toFixed(1),
+          ),
+        }
+      }),
       patientsSummary,
-      totalGrandAReceber,
+      totalGrandAReceber: patientsSummary.reduce((acc, curr) => acc + curr.valor_a_receber, 0),
     }
   }, [month, finances, appointments, patients])
 
-  const openModal = (patient: any) => {
-    setSelectedPatient(patient)
-    setIsModalOpen(true)
+  const handlePay = async () => {
+    if (!selectedPatient?.fin_id) return
+    const val = Number(paymentAmount.replace(',', '.'))
+    if (!val || val <= 0) return
+
+    setLoading(true)
+    await supabase
+      .from('financeiro')
+      .update({
+        valor_recebido: Number(selectedPatient.valor_recebido) + val,
+        valor_a_receber: Math.max(0, Number(selectedPatient.valor_a_receber) - val),
+      })
+      .eq('id', selectedPatient.fin_id)
+
+    toast({ title: 'Pagamento registrado com sucesso!' })
+    setPaymentAmount('')
+    setIsModalOpen(false)
+    fetchYearData()
   }
 
   return (
@@ -213,63 +222,42 @@ export default function Finances() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="shadow-sm border-emerald-100 bg-emerald-50/50">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-emerald-700 font-medium text-sm">Total Recebido</p>
-                <h3 className="text-3xl font-bold mt-1 text-emerald-900 tracking-tight">
-                  {loading ? '...' : formatBRL(currentMonthRecebido)}
-                </h3>
+        {[
+          {
+            title: 'Total Recebido',
+            val: currentMonthRecebido,
+            icon: ArrowDownRight,
+            color: 'emerald',
+          },
+          { title: 'Total a Receber', val: currentMonthAReceber, icon: AlertCircle, color: 'red' },
+          { title: 'Faturamento Total', val: faturamentoTotal, icon: Wallet, color: 'blue' },
+        ].map((card, i) => (
+          <Card key={i} className={`shadow-sm border-${card.color}-100 bg-${card.color}-50/50`}>
+            <CardContent className="p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className={`text-${card.color}-700 font-medium text-sm`}>{card.title}</p>
+                  <h3 className={`text-3xl font-bold mt-1 text-${card.color}-900`}>
+                    {loading ? '...' : formatBRL(card.val)}
+                  </h3>
+                </div>
+                <div className={`p-2 bg-${card.color}-100 text-${card.color}-600 rounded-full`}>
+                  <card.icon className="w-5 h-5" />
+                </div>
               </div>
-              <div className="p-2 bg-emerald-100 text-emerald-600 rounded-full shadow-sm">
-                <ArrowDownRight className="w-5 h-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-red-100 bg-red-50/50">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-red-700 font-medium text-sm">Total a Receber</p>
-                <h3 className="text-3xl font-bold mt-1 text-red-900 tracking-tight">
-                  {loading ? '...' : formatBRL(currentMonthAReceber)}
-                </h3>
-              </div>
-              <div className="p-2 bg-red-100 text-red-600 rounded-full shadow-sm">
-                <AlertCircle className="w-5 h-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-blue-100 bg-blue-50/50">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-blue-700 font-medium text-sm">Faturamento Total</p>
-                <h3 className="text-3xl font-bold mt-1 text-blue-900 tracking-tight">
-                  {loading ? '...' : formatBRL(faturamentoTotal)}
-                </h3>
-              </div>
-              <div className="p-2 bg-blue-100 text-blue-600 rounded-full shadow-sm">
-                <Wallet className="w-5 h-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="shadow-sm">
           <div className="p-6 border-b border-slate-100">
-            <h2 className="font-semibold text-lg text-slate-800">Evolução de Receita ({year})</h2>
+            <h2 className="font-semibold text-lg">Evolução de Receita ({year})</h2>
           </div>
           <CardContent className="p-6 h-[300px]">
             {loading ? (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="flex h-full items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : (
@@ -277,7 +265,7 @@ export default function Finances() {
                 config={{ recebido: { label: 'Recebido', color: '#10b981' } }}
                 className="w-full h-full"
               >
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer>
                   <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis
@@ -300,14 +288,13 @@ export default function Finances() {
             )}
           </CardContent>
         </Card>
-
         <Card className="shadow-sm">
           <div className="p-6 border-b border-slate-100">
-            <h2 className="font-semibold text-lg text-slate-800">Taxa de Comparecimento (%)</h2>
+            <h2 className="font-semibold text-lg">Taxa de Comparecimento (%)</h2>
           </div>
           <CardContent className="p-6 h-[300px]">
             {loading ? (
-              <div className="w-full h-full flex items-center justify-center">
+              <div className="flex h-full items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : (
@@ -315,7 +302,7 @@ export default function Finances() {
                 config={{ taxaComparecimento: { label: 'Comparecimento (%)', color: '#3b82f6' } }}
                 className="w-full h-full"
               >
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer>
                   <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
                     <XAxis
@@ -343,32 +330,25 @@ export default function Finances() {
       </div>
 
       <Card className="shadow-sm overflow-hidden border-slate-200">
-        <div className="p-6 border-b border-slate-100">
-          <h2 className="font-semibold text-lg text-slate-800">
-            Saldos dos Pacientes ({months.find((m) => m.value === month)?.label})
-          </h2>
-        </div>
         <Table>
           <TableHeader className="bg-slate-50/50">
             <TableRow>
-              <TableHead className="font-semibold text-slate-600">Paciente</TableHead>
-              <TableHead className="text-right font-semibold text-slate-600">Recebido</TableHead>
-              <TableHead className="text-right font-semibold text-slate-600">A Receber</TableHead>
+              <TableHead>Paciente</TableHead>
+              <TableHead className="text-right">Recebido</TableHead>
+              <TableHead className="text-right">A Receber</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-8">
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                  </div>
+                  Carregando...
                 </TableCell>
               </TableRow>
             ) : patientsSummary.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center text-slate-500 py-8">
-                  Nenhum registro financeiro para este mês.
+                  Nenhum registro para este mês.
                 </TableCell>
               </TableRow>
             ) : (
@@ -379,12 +359,15 @@ export default function Finances() {
                     'cursor-pointer transition-colors',
                     p.valor_a_receber > 0 ? 'bg-red-50/50 hover:bg-red-50/80' : 'hover:bg-slate-50',
                   )}
-                  onClick={() => openModal(p)}
+                  onClick={() => {
+                    setSelectedPatient(p)
+                    setIsModalOpen(true)
+                  }}
                 >
                   <TableCell className="font-medium text-slate-900">
-                    {p.nome}
+                    {p.nome}{' '}
                     {p.valor_a_receber > 0 && (
-                      <Badge variant="destructive" className="ml-2 text-[10px] h-5 py-0">
+                      <Badge variant="destructive" className="ml-2 h-5 text-[10px]">
                         Pendente
                       </Badge>
                     )}
@@ -405,8 +388,8 @@ export default function Finances() {
             )}
           </TableBody>
           <TableFooter>
-            <TableRow className="bg-slate-50 hover:bg-slate-50">
-              <TableCell className="font-bold text-slate-900 text-base">Total Pendente</TableCell>
+            <TableRow className="bg-slate-50">
+              <TableCell className="font-bold text-base">Total Pendente</TableCell>
               <TableCell></TableCell>
               <TableCell className="text-right font-bold text-red-600 text-base">
                 {formatBRL(totalGrandAReceber)}
@@ -416,7 +399,13 @@ export default function Finances() {
         </Table>
       </Card>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog
+        open={isModalOpen}
+        onOpenChange={(open) => {
+          setIsModalOpen(open)
+          if (!open) setPaymentAmount('')
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl">Detalhes Financeiros</DialogTitle>
@@ -426,46 +415,77 @@ export default function Finances() {
               <div className="text-center pb-4 border-b border-slate-100">
                 <h3 className="text-lg font-bold text-slate-900">{selectedPatient.nome}</h3>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Valor já pago</span>
-                <span className="font-bold text-lg text-emerald-600">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 font-medium">Valor por sessão</span>
+                <span className="font-medium">{formatBRL(selectedPatient.valor_sessao)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Já recebido</span>
+                <span className="font-bold text-emerald-600">
                   {formatBRL(selectedPatient.valor_recebido)}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-medium">Saldo a receber</span>
                 <span
                   className={cn(
-                    'font-bold text-lg',
+                    'font-bold',
                     selectedPatient.valor_a_receber > 0 ? 'text-red-600' : 'text-slate-600',
                   )}
                 >
                   {formatBRL(selectedPatient.valor_a_receber)}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-slate-100">
-                <span className="text-slate-500 font-medium">Status de Pagamento</span>
-                <Badge
-                  variant={selectedPatient.valor_a_receber > 0 ? 'destructive' : 'default'}
-                  className={
-                    selectedPatient.valor_a_receber === 0
-                      ? 'bg-emerald-500 hover:bg-emerald-600'
-                      : ''
-                  }
-                >
-                  {selectedPatient.valor_a_receber > 0 ? 'Pendente' : 'Pago'}
-                </Badge>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-slate-500 font-medium">Valor por sessão</span>
-                <span className="font-medium text-slate-900">
-                  {formatBRL(selectedPatient.valor_sessao)}
-                </span>
+
+              <div className="flex flex-col sm:flex-row justify-between items-end gap-4 pt-4 border-t border-slate-100">
+                {selectedPatient.valor_a_receber > 0 ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      Registrar Pagamento
+                    </span>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Ex: 150.00"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                      />
+                      <Button onClick={handlePay}>Confirmar</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full flex flex-col gap-3">
+                    <Badge className="bg-emerald-500 justify-center text-sm py-1">
+                      Fatura Paga
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2 border-primary/20 text-primary"
+                      onClick={() => {
+                        setReceiptData({
+                          open: true,
+                          patientName: selectedPatient.nome,
+                          amount: selectedPatient.valor_recebido,
+                          dateStr: new Date().toLocaleDateString('pt-BR'),
+                          referencia: `${String(month).padStart(2, '0')}/${year}`,
+                        })
+                      }}
+                    >
+                      <FileText className="w-4 h-4" /> Baixar Recibo
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <ReceiptDialog
+        {...receiptData}
+        onOpenChange={(val: boolean) => setReceiptData(val ? receiptData : null)}
+      />
     </div>
   )
 }

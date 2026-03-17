@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f8fafc;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 40px auto;
+        background-color: #ffffff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        background-color: #f1f5f9;
+        padding: 30px;
+        text-align: center;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .logo {
+        max-height: 80px;
+        margin-bottom: 15px;
+      }
+      .content {
+        padding: 40px 30px;
+        color: #334155;
+        line-height: 1.6;
+      }
+      .title {
+        color: #0f172a;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .button {
+        display: inline-block;
+        background-color: #0f172a;
+        color: #ffffff;
+        text-decoration: none;
+        padding: 14px 28px;
+        border-radius: 8px;
+        font-weight: bold;
+        margin: 30px 0;
+        text-align: center;
+      }
+      .footer {
+        padding: 20px 30px;
+        background-color: #f8fafc;
+        color: #94a3b8;
+        font-size: 14px;
+        text-align: center;
+        border-top: 1px solid #e2e8f0;
+      }
+      .center {
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <!-- These placeholders map to Supabase template variables if injected via user metadata or custom SMTP provider proxy -->
+        <img
+          src="{{ .Data.logo_url }}"
+          alt="Logo da Clínica"
+          class="logo"
+          onerror="this.style.display = 'none'"
+        />
+        <h2 style="margin: 0; color: #0f172a">{{ .Data.nome_consultorio }}</h2>
+      </div>
+      <div class="content center">
+        <h1 class="title">Bem-vindo(a)!</h1>
+        <p>Olá,</p>
+        <p>
+          Você foi cadastrado(a) no sistema de gestão da
+          <strong>{{ .Data.nome_consultorio }}</strong>.
+        </p>
+        <p>
+          Para ativar sua conta e acessar seus dados, por favor confirme seu e-mail clicando no
+          botão abaixo:
+        </p>
+        <div>
+          <a href="{{ .ConfirmationURL }}" class="button">Confirmar Meu E-mail</a>
+        </div>
+        <p style="font-size: 13px">
+          Ou acesse o link diretamente:<br />
+          <a href="{{ .ConfirmationURL }}" style="color: #3b82f6; word-break: break-all"
+            >{{ .ConfirmationURL }}</a
+          >
+        </p>
+      </div>
+      <div class="footer">
+        <p>Esta é uma mensagem automática. Por favor, não responda.</p>
+        <p>&copy; {{ .Data.nome_consultorio }}. Todos os direitos reservados.</p>
+      </div>
+    </div>
+  </body>
+</html>

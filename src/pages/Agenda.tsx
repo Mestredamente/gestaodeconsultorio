@@ -2,14 +2,16 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Check, X } from 'lucide-react'
+import { Check, X, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
+import ReceiptDialog from '@/components/ReceiptDialog'
 
 export default function Agenda() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [receiptData, setReceiptData] = useState<any>(null)
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -18,37 +20,22 @@ export default function Agenda() {
 
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
-
     const endOfDay = new Date(startOfDay)
     endOfDay.setDate(endOfDay.getDate() + 1)
 
     const { data, error } = await supabase
       .from('agendamentos')
-      .select(`
-        id,
-        data_hora,
-        status,
-        paciente_id,
-        pacientes (
-          id,
-          nome,
-          valor_sessao
-        )
-      `)
+      .select(`id, data_hora, status, paciente_id, pacientes (id, nome, valor_sessao)`)
       .eq('usuario_id', user.id)
       .gte('data_hora', startOfDay.toISOString())
       .lt('data_hora', endOfDay.toISOString())
       .order('data_hora', { ascending: true })
-
-    if (!error && data) {
-      setAppointments(data)
-    }
+    if (!error && data) setAppointments(data)
     setLoading(false)
   }, [user])
 
   useEffect(() => {
     fetchAppointments()
-
     if (!user) return
 
     const subscription = supabase
@@ -57,9 +44,9 @@ export default function Agenda() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'agendamentos', filter: `usuario_id=eq.${user.id}` },
         (payload) => {
-          if (payload.eventType === 'DELETE') {
+          if (payload.eventType === 'DELETE')
             setAppointments((prev) => prev.filter((a) => a.id !== payload.old.id))
-          } else if (payload.eventType === 'UPDATE') {
+          else if (payload.eventType === 'UPDATE')
             setAppointments((prev) =>
               prev.map((a) =>
                 a.id === payload.new.id
@@ -67,9 +54,7 @@ export default function Agenda() {
                   : a,
               ),
             )
-          } else if (payload.eventType === 'INSERT') {
-            fetchAppointments()
-          }
+          else if (payload.eventType === 'INSERT') fetchAppointments()
         },
       )
       .subscribe()
@@ -81,37 +66,23 @@ export default function Agenda() {
 
   const handleCompareceu = async (apt: any) => {
     if (apt.status === 'compareceu') return
-
-    // Optimistic UI Update
     setAppointments((prev) =>
       prev.map((a) => (a.id === apt.id ? { ...a, status: 'compareceu' } : a)),
     )
-
-    const { error: aptError } = await supabase
-      .from('agendamentos')
-      .update({ status: 'compareceu' })
-      .eq('id', apt.id)
-
-    if (aptError) {
-      toast({ title: 'Erro ao atualizar', variant: 'destructive' })
-      return
-    }
+    await supabase.from('agendamentos').update({ status: 'compareceu' }).eq('id', apt.id)
 
     if (!user) return
-
-    const now = new Date()
+    const now = new Date(apt.data_hora)
     const mes = now.getMonth() + 1
     const ano = now.getFullYear()
-
     const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
     const valorSessao = pacienteInfo?.valor_sessao || 0
-    const pacienteId = apt.paciente_id
 
     const { data: finData } = await supabase
       .from('financeiro')
       .select('*')
       .eq('usuario_id', user.id)
-      .eq('paciente_id', pacienteId)
+      .eq('paciente_id', apt.paciente_id)
       .eq('mes', mes)
       .eq('ano', ano)
       .maybeSingle()
@@ -125,47 +96,73 @@ export default function Agenda() {
         })
         .eq('id', finData.id)
     } else {
-      await supabase.from('financeiro').insert({
-        usuario_id: user.id,
-        paciente_id: pacienteId,
-        mes,
-        ano,
-        valor_recebido: 0,
-        valor_a_receber: Number(valorSessao),
-      })
+      await supabase
+        .from('financeiro')
+        .insert({
+          usuario_id: user.id,
+          paciente_id: apt.paciente_id,
+          mes,
+          ano,
+          valor_recebido: 0,
+          valor_a_receber: Number(valorSessao),
+        })
     }
-
     toast({ title: 'Status atualizado: Compareceu' })
   }
 
   const handleFaltou = async (apt: any) => {
     if (apt.status === 'faltou') return
-
     setAppointments((prev) => prev.map((a) => (a.id === apt.id ? { ...a, status: 'faltou' } : a)))
-    const { error } = await supabase
-      .from('agendamentos')
-      .update({ status: 'faltou' })
-      .eq('id', apt.id)
-    if (!error) {
-      toast({ title: 'Status atualizado: Faltou' })
-    }
+    await supabase.from('agendamentos').update({ status: 'faltou' }).eq('id', apt.id)
+    toast({ title: 'Status atualizado: Faltou' })
   }
 
   const handleDesmarcou = async (apt: any) => {
     setAppointments((prev) => prev.filter((a) => a.id !== apt.id))
-    const { error } = await supabase.from('agendamentos').delete().eq('id', apt.id)
-    if (!error) {
-      toast({ title: 'Sessão desmarcada' })
+    await supabase.from('agendamentos').delete().eq('id', apt.id)
+    toast({ title: 'Sessão desmarcada' })
+  }
+
+  const handleViewReceipt = async (apt: any) => {
+    if (!user) return
+    const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+    const now = new Date(apt.data_hora)
+    const mes = now.getMonth() + 1
+    const ano = now.getFullYear()
+
+    const { data: fin } = await supabase
+      .from('financeiro')
+      .select('valor_recebido')
+      .eq('usuario_id', user.id)
+      .eq('paciente_id', apt.paciente_id)
+      .eq('mes', mes)
+      .eq('ano', ano)
+      .maybeSingle()
+
+    if (fin && fin.valor_recebido > 0) {
+      setReceiptData({
+        open: true,
+        patientName: pacienteInfo.nome,
+        amount: fin.valor_recebido,
+        dateStr: new Date().toLocaleDateString('pt-BR'),
+        referencia: `${String(mes).padStart(2, '0')}/${ano}`,
+      })
+    } else {
+      toast({
+        title: 'Pagamento pendente',
+        description:
+          'O paciente ainda não possui pagamentos registrados para emitir recibo neste mês.',
+        variant: 'destructive',
+      })
     }
   }
 
-  if (loading) {
+  if (loading)
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
-  }
 
   const todayStr = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -173,7 +170,6 @@ export default function Agenda() {
     month: 'long',
     year: 'numeric',
   }).format(new Date())
-
   const statusColors: Record<string, string> = {
     agendado: 'border-l-slate-200',
     compareceu: 'border-l-emerald-500',
@@ -182,7 +178,7 @@ export default function Agenda() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
+    <div className="max-w-3xl mx-auto space-y-8 animate-fade-in pb-10">
       <header className="text-center sm:text-left">
         <h1 className="text-3xl font-bold text-slate-900 tracking-tight capitalize">{todayStr}</h1>
         <p className="text-slate-500 mt-2 font-medium">Sua agenda de hoje</p>
@@ -199,12 +195,9 @@ export default function Agenda() {
               hour: '2-digit',
               minute: '2-digit',
             })
-
             const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
             const patientName = pacienteInfo?.nome || 'Paciente Desconhecido'
-            const sessionValue = pacienteInfo?.valor_sessao || 0
-
-            const valueStr = Number(sessionValue).toLocaleString('pt-BR', {
+            const valueStr = Number(pacienteInfo?.valor_sessao || 0).toLocaleString('pt-BR', {
               style: 'currency',
               currency: 'BRL',
             })
@@ -229,13 +222,23 @@ export default function Agenda() {
                   </div>
 
                   <div className="flex gap-2 w-full sm:w-auto justify-end">
+                    {apt.status === 'compareceu' && (
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                        onClick={() => handleViewReceipt(apt)}
+                        title="Gerar Recibo de Pagamento"
+                      >
+                        <FileText className="w-5 h-5 text-blue-500" />
+                      </Button>
+                    )}
                     <Button
                       size="icon"
                       variant="outline"
                       className={cn(
-                        'hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors',
-                        apt.status === 'compareceu' &&
-                          'bg-emerald-50 text-emerald-600 border-emerald-200',
+                        'hover:bg-emerald-50 hover:border-emerald-200 transition-colors',
+                        apt.status === 'compareceu' && 'bg-emerald-50 border-emerald-200',
                       )}
                       onClick={() => handleCompareceu(apt)}
                       title="Compareceu"
@@ -246,8 +249,8 @@ export default function Agenda() {
                       size="icon"
                       variant="outline"
                       className={cn(
-                        'hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors',
-                        apt.status === 'faltou' && 'bg-red-50 text-red-600 border-red-200',
+                        'hover:bg-red-50 hover:border-red-200 transition-colors',
+                        apt.status === 'faltou' && 'bg-red-50 border-red-200',
                       )}
                       onClick={() => handleFaltou(apt)}
                       title="Faltou"
@@ -258,8 +261,8 @@ export default function Agenda() {
                       size="icon"
                       variant="outline"
                       className={cn(
-                        'hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200 transition-colors font-bold text-lg text-amber-500',
-                        apt.status === 'desmarcou' && 'bg-amber-50 text-amber-600 border-amber-200',
+                        'hover:bg-amber-50 hover:border-amber-200 transition-colors font-bold text-lg text-amber-500',
+                        apt.status === 'desmarcou' && 'bg-amber-50 border-amber-200',
                       )}
                       onClick={() => handleDesmarcou(apt)}
                       title="Desmarcou"
@@ -273,6 +276,10 @@ export default function Agenda() {
           })
         )}
       </div>
+      <ReceiptDialog
+        {...receiptData}
+        onOpenChange={(val: boolean) => setReceiptData(val ? receiptData : null)}
+      />
     </div>
   )
 }
