@@ -41,7 +41,8 @@ const AppRoutes = () => (
       <Route path="/agenda" element={<Agenda />} />
       <Route path="/pacientes" element={<Patients />} />
       <Route path="/pacientes/:id" element={<PatientDetail />} />
-      <Route path="/financeiro" element={<Finances />} />
+      <Route path="/carteira" element={<Finances />} />
+      <Route path="/financeiro" element={<Navigate to="/carteira" replace />} />
       <Route path="/configuracoes" element={<Settings />} />
     </Route>
     <Route path="*" element={<NotFound />} />

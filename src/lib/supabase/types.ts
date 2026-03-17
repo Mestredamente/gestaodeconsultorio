@@ -75,6 +75,54 @@ export type Database = {
         }
         Relationships: []
       }
+      financeiro: {
+        Row: {
+          ano: number
+          data_atualizacao: string
+          id: string
+          mes: number
+          paciente_id: string
+          usuario_id: string
+          valor_a_receber: number
+          valor_recebido: number
+        }
+        Insert: {
+          ano: number
+          data_atualizacao?: string
+          id?: string
+          mes: number
+          paciente_id: string
+          usuario_id: string
+          valor_a_receber?: number
+          valor_recebido?: number
+        }
+        Update: {
+          ano?: number
+          data_atualizacao?: string
+          id?: string
+          mes?: number
+          paciente_id?: string
+          usuario_id?: string
+          valor_a_receber?: number
+          valor_recebido?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'financeiro_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'financeiro_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       pacientes: {
         Row: {
           cpf: string | null
@@ -300,6 +348,15 @@ export const Constants = {
 //   session_value: numeric (not null)
 //   status: text (not null, default: 'scheduled'::text)
 //   user_id: uuid (nullable)
+// Table: financeiro
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   paciente_id: uuid (not null)
+//   mes: integer (not null)
+//   ano: integer (not null)
+//   valor_recebido: numeric (not null, default: 0)
+//   valor_a_receber: numeric (not null, default: 0)
+//   data_atualizacao: timestamp with time zone (not null, default: now())
 // Table: pacientes
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -325,6 +382,11 @@ export const Constants = {
 // Table: appointments
 //   PRIMARY KEY appointments_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY appointments_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: financeiro
+//   FOREIGN KEY financeiro_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY financeiro_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY financeiro_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+//   UNIQUE financeiro_usuario_paciente_mes_ano_key: UNIQUE (usuario_id, paciente_id, mes, ano)
 // Table: pacientes
 //   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -347,6 +409,10 @@ export const Constants = {
 //   Policy "authenticated_update" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: financeiro
+//   Policy "financeiro_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
 // Table: pacientes
 //   Policy "pacientes_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
@@ -402,3 +468,7 @@ export const Constants = {
 //   END;
 //   $function$
 //
+
+// --- INDEXES ---
+// Table: financeiro
+//   CREATE UNIQUE INDEX financeiro_usuario_paciente_mes_ano_key ON public.financeiro USING btree (usuario_id, paciente_id, mes, ano)
