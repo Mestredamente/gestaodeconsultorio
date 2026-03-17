@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, KeyRound } from 'lucide-react'
+import { ArrowLeft, KeyRound, Loader2 } from 'lucide-react'
 
 export default function ResetPassword() {
   const [email, setEmail] = useState('')
@@ -17,41 +17,53 @@ export default function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    const { error } = await resetPassword(email)
-    setIsSubmitting(false)
 
-    if (error) {
-      const isRateLimit =
-        error.status === 429 ||
-        error.message?.toLowerCase().includes('rate limit') ||
-        error.code === 'over_email_send_rate_limit'
+    try {
+      const { error } = await resetPassword(email)
 
-      if (isRateLimit) {
-        toast({
-          title: 'Limite atingido',
-          description:
-            'Limite de envio de e-mail atingido. Por favor, aguarde alguns minutos antes de tentar solicitar uma nova senha novamente.',
-          variant: 'destructive',
-        })
-      } else if (error.code === 'email_provider_disabled') {
-        toast({
-          title: 'Serviço Indisponível',
-          description: error.message,
-          variant: 'destructive',
-        })
+      if (error) {
+        const isRateLimit =
+          error.status === 429 ||
+          error.message?.toLowerCase().includes('rate limit') ||
+          error.code === 'over_email_send_rate_limit'
+
+        if (isRateLimit) {
+          toast({
+            title: 'Limite atingido',
+            description:
+              'Limite de envio de e-mail atingido. Por favor, aguarde alguns minutos antes de tentar solicitar uma nova senha.',
+            variant: 'destructive',
+          })
+        } else if (error.code === 'email_provider_disabled') {
+          toast({
+            title: 'Serviço Indisponível',
+            description: error.message || 'O provedor de e-mail está desativado no momento.',
+            variant: 'destructive',
+          })
+        } else {
+          toast({
+            title: 'Erro ao solicitar redefinição',
+            description: error.message || 'Verifique o e-mail informado e tente novamente.',
+            variant: 'destructive',
+          })
+        }
       } else {
         toast({
-          title: 'Erro ao solicitar redefinição',
-          description: error.message,
-          variant: 'destructive',
+          title: 'Link de recuperação enviado!',
+          description: 'Verifique sua caixa de entrada para redefinir a senha.',
         })
+        setEmail('')
       }
-    } else {
+    } catch (err: any) {
       toast({
-        title: 'Link de recuperação enviado!',
-        description: 'Verifique sua caixa de entrada para redefinir a senha.',
+        title: 'Erro inesperado',
+        description:
+          err?.message ||
+          'Ocorreu um erro ao processar sua solicitação. Tente novamente mais tarde.',
+        variant: 'destructive',
       })
-      setEmail('')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -79,6 +91,7 @@ export default function ResetPassword() {
                 placeholder="Seu e-mail cadastrado"
                 required
                 className="bg-white"
+                disabled={isSubmitting}
               />
             </div>
             <Button
@@ -86,7 +99,14 @@ export default function ResetPassword() {
               className="w-full h-11 text-base font-medium"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Enviando...' : 'Enviar Link de Recuperação'}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                'Enviar Link de Recuperação'
+              )}
             </Button>
           </form>
           <div className="mt-6 text-center">

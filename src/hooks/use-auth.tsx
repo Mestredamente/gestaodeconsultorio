@@ -80,23 +80,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/atualizar-senha`,
-    })
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/atualizar-senha`,
+      })
 
-    if (error && error.code === 'email_provider_disabled') {
+      if (error) {
+        const isEmailProviderDisabled =
+          error.code === 'email_provider_disabled' ||
+          (error.status === 400 &&
+            error.message?.toLowerCase().includes('email provider is disabled')) ||
+          (error.status === 400 && error.message?.toLowerCase().includes('provider is disabled'))
+
+        if (isEmailProviderDisabled) {
+          return {
+            error: {
+              name: error.name || 'Error',
+              message:
+                'O serviço de envio de e-mails está temporariamente indisponível. Por favor, tente novamente mais tarde ou contate o administrador.',
+              status: error.status || 400,
+              code: 'email_provider_disabled',
+            },
+          }
+        }
+        return { error }
+      }
+
+      return { error: null }
+    } catch (error: any) {
+      const isEmailProviderDisabled =
+        error?.code === 'email_provider_disabled' ||
+        (error?.status === 400 &&
+          error?.message?.toLowerCase().includes('email provider is disabled')) ||
+        (error?.status === 400 && error?.message?.toLowerCase().includes('provider is disabled'))
+
+      if (isEmailProviderDisabled) {
+        return {
+          error: {
+            name: error?.name || 'Error',
+            message:
+              'O serviço de envio de e-mails está temporariamente indisponível. Por favor, tente novamente mais tarde ou contate o administrador.',
+            status: error?.status || 400,
+            code: 'email_provider_disabled',
+          },
+        }
+      }
       return {
         error: {
-          name: error.name,
-          message:
-            'O provedor de e-mail está desativado no momento. Por favor, entre em contato com o administrador.',
-          status: error.status,
-          code: error.code,
+          message: error?.message || 'Ocorreu um erro inesperado. Tente novamente.',
+          name: error?.name || 'UnexpectedError',
         },
       }
     }
-
-    return { error }
   }
 
   const updatePassword = async (password: string) => {
