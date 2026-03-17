@@ -36,7 +36,26 @@ export default function Auth() {
     } else {
       const { error } = await signUp(email, password, clinicName)
       if (error) {
-        toast({ title: 'Erro ao cadastrar', description: error.message, variant: 'destructive' })
+        // Specifically identify the rate limit error
+        const isRateLimit =
+          error.status === 429 ||
+          error.message?.toLowerCase().includes('email rate limit exceeded') ||
+          (error as any).code === 'over_email_send_rate_limit'
+
+        if (isRateLimit) {
+          toast({
+            title: 'Limite excedido',
+            description:
+              'Email rate limit exceeded. Please wait a few minutes before trying to sign up again.',
+            variant: 'destructive',
+          })
+        } else {
+          toast({
+            title: 'Erro ao cadastrar',
+            description: error.message,
+            variant: 'destructive',
+          })
+        }
       } else {
         toast({ title: 'Conta criada!', description: 'Bem-vindo ao sistema da sua clínica.' })
       }

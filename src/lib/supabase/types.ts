@@ -297,6 +297,7 @@ export type Database = {
           chave_pix: string | null
           email: string | null
           id: string
+          logo_url: string | null
           nome_consultorio: string | null
           template_cobranca: string | null
         }
@@ -304,6 +305,7 @@ export type Database = {
           chave_pix?: string | null
           email?: string | null
           id: string
+          logo_url?: string | null
           nome_consultorio?: string | null
           template_cobranca?: string | null
         }
@@ -311,6 +313,7 @@ export type Database = {
           chave_pix?: string | null
           email?: string | null
           id?: string
+          logo_url?: string | null
           nome_consultorio?: string | null
           template_cobranca?: string | null
         }
@@ -532,6 +535,7 @@ export const Constants = {
 //   nome_consultorio: text (nullable)
 //   chave_pix: text (nullable)
 //   template_cobranca: text (nullable)
+//   logo_url: text (nullable)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
