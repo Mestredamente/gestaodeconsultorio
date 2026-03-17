@@ -5,39 +5,52 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [clinicName, setClinicName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
   const { signIn, signUp, session, loading } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
 
   if (loading) return null
-  if (session) return <Navigate to="/agenda" replace />
+  if (session) return <Navigate to="/" replace />
 
   const handleAuth = async (action: 'login' | 'signup', e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
-    const { error } =
-      action === 'login' ? await signIn(email, password) : await signUp(email, password)
-
-    if (error) {
-      toast({
-        title: action === 'login' ? 'Erro ao fazer login' : 'Erro ao cadastrar',
-        description: error.message,
-        variant: 'destructive',
-      })
-    } else {
-      if (action === 'signup') {
-        toast({ title: 'Conta criada!', description: 'Bem-vindo ao sistema da sua clínica.' })
+    if (action === 'login') {
+      const { error } = await signIn(email, password)
+      if (error) {
+        toast({
+          title: 'Erro ao fazer login',
+          description: error.message,
+          variant: 'destructive',
+        })
       } else {
         toast({ title: 'Bem-vindo de volta!' })
+        navigate('/')
       }
-      navigate('/agenda')
+    } else {
+      const { error } = await signUp(email, password, clinicName)
+      if (error) {
+        toast({
+          title: 'Erro ao cadastrar',
+          description: error.message,
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: 'Conta criada!',
+          description: 'Bem-vindo ao sistema da sua clínica.',
+        })
+      }
     }
 
     setIsSubmitting(false)
@@ -45,7 +58,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md shadow-lg border-slate-200">
+      <Card className="w-full max-w-md shadow-lg border-slate-200 animate-fade-in-up">
         <CardHeader className="text-center pb-6">
           <CardTitle className="text-3xl font-bold text-slate-900">App Gestão Clínica</CardTitle>
           <CardDescription>Acesse ou crie sua conta para gerenciar seus pacientes</CardDescription>
@@ -60,7 +73,9 @@ export default function Auth() {
             <TabsContent value="login">
               <form onSubmit={(e) => handleAuth('login', e)} className="space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="login-email">E-mail</Label>
                   <Input
+                    id="login-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -70,7 +85,9 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="login-password">Senha</Label>
                   <Input
+                    id="login-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -81,7 +98,7 @@ export default function Auth() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-11 text-base font-medium"
+                  className="w-full h-11 text-base font-medium mt-2"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? 'Entrando...' : 'Entrar na Clínica'}
@@ -92,7 +109,21 @@ export default function Auth() {
             <TabsContent value="signup">
               <form onSubmit={(e) => handleAuth('signup', e)} className="space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="signup-clinic">Nome do Consultório</Label>
                   <Input
+                    id="signup-clinic"
+                    type="text"
+                    value={clinicName}
+                    onChange={(e) => setClinicName(e.target.value)}
+                    placeholder="Ex: Espaço Mente Saudável"
+                    required
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">E-mail</Label>
+                  <Input
+                    id="signup-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -102,7 +133,9 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="signup-password">Senha</Label>
                   <Input
+                    id="signup-password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -114,7 +147,7 @@ export default function Auth() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-11 text-base font-medium"
+                  className="w-full h-11 text-base font-medium mt-2"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? 'Criando conta...' : 'Criar Minha Conta'}

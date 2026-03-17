@@ -1,4 +1,4 @@
-import { Bell, Search, User } from 'lucide-react'
+import { Bell, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -10,8 +10,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAuth } from '@/hooks/use-auth'
 
 export function Header() {
+  const { user, signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    await signOut()
+  }
+
+  const userEmail = user?.email || 'usuario@clinica.io'
+  const userInitial = userEmail.charAt(0).toUpperCase()
+
   return (
     <header className="h-16 bg-card/80 backdrop-blur-md border-b sticky top-0 z-10 px-4 md:px-6 flex items-center justify-between">
       <div className="flex items-center md:hidden gap-2">
@@ -42,25 +52,26 @@ export function Header() {
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9 border border-slate-200">
                 <AvatarImage
-                  src="https://img.usecurling.com/ppl/thumbnail?gender=male&seed=10"
-                  alt="Dr. Marcos"
+                  src={`https://img.usecurling.com/ppl/thumbnail?gender=male&seed=${user?.id || '1'}`}
+                  alt="Avatar do Usuário"
                 />
-                <AvatarFallback>DM</AvatarFallback>
+                <AvatarFallback>{userInitial}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">Dr. Marcos L.</p>
-                <p className="text-xs leading-none text-muted-foreground">marcos@clinica.io</p>
+                <p className="text-sm font-medium leading-none">Minha Conta</p>
+                <p className="text-xs leading-none text-muted-foreground truncate">{userEmail}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Meu Perfil</DropdownMenuItem>
             <DropdownMenuItem>Configurações</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600">Sair</DropdownMenuItem>
+            <DropdownMenuItem className="text-red-600 cursor-pointer" onClick={handleSignOut}>
+              Sair
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

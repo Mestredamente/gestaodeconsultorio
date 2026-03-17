@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Check, X, RefreshCw, Cake } from 'lucide-react'
+import { Calendar, Check, X, RefreshCw, Cake, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
 export default function Index() {
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const { toast } = useToast()
   const [appointments, setAppointments] = useState<any[]>([])
   const [birthdays, setBirthdays] = useState<any[]>([])
@@ -29,7 +29,7 @@ export default function Index() {
     const endOfDay = new Date(startOfDay)
     endOfDay.setDate(endOfDay.getDate() + 1)
 
-    // Fetch today's appointments
+    // Fetch today's appointments enforcing multi-tenancy
     const { data: appts } = await supabase
       .from('agendamentos')
       .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
@@ -40,7 +40,7 @@ export default function Index() {
 
     if (appts) setAppointments(appts)
 
-    // Fetch all patients to filter birthdays in JS (safest across locales)
+    // Fetch all patients to filter birthdays in JS safely
     const currentMonth = new Date().getMonth() + 1
     const { data: pats } = await supabase
       .from('pacientes')
@@ -96,11 +96,20 @@ export default function Index() {
     }
   }
 
+  const handleLogout = async () => {
+    await signOut()
+  }
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a)!</h1>
-        <p className="text-slate-500 capitalize">{todayStr}</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a)!</h1>
+          <p className="text-slate-500 capitalize">{todayStr}</p>
+        </div>
+        <Button variant="outline" className="text-slate-600 gap-2" onClick={handleLogout}>
+          <LogOut className="w-4 h-4" /> Sair da Conta
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -200,7 +209,7 @@ export default function Index() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {birthdays.map((b) => {
-                  const [year, month, day] = b.data_nascimento.split('-')
+                  const [, month, day] = b.data_nascimento.split('-')
                   return (
                     <div key={b.id} className="p-4 flex items-center justify-between">
                       <p className="font-medium text-slate-800">{b.nome}</p>

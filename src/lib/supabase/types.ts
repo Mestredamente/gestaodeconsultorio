@@ -75,6 +75,38 @@ export type Database = {
         }
         Relationships: []
       }
+      estoque: {
+        Row: {
+          data_atualizacao: string | null
+          id: string
+          nome_item: string
+          quantidade: number
+          usuario_id: string
+        }
+        Insert: {
+          data_atualizacao?: string | null
+          id?: string
+          nome_item: string
+          quantidade?: number
+          usuario_id: string
+        }
+        Update: {
+          data_atualizacao?: string | null
+          id?: string
+          nome_item?: string
+          quantidade?: number
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'estoque_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       financeiro: {
         Row: {
           ano: number
@@ -289,7 +321,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_public_booking: {
+        Args: {
+          p_clinic_id: string
+          p_data_hora: string
+          p_nome: string
+          p_telefone: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
@@ -444,6 +484,12 @@ export const Constants = {
 //   session_value: numeric (not null)
 //   status: text (not null, default: 'scheduled'::text)
 //   user_id: uuid (nullable)
+// Table: estoque
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   nome_item: text (not null)
+//   quantidade: integer (not null, default: 0)
+//   data_atualizacao: timestamp with time zone (nullable, default: now())
 // Table: financeiro
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -496,6 +542,9 @@ export const Constants = {
 // Table: appointments
 //   PRIMARY KEY appointments_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY appointments_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: estoque
+//   PRIMARY KEY estoque_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY estoque_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: financeiro
 //   FOREIGN KEY financeiro_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY financeiro_pkey: PRIMARY KEY (id)
@@ -532,6 +581,10 @@ export const Constants = {
 //   Policy "authenticated_update" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: estoque
+//   Policy "estoque_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
 // Table: financeiro
 //   Policy "financeiro_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
@@ -549,11 +602,43 @@ export const Constants = {
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: usuarios
+//   Policy "anon_read_usuarios" (SELECT, PERMISSIVE) roles={anon}
+//     USING: true
 //   Policy "usuarios_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (id = auth.uid())
 //     WITH CHECK: (id = auth.uid())
 
 // --- DATABASE FUNCTIONS ---
+// FUNCTION create_public_booking(uuid, text, text, timestamp with time zone)
+//   CREATE OR REPLACE FUNCTION public.create_public_booking(p_clinic_id uuid, p_nome text, p_telefone text, p_data_hora timestamp with time zone)
+//    RETURNS jsonb
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_paciente_id UUID;
+//     v_agendamento_id UUID;
+//   BEGIN
+//     -- Check if patient already exists by phone and clinic
+//     SELECT id INTO v_paciente_id FROM public.pacientes
+//     WHERE telefone = p_telefone AND usuario_id = p_clinic_id LIMIT 1;
+//
+//     -- Create patient if not exists
+//     IF v_paciente_id IS NULL THEN
+//       INSERT INTO public.pacientes (usuario_id, nome, telefone)
+//       VALUES (p_clinic_id, p_nome, p_telefone)
+//       RETURNING id INTO v_paciente_id;
+//     END IF;
+//
+//     -- Create appointment
+//     INSERT INTO public.agendamentos (usuario_id, paciente_id, data_hora, status)
+//     VALUES (p_clinic_id, v_paciente_id, p_data_hora, 'agendado')
+//     RETURNING id INTO v_agendamento_id;
+//
+//     RETURN jsonb_build_object('success', true, 'agendamento_id', v_agendamento_id);
+//   END;
+//   $function$
+//
 // FUNCTION handle_new_user()
 //   CREATE OR REPLACE FUNCTION public.handle_new_user()
 //    RETURNS trigger
