@@ -75,6 +75,44 @@ export type Database = {
         }
         Relationships: []
       }
+      despesas: {
+        Row: {
+          categoria: string | null
+          created_at: string
+          data: string
+          descricao: string
+          id: string
+          usuario_id: string
+          valor: number
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string
+          data: string
+          descricao: string
+          id?: string
+          usuario_id: string
+          valor?: number
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string
+          data?: string
+          descricao?: string
+          id?: string
+          usuario_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'despesas_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       estoque: {
         Row: {
           data_atualizacao: string | null
@@ -282,6 +320,7 @@ export type Database = {
       }
       pacientes: {
         Row: {
+          anamnese: Json | null
           contato_emergencia_nome: string | null
           contato_emergencia_telefone: string | null
           cpf: string | null
@@ -289,6 +328,7 @@ export type Database = {
           data_nascimento: string | null
           email: string | null
           endereco: string | null
+          hash_anamnese: string | null
           id: string
           nome: string
           telefone: string | null
@@ -296,6 +336,7 @@ export type Database = {
           valor_sessao: number | null
         }
         Insert: {
+          anamnese?: Json | null
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
           cpf?: string | null
@@ -303,6 +344,7 @@ export type Database = {
           data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
+          hash_anamnese?: string | null
           id?: string
           nome: string
           telefone?: string | null
@@ -310,6 +352,7 @@ export type Database = {
           valor_sessao?: number | null
         }
         Update: {
+          anamnese?: Json | null
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
           cpf?: string | null
@@ -317,6 +360,7 @@ export type Database = {
           data_nascimento?: string | null
           email?: string | null
           endereco?: string | null
+          hash_anamnese?: string | null
           id?: string
           nome?: string
           telefone?: string | null
@@ -374,28 +418,37 @@ export type Database = {
       }
       usuarios: {
         Row: {
+          anamnese_template: Json | null
           chave_pix: string | null
           email: string | null
           id: string
+          lembrete_whatsapp_ativo: boolean | null
           logo_url: string | null
           nome_consultorio: string | null
           template_cobranca: string | null
+          template_lembrete: string | null
         }
         Insert: {
+          anamnese_template?: Json | null
           chave_pix?: string | null
           email?: string | null
           id: string
+          lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
           nome_consultorio?: string | null
           template_cobranca?: string | null
+          template_lembrete?: string | null
         }
         Update: {
+          anamnese_template?: Json | null
           chave_pix?: string | null
           email?: string | null
           id?: string
+          lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
           nome_consultorio?: string | null
           template_cobranca?: string | null
+          template_lembrete?: string | null
         }
         Relationships: []
       }
@@ -411,6 +464,11 @@ export type Database = {
           p_nome: string
           p_telefone: string
         }
+        Returns: Json
+      }
+      get_anamnese_data: { Args: { p_hash: string }; Returns: Json }
+      update_anamnese: {
+        Args: { p_anamnese: Json; p_hash: string }
         Returns: Json
       }
     }
@@ -567,6 +625,14 @@ export const Constants = {
 //   session_value: numeric (not null)
 //   status: text (not null, default: 'scheduled'::text)
 //   user_id: uuid (nullable)
+// Table: despesas
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   descricao: text (not null)
+//   valor: numeric (not null, default: 0)
+//   data: date (not null)
+//   categoria: text (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: estoque
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -618,6 +684,8 @@ export const Constants = {
 //   data_nascimento: date (nullable)
 //   contato_emergencia_nome: text (nullable)
 //   contato_emergencia_telefone: text (nullable)
+//   anamnese: jsonb (nullable, default: '{}'::jsonb)
+//   hash_anamnese: uuid (nullable, default: gen_random_uuid())
 // Table: prontuarios
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)
@@ -631,6 +699,9 @@ export const Constants = {
 //   chave_pix: text (nullable)
 //   template_cobranca: text (nullable)
 //   logo_url: text (nullable)
+//   anamnese_template: jsonb (nullable, default: '[]'::jsonb)
+//   lembrete_whatsapp_ativo: boolean (nullable, default: false)
+//   template_lembrete: text (nullable, default: 'Olá [Nome], você tem uma consulta amanhã às [hora].'::text)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
@@ -641,6 +712,9 @@ export const Constants = {
 // Table: appointments
 //   PRIMARY KEY appointments_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY appointments_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: despesas
+//   PRIMARY KEY despesas_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY despesas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: estoque
 //   PRIMARY KEY estoque_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY estoque_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -688,6 +762,10 @@ export const Constants = {
 //   Policy "authenticated_update" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: despesas
+//   Policy "despesas_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
 // Table: estoque
 //   Policy "estoque_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
@@ -751,6 +829,29 @@ export const Constants = {
 //     RETURNING id INTO v_agendamento_id;
 //
 //     RETURN jsonb_build_object('success', true, 'agendamento_id', v_agendamento_id);
+//   END;
+//   $function$
+//
+// FUNCTION get_anamnese_data(uuid)
+//   CREATE OR REPLACE FUNCTION public.get_anamnese_data(p_hash uuid)
+//    RETURNS jsonb
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_result jsonb;
+//   BEGIN
+//     SELECT jsonb_build_object(
+//       'paciente_nome', p.nome,
+//       'anamnese', p.anamnese,
+//       'template', u.anamnese_template,
+//       'consultorio', u.nome_consultorio
+//     ) INTO v_result
+//     FROM public.pacientes p
+//     JOIN public.usuarios u ON p.usuario_id = u.id
+//     WHERE p.hash_anamnese = p_hash LIMIT 1;
+//
+//     RETURN COALESCE(v_result, '{}'::jsonb);
 //   END;
 //   $function$
 //
@@ -874,6 +975,23 @@ export const Constants = {
 //           RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;
 //        END IF;
 //     END LOOP;
+//   END;
+//   $function$
+//
+// FUNCTION update_anamnese(uuid, jsonb)
+//   CREATE OR REPLACE FUNCTION public.update_anamnese(p_hash uuid, p_anamnese jsonb)
+//    RETURNS jsonb
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//     v_paciente_id uuid;
+//   BEGIN
+//     UPDATE public.pacientes SET anamnese = p_anamnese WHERE hash_anamnese = p_hash RETURNING id INTO v_paciente_id;
+//     IF v_paciente_id IS NULL THEN
+//       RETURN jsonb_build_object('success', false);
+//     END IF;
+//     RETURN jsonb_build_object('success', true);
 //   END;
 //   $function$
 //

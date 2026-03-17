@@ -21,11 +21,25 @@ export default function ResetPassword() {
     setIsSubmitting(false)
 
     if (error) {
-      toast({
-        title: 'Erro ao solicitar redefinição',
-        description: error.message,
-        variant: 'destructive',
-      })
+      const isRateLimit =
+        error.status === 429 ||
+        error.message?.toLowerCase().includes('rate limit') ||
+        error.code === 'over_email_send_rate_limit'
+
+      if (isRateLimit) {
+        toast({
+          title: 'Limite atingido',
+          description:
+            'Limite de envio de e-mail atingido. Por favor, aguarde alguns minutos antes de tentar solicitar uma nova senha novamente.',
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: 'Erro ao solicitar redefinição',
+          description: error.message,
+          variant: 'destructive',
+        })
+      }
     } else {
       toast({
         title: 'Link de recuperação enviado!',

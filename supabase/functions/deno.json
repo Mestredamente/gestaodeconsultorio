@@ -1,7 +1,6 @@
 {
   "_versions": {
     "enviar_cobranca_whatsapp": 2,
-    "enviar_lembrete_consulta": 2,
-    "functions": 1
+    "enviar_lembrete_consulta": 1
   }
 }
