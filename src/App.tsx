@@ -12,6 +12,8 @@ import PatientRecord from './pages/PatientRecord'
 import Finances from './pages/Finances'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import Stock from './pages/Stock'
+import PublicBooking from './pages/PublicBooking'
 import NotFound from './pages/NotFound'
 import Auth from './pages/Auth'
 
@@ -32,6 +34,7 @@ const AppRoutes = () => (
   <Routes>
     <Route path="/auth" element={<Auth />} />
     <Route path="/login" element={<Navigate to="/auth" replace />} />
+    <Route path="/agendar/:clinicId" element={<PublicBooking />} />
     <Route
       element={
         <ProtectedRoute>
@@ -47,6 +50,7 @@ const AppRoutes = () => (
       <Route path="/carteira" element={<Finances />} />
       <Route path="/financeiro" element={<Navigate to="/carteira" replace />} />
       <Route path="/relatorios" element={<Reports />} />
+      <Route path="/estoque" element={<Stock />} />
       <Route path="/configuracoes" element={<Settings />} />
     </Route>
     <Route path="*" element={<NotFound />} />

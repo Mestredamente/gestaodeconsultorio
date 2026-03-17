@@ -1,4 +1,12 @@
-import { LayoutDashboard, Calendar, Users, Wallet, Settings, FileBarChart } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  Wallet,
+  Settings,
+  FileBarChart,
+  Package,
+} from 'lucide-react'
 
 export const navItems = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -6,5 +14,6 @@ export const navItems = [
   { name: 'Pacientes', href: '/pacientes', icon: Users },
   { name: 'Carteira', href: '/carteira', icon: Wallet },
   { name: 'Relatórios', href: '/relatorios', icon: FileBarChart },
+  { name: 'Estoque', href: '/estoque', icon: Package },
   { name: 'Configurações', href: '/configuracoes', icon: Settings },
 ]

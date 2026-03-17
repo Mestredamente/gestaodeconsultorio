@@ -123,6 +123,51 @@ export type Database = {
           },
         ]
       }
+      historico_cobrancas: {
+        Row: {
+          ano_referencia: number
+          data_envio: string
+          id: string
+          mes_referencia: number
+          paciente_id: string
+          usuario_id: string
+          valor_cobrado: number
+        }
+        Insert: {
+          ano_referencia: number
+          data_envio?: string
+          id?: string
+          mes_referencia: number
+          paciente_id: string
+          usuario_id: string
+          valor_cobrado: number
+        }
+        Update: {
+          ano_referencia?: number
+          data_envio?: string
+          id?: string
+          mes_referencia?: number
+          paciente_id?: string
+          usuario_id?: string
+          valor_cobrado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'historico_cobrancas_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'historico_cobrancas_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       pacientes: {
         Row: {
           contato_emergencia_nome: string | null
@@ -221,18 +266,21 @@ export type Database = {
           email: string | null
           id: string
           nome_consultorio: string | null
+          template_cobranca: string | null
         }
         Insert: {
           chave_pix?: string | null
           email?: string | null
           id: string
           nome_consultorio?: string | null
+          template_cobranca?: string | null
         }
         Update: {
           chave_pix?: string | null
           email?: string | null
           id?: string
           nome_consultorio?: string | null
+          template_cobranca?: string | null
         }
         Relationships: []
       }
@@ -405,6 +453,14 @@ export const Constants = {
 //   valor_recebido: numeric (not null, default: 0)
 //   valor_a_receber: numeric (not null, default: 0)
 //   data_atualizacao: timestamp with time zone (not null, default: now())
+// Table: historico_cobrancas
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   paciente_id: uuid (not null)
+//   data_envio: timestamp with time zone (not null, default: now())
+//   valor_cobrado: numeric (not null)
+//   mes_referencia: integer (not null)
+//   ano_referencia: integer (not null)
 // Table: pacientes
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -429,6 +485,7 @@ export const Constants = {
 //   email: text (nullable)
 //   nome_consultorio: text (nullable)
 //   chave_pix: text (nullable)
+//   template_cobranca: text (nullable)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
@@ -444,6 +501,10 @@ export const Constants = {
 //   PRIMARY KEY financeiro_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY financeiro_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 //   UNIQUE financeiro_usuario_paciente_mes_ano_key: UNIQUE (usuario_id, paciente_id, mes, ano)
+// Table: historico_cobrancas
+//   FOREIGN KEY historico_cobrancas_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY historico_cobrancas_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY historico_cobrancas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: pacientes
 //   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -473,6 +534,10 @@ export const Constants = {
 //     WITH CHECK: true
 // Table: financeiro
 //   Policy "financeiro_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: historico_cobrancas
+//   Policy "historico_cobrancas_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: pacientes

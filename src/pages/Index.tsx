@@ -1,167 +1,220 @@
-import { Card, CardContent } from '@/components/ui/card'
+import { useEffect, useState, useCallback } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Users, Calendar, DollarSign, Activity } from 'lucide-react'
-import { mockAppointments, mockChartData } from '@/lib/mock-data'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
+import { Calendar, Check, X, RefreshCw, Cake } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
-
-const MetricCard = ({ title, value, sub, icon: Icon, colorClass }: any) => (
-  <Card className="hover:shadow-md transition-shadow duration-300">
-    <CardContent className="p-5 flex items-center gap-4">
-      <div className={`p-3 rounded-xl ${colorClass}`}>
-        <Icon className="w-6 h-6" />
-      </div>
-      <div>
-        <p className="text-sm text-slate-500 font-medium mb-0.5">{title}</p>
-        <h3 className="text-2xl font-bold text-slate-800 tracking-tight">{value}</h3>
-        <p className="text-xs text-emerald-600 font-medium mt-0.5">{sub}</p>
-      </div>
-    </CardContent>
-  </Card>
-)
+import { cn } from '@/lib/utils'
 
 export default function Index() {
+  const { user } = useAuth()
   const { toast } = useToast()
-  const today = new Intl.DateTimeFormat('pt-BR', {
+  const [appointments, setAppointments] = useState<any[]>([])
+  const [birthdays, setBirthdays] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const todayStr = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
   }).format(new Date())
 
-  const handleCheckIn = () => {
-    toast({ title: 'Check-in realizado!', description: 'Paciente notificado.', variant: 'default' })
+  const fetchDashboardData = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
+
+    const startOfDay = new Date()
+    startOfDay.setHours(0, 0, 0, 0)
+    const endOfDay = new Date(startOfDay)
+    endOfDay.setDate(endOfDay.getDate() + 1)
+
+    // Fetch today's appointments
+    const { data: appts } = await supabase
+      .from('agendamentos')
+      .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
+      .eq('usuario_id', user.id)
+      .gte('data_hora', startOfDay.toISOString())
+      .lt('data_hora', endOfDay.toISOString())
+      .order('data_hora', { ascending: true })
+
+    if (appts) setAppointments(appts)
+
+    // Fetch all patients to filter birthdays in JS (safest across locales)
+    const currentMonth = new Date().getMonth() + 1
+    const { data: pats } = await supabase
+      .from('pacientes')
+      .select('id, nome, data_nascimento')
+      .eq('usuario_id', user.id)
+
+    if (pats) {
+      const bdays = pats.filter((p) => {
+        if (!p.data_nascimento) return false
+        const [, month] = p.data_nascimento.split('-')
+        return parseInt(month) === currentMonth
+      })
+      setBirthdays(bdays)
+    }
+
+    setLoading(false)
+  }, [user])
+
+  useEffect(() => {
+    fetchDashboardData()
+    if (!user) return
+
+    const subscription = supabase
+      .channel('dash_agendamentos')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agendamentos', filter: `usuario_id=eq.${user.id}` },
+        () => fetchDashboardData(),
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [user, fetchDashboardData])
+
+  const updateStatus = async (id: string, status: string) => {
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
+    const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
+    if (!error) toast({ title: `Status atualizado: ${status.toUpperCase()}` })
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'compareceu':
+        return 'bg-emerald-100 text-emerald-700'
+      case 'faltou':
+        return 'bg-red-100 text-red-700'
+      case 'desmarcou':
+        return 'bg-amber-100 text-amber-700'
+      default:
+        return 'bg-slate-100 text-slate-700'
+    }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Olá, Dr. Marcos!</h1>
-          <p className="text-slate-500 capitalize">
-            {today} • Você tem {mockAppointments.length} sessões hoje.
-          </p>
-        </div>
-        <Button className="hidden md:flex gap-2 rounded-full px-6">
-          <Plus className="w-4 h-4" /> Novo Agendamento
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Sessões Hoje"
-          value="5"
-          sub="2 concluídas"
-          icon={Calendar}
-          colorClass="bg-sky-100 text-sky-600"
-        />
-        <MetricCard
-          title="Novos Pacientes"
-          value="12"
-          sub="+3 este mês"
-          icon={Users}
-          colorClass="bg-emerald-100 text-emerald-600"
-        />
-        <MetricCard
-          title="Faturamento Mensal"
-          value="R$ 8.450"
-          sub="+15% vs mês ant."
-          icon={DollarSign}
-          colorClass="bg-amber-100 text-amber-600"
-        />
-        <MetricCard
-          title="Taxa de Presença"
-          value="92%"
-          sub="Ótima"
-          icon={Activity}
-          colorClass="bg-indigo-100 text-indigo-600"
-        />
+    <div className="space-y-6 animate-fade-in pb-10">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a)!</h1>
+        <p className="text-slate-500 capitalize">{todayStr}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 shadow-sm">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-            <h2 className="text-lg font-semibold">Sessões por Mês</h2>
-          </div>
-          <CardContent className="p-6 h-[300px]">
-            <ChartContainer
-              config={{ sessoes: { label: 'Sessões', color: 'hsl(var(--primary))' } }}
-              className="w-full h-full"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={mockChartData}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis
-                    dataKey="month"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#64748b', fontSize: 12 }}
-                    dy={10}
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar
-                    dataKey="sessoes"
-                    fill="var(--color-sessoes)"
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={50}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+        <Card className="lg:col-span-2 shadow-sm border-slate-200">
+          <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" /> Sessões de Hoje
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="p-8 flex justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : appointments.length === 0 ? (
+              <div className="p-8 text-center text-slate-500">Nenhuma sessão para hoje.</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {appointments.map((apt) => {
+                  const pInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+                  const time = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                  return (
+                    <div
+                      key={apt.id}
+                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex gap-4 items-center">
+                        <div className="w-14 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-primary font-bold shadow-sm">
+                          {time}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">
+                            {pInfo?.nome || 'Paciente Excluído'}
+                          </p>
+                          <span
+                            className={cn(
+                              'text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider mt-1 inline-block',
+                              getStatusColor(apt.status),
+                            )}
+                          >
+                            {apt.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 sm:flex-none text-emerald-600 hover:bg-emerald-50"
+                          onClick={() => updateStatus(apt.id, 'compareceu')}
+                        >
+                          <Check className="w-4 h-4 mr-1" /> Compareceu
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 sm:flex-none text-red-600 hover:bg-red-50"
+                          onClick={() => updateStatus(apt.id, 'faltou')}
+                        >
+                          <X className="w-4 h-4 mr-1" /> Faltou
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 sm:flex-none text-amber-600 hover:bg-amber-50"
+                          onClick={() => updateStatus(apt.id, 'desmarcou')}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-1" /> Desmarcou
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <div className="p-6 border-b border-slate-100">
-            <h2 className="text-lg font-semibold">Próximas Sessões</h2>
-          </div>
+        <Card className="shadow-sm border-slate-200 h-fit">
+          <CardHeader className="border-b border-slate-100 bg-rose-50/50 pb-4">
+            <CardTitle className="text-lg flex items-center gap-2 text-rose-600">
+              <Cake className="w-5 h-5" /> Aniversariantes do Mês
+            </CardTitle>
+          </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-slate-100">
-              {mockAppointments.map((apt, i) => (
-                <div
-                  key={apt.id}
-                  className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex gap-4 items-center">
-                    <div className="w-12 h-12 bg-slate-100 rounded-xl flex flex-col items-center justify-center text-primary font-semibold">
-                      <span className="text-sm">{apt.time.split(':')[0]}</span>
-                      <span className="text-[10px] text-slate-500">{apt.time.split(':')[1]}</span>
+            {loading ? (
+              <div className="p-8 flex justify-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-rose-500"></div>
+              </div>
+            ) : birthdays.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">
+                Nenhum aniversário este mês.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {birthdays.map((b) => {
+                  const [year, month, day] = b.data_nascimento.split('-')
+                  return (
+                    <div key={b.id} className="p-4 flex items-center justify-between">
+                      <p className="font-medium text-slate-800">{b.nome}</p>
+                      <span className="text-sm font-bold text-rose-500 bg-rose-100 px-2 py-1 rounded-md">
+                        {day}/{month}
+                      </span>
                     </div>
-                    <div>
-                      <p className="font-semibold text-sm text-slate-900">{apt.patientName}</p>
-                      <p className="text-xs text-slate-500">{apt.type}</p>
-                    </div>
-                  </div>
-                  {i === 0 ? (
-                    <Button size="sm" onClick={handleCheckIn} className="rounded-full relative">
-                      <div className="absolute inset-0 rounded-full animate-pulse-ring"></div>
-                      Check-in
-                    </Button>
-                  ) : (
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-medium ${apt.status === 'Confirmado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}
-                    >
-                      {apt.status}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="p-4 text-center border-t border-slate-100">
-              <Button variant="link" className="text-primary h-auto p-0">
-                Ver agenda completa
-              </Button>
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      <Button className="fixed bottom-20 right-4 rounded-full w-14 h-14 shadow-lg md:hidden z-40 bg-primary hover:bg-primary/90">
-        <Plus className="w-6 h-6 text-white" />
-      </Button>
     </div>
   )
 }

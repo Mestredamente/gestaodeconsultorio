@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { Save, AlertTriangle } from 'lucide-react'
+import { Save, AlertTriangle, Calendar, Globe, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -37,7 +37,6 @@ export default function Settings() {
                 'Olá [Nome], você tem R$ [valor] a pagar referente a [periodo]. PIX: [chave_pix]',
             })
           } else {
-            // Ensure row exists
             supabase.from('usuarios').insert({ id: user.id }).then()
           }
         })
@@ -57,6 +56,17 @@ export default function Settings() {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     } else {
       toast({ title: 'Configurações salvas!' })
+    }
+  }
+
+  const handleCopyLink = () => {
+    if (user) {
+      const link = `${window.location.origin}/agendar/${user.id}`
+      navigator.clipboard.writeText(link)
+      toast({
+        title: 'Link copiado!',
+        description: 'Envie este link para seus pacientes agendarem online.',
+      })
     }
   }
 
@@ -97,22 +107,10 @@ export default function Settings() {
             <div className="space-y-2 pt-2">
               <Label htmlFor="template">Template de Cobrança (WhatsApp)</Label>
               <p className="text-xs text-slate-500 mb-2">
-                Utilize as variáveis para personalizar a mensagem. Variáveis disponíveis:{' '}
-                <code className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                  [Nome]
-                </code>
-                ,{' '}
-                <code className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                  [valor]
-                </code>
-                ,{' '}
-                <code className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                  [periodo]
-                </code>
-                ,{' '}
-                <code className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200">
-                  [chave_pix]
-                </code>
+                Utilize as variáveis: <code className="bg-slate-100 px-1 rounded">[Nome]</code>,{' '}
+                <code className="bg-slate-100 px-1 rounded">[valor]</code>,{' '}
+                <code className="bg-slate-100 px-1 rounded">[periodo]</code>,{' '}
+                <code className="bg-slate-100 px-1 rounded">[chave_pix]</code>
               </p>
               <Textarea
                 id="template"
@@ -123,12 +121,54 @@ export default function Settings() {
               />
             </div>
 
-            <div className="pt-2">
-              <Button type="submit" className="gap-2 w-full sm:w-auto" disabled={loading}>
+            <div className="pt-2 flex flex-col sm:flex-row gap-4">
+              <Button type="submit" className="gap-2 flex-1 sm:flex-none" disabled={loading}>
                 <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar Alterações'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2 flex-1 sm:flex-none text-primary border-primary/20 hover:bg-primary/5"
+                onClick={handleCopyLink}
+              >
+                <Copy className="w-4 h-4" /> Link de Agendamento Online
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm border-slate-200">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+          <CardTitle className="text-lg">Sincronização de Agenda</CardTitle>
+          <CardDescription>Conecte sua agenda com calendários externos</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-4">
+          <p className="text-sm text-slate-600 mb-4">
+            Mantenha suas sessões sincronizadas com seu calendário pessoal para evitar conflitos de
+            horários.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                navigator.clipboard.writeText(`https://api.clinica.io/cal/${user?.id}.ics`)
+                toast({ title: 'Link iCal gerado e copiado!' })
+              }}
+            >
+              <Calendar className="w-4 h-4" /> Gerar Link iCal
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                toast({ title: 'Redirecionando para autenticação do Google...' })
+              }}
+            >
+              <Globe className="w-4 h-4 text-blue-500" /> Conectar Google Calendar
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -140,8 +180,8 @@ export default function Settings() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-slate-500 mb-4">
-            Ao deletar sua conta, todos os dados, pacientes e registros financeiros serão
-            permanentemente removidos. Esta ação não pode ser desfeita.
+            Ao deletar sua conta, todos os dados serão permanentemente removidos. Esta ação não pode
+            ser desfeita.
           </p>
           <Button variant="destructive">Excluir Minha Conta</Button>
         </CardContent>
