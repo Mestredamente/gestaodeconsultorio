@@ -13,28 +13,39 @@ export function ServiceGoalTracker() {
   useEffect(() => {
     if (!user) return
     const fetchGoalData = async () => {
-      const { data: u } = await supabase
-        .from('usuarios')
-        .select('meta_mensal_consultas')
-        .eq('id', user.id)
-        .single()
-      if (u && u.meta_mensal_consultas) setGoal(u.meta_mensal_consultas)
+      try {
+        const { data: u, error: uError } = await supabase
+          .from('usuarios')
+          .select('meta_mensal_consultas')
+          .eq('id', user.id)
+          .maybeSingle()
 
-      const start = new Date()
-      start.setDate(1)
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(start)
-      end.setMonth(end.getMonth() + 1)
+        if (!uError && u && u.meta_mensal_consultas) {
+          setGoal(u.meta_mensal_consultas)
+        }
 
-      const { count } = await supabase
-        .from('agendamentos')
-        .select('id', { count: 'exact', head: true })
-        .eq('usuario_id', user.id)
-        .eq('status', 'compareceu')
-        .gte('data_hora', start.toISOString())
-        .lt('data_hora', end.toISOString())
+        const start = new Date()
+        start.setDate(1)
+        start.setHours(0, 0, 0, 0)
+        const end = new Date(start)
+        end.setMonth(end.getMonth() + 1)
 
-      setCurrent(count || 0)
+        // Using limit(0) instead of head: true to avoid JSON parse errors on 204 No Content responses
+        const { count, error } = await supabase
+          .from('agendamentos')
+          .select('id', { count: 'exact' })
+          .eq('usuario_id', user.id)
+          .eq('status', 'compareceu')
+          .gte('data_hora', start.toISOString())
+          .lt('data_hora', end.toISOString())
+          .limit(0)
+
+        if (!error && count !== null) {
+          setCurrent(count)
+        }
+      } catch (err) {
+        console.error('Error fetching goal data:', err)
+      }
     }
     fetchGoalData()
   }, [user])

@@ -40,14 +40,12 @@ export function TemplatesManager() {
         .update({ titulo: editing.titulo, conteudo: editing.conteudo, tipo: editing.tipo })
         .eq('id', editing.id)
     } else {
-      await supabase
-        .from('templates_documentos')
-        .insert({
-          usuario_id: user!.id,
-          titulo: editing.titulo,
-          conteudo: editing.conteudo,
-          tipo: editing.tipo,
-        })
+      await supabase.from('templates_documentos').insert({
+        usuario_id: user!.id,
+        titulo: editing.titulo,
+        conteudo: editing.conteudo,
+        tipo: editing.tipo,
+      })
     }
     setEditing(null)
     fetchTemplates()

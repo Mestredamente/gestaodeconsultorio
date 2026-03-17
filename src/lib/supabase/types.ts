@@ -470,6 +470,41 @@ export type Database = {
           },
         ]
       }
+      prescricoes: {
+        Row: {
+          conteudo_json: Json
+          data_emissao: string
+          hash_verificacao: string
+          id: string
+          paciente_id: string
+          usuario_id: string
+        }
+        Insert: {
+          conteudo_json?: Json
+          data_emissao?: string
+          hash_verificacao?: string
+          id?: string
+          paciente_id: string
+          usuario_id: string
+        }
+        Update: {
+          conteudo_json?: Json
+          data_emissao?: string
+          hash_verificacao?: string
+          id?: string
+          paciente_id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'prescricoes_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       prontuarios: {
         Row: {
           historico_sessoes: Json
@@ -509,6 +544,33 @@ export type Database = {
           },
         ]
       }
+      templates_documentos: {
+        Row: {
+          conteudo: string
+          data_criacao: string
+          id: string
+          tipo: string
+          titulo: string
+          usuario_id: string
+        }
+        Insert: {
+          conteudo: string
+          data_criacao?: string
+          id?: string
+          tipo?: string
+          titulo: string
+          usuario_id: string
+        }
+        Update: {
+          conteudo?: string
+          data_criacao?: string
+          id?: string
+          tipo?: string
+          titulo?: string
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       usuarios: {
         Row: {
           anamnese_template: Json | null
@@ -518,9 +580,11 @@ export type Database = {
           id: string
           lembrete_whatsapp_ativo: boolean | null
           logo_url: string | null
+          meta_mensal_consultas: number | null
           nome_consultorio: string | null
           politica_cancelamento: string | null
           preferencias_dashboard: Json | null
+          sync_calendarios: Json | null
           template_cobranca: string | null
           template_lembrete: string | null
           texto_contrato: string | null
@@ -533,9 +597,11 @@ export type Database = {
           id: string
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
+          meta_mensal_consultas?: number | null
           nome_consultorio?: string | null
           politica_cancelamento?: string | null
           preferencias_dashboard?: Json | null
+          sync_calendarios?: Json | null
           template_cobranca?: string | null
           template_lembrete?: string | null
           texto_contrato?: string | null
@@ -548,9 +614,11 @@ export type Database = {
           id?: string
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
+          meta_mensal_consultas?: number | null
           nome_consultorio?: string | null
           politica_cancelamento?: string | null
           preferencias_dashboard?: Json | null
+          sync_calendarios?: Json | null
           template_cobranca?: string | null
           template_lembrete?: string | null
           texto_contrato?: string | null
@@ -582,6 +650,7 @@ export type Database = {
       }
       get_anamnese_data: { Args: { p_hash: string }; Returns: Json }
       get_patient_portal_data: { Args: { p_hash: string }; Returns: Json }
+      get_prescricao_publica: { Args: { p_hash: string }; Returns: Json }
       update_anamnese: {
         Args: { p_anamnese: Json; p_hash: string }
         Returns: Json
@@ -825,12 +894,26 @@ export const Constants = {
 //   dia_pagamento: integer (nullable)
 //   contrato_aceito: boolean (nullable, default: false)
 //   data_aceite_contrato: timestamp with time zone (nullable)
+// Table: prescricoes
+//   id: uuid (not null, default: gen_random_uuid())
+//   paciente_id: uuid (not null)
+//   usuario_id: uuid (not null)
+//   conteudo_json: jsonb (not null, default: '[]'::jsonb)
+//   hash_verificacao: uuid (not null, default: gen_random_uuid())
+//   data_emissao: timestamp with time zone (not null, default: now())
 // Table: prontuarios
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)
 //   usuario_id: uuid (not null)
 //   queixa_principal: text (nullable)
 //   historico_sessoes: jsonb (not null, default: '[]'::jsonb)
+// Table: templates_documentos
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   titulo: text (not null)
+//   conteudo: text (not null)
+//   tipo: text (not null, default: 'outro'::text)
+//   data_criacao: timestamp with time zone (not null, default: now())
 // Table: usuarios
 //   id: uuid (not null)
 //   email: text (nullable)
@@ -845,6 +928,8 @@ export const Constants = {
 //   preferencias_dashboard: jsonb (nullable, default: '{"show_agenda": true, "show_revenue": true, "show_birthdays": true}'::jsonb)
 //   texto_contrato: text (nullable)
 //   politica_cancelamento: text (nullable)
+//   meta_mensal_consultas: integer (nullable, default: 50)
+//   sync_calendarios: jsonb (nullable, default: '{"google": false, "outlook": false}'::jsonb)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
@@ -886,11 +971,18 @@ export const Constants = {
 // Table: pacientes
 //   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: prescricoes
+//   FOREIGN KEY prescricoes_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY prescricoes_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY prescricoes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES auth.users(id) ON DELETE CASCADE
 // Table: prontuarios
 //   FOREIGN KEY prontuarios_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   UNIQUE prontuarios_paciente_id_key: UNIQUE (paciente_id)
 //   PRIMARY KEY prontuarios_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY prontuarios_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: templates_documentos
+//   PRIMARY KEY templates_documentos_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY templates_documentos_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES auth.users(id) ON DELETE CASCADE
 // Table: usuarios
 //   FOREIGN KEY usuarios_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 //   PRIMARY KEY usuarios_pkey: PRIMARY KEY (id)
@@ -947,8 +1039,20 @@ export const Constants = {
 //   Policy "pacientes_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
+// Table: prescricoes
+//   Policy "anon_read_prescricao" (SELECT, PERMISSIVE) roles={anon}
+//     USING: true
+//   Policy "prescricoes_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+//   Policy "public_read_prescricao" (SELECT, PERMISSIVE) roles={public}
+//     USING: true
 // Table: prontuarios
 //   Policy "prontuarios_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: templates_documentos
+//   Policy "templates_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: usuarios
@@ -1064,8 +1168,7 @@ export const Constants = {
 //       v_clinica record;
 //       v_past_appointments jsonb;
 //   BEGIN
-//       -- Busca paciente pelo hash
-//       SELECT p.id, p.nome, p.usuario_id, p.contrato_aceito INTO v_paciente
+//       SELECT p.id, p.nome, p.cpf, p.usuario_id, p.contrato_aceito INTO v_paciente
 //       FROM public.pacientes p
 //       WHERE p.hash_anamnese = p_hash LIMIT 1;
 //
@@ -1073,12 +1176,10 @@ export const Constants = {
 //           RETURN '{}'::jsonb;
 //       END IF;
 //
-//       -- Busca informações da clínica (incluindo textos legais)
 //       SELECT nome_consultorio, texto_contrato, politica_cancelamento INTO v_clinica
 //       FROM public.usuarios
 //       WHERE id = v_paciente.usuario_id LIMIT 1;
 //
-//       -- Busca agendamentos futuros
 //       SELECT COALESCE(jsonb_agg(jsonb_build_object(
 //           'id', a.id,
 //           'data_hora', a.data_hora,
@@ -1090,7 +1191,6 @@ export const Constants = {
 //       WHERE a.paciente_id = v_paciente.id AND a.data_hora >= NOW() AND a.status = 'agendado'
 //       ORDER BY a.data_hora ASC;
 //
-//       -- Busca último agendamento passado para pesquisa de satisfação
 //       SELECT COALESCE(jsonb_agg(jsonb_build_object(
 //           'id', a.id,
 //           'data_hora', a.data_hora,
@@ -1105,15 +1205,14 @@ export const Constants = {
 //       ORDER BY a.data_hora DESC
 //       LIMIT 1;
 //
-//       -- Busca histórico de sessões
 //       SELECT historico_sessoes INTO v_historico
 //       FROM public.prontuarios
 //       WHERE paciente_id = v_paciente.id LIMIT 1;
 //
-//       -- Retorna o JSON final
 //       RETURN jsonb_build_object(
 //           'paciente_id', v_paciente.id,
 //           'paciente_nome', v_paciente.nome,
+//           'paciente_cpf', v_paciente.cpf,
 //           'contrato_aceito', v_paciente.contrato_aceito,
 //           'consultorio', v_clinica.nome_consultorio,
 //           'texto_contrato', v_clinica.texto_contrato,
@@ -1122,6 +1221,32 @@ export const Constants = {
 //           'historico', COALESCE(v_historico, '[]'::jsonb),
 //           'pending_survey', v_past_appointments
 //       );
+//   END;
+//   $function$
+//
+// FUNCTION get_prescricao_publica(uuid)
+//   CREATE OR REPLACE FUNCTION public.get_prescricao_publica(p_hash uuid)
+//    RETURNS jsonb
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//       v_result jsonb;
+//   BEGIN
+//       SELECT jsonb_build_object(
+//           'data_emissao', pr.data_emissao,
+//           'conteudo', pr.conteudo_json,
+//           'paciente_nome', p.nome,
+//           'paciente_cpf', p.cpf,
+//           'medico_nome', u.nome_consultorio,
+//           'medico_email', u.email
+//       ) INTO v_result
+//       FROM public.prescricoes pr
+//       JOIN public.pacientes p ON pr.paciente_id = p.id
+//       JOIN public.usuarios u ON pr.usuario_id = u.id
+//       WHERE pr.hash_verificacao = p_hash LIMIT 1;
+//
+//       RETURN COALESCE(v_result, '{}'::jsonb);
 //   END;
 //   $function$
 //

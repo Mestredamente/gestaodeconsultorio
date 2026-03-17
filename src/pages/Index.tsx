@@ -40,50 +40,74 @@ export default function Index() {
     if (!user) return
     setLoading(true)
 
-    const { data: u } = await supabase
-      .from('usuarios')
-      .select('preferencias_dashboard')
-      .eq('id', user.id)
-      .single()
-    if (u?.preferencias_dashboard) setPrefs(u.preferencias_dashboard)
+    try {
+      const { data: u, error: uError } = await supabase
+        .from('usuarios')
+        .select('preferencias_dashboard')
+        .eq('id', user.id)
+        .maybeSingle()
 
-    const startOfDay = new Date()
-    startOfDay.setHours(0, 0, 0, 0)
-    const endOfDay = new Date(startOfDay)
-    endOfDay.setDate(endOfDay.getDate() + 1)
+      if (!uError && u?.preferencias_dashboard) {
+        setPrefs(u.preferencias_dashboard)
+      }
 
-    const { data: appts } = await supabase
-      .from('agendamentos')
-      .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
-      .eq('usuario_id', user.id)
-      .gte('data_hora', startOfDay.toISOString())
-      .lt('data_hora', endOfDay.toISOString())
-      .order('data_hora', { ascending: true })
-    if (appts) setAppointments(appts)
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date(startOfDay)
+      endOfDay.setDate(endOfDay.getDate() + 1)
 
-    const currentMonth = new Date().getMonth() + 1
-    const { data: pats } = await supabase
-      .from('pacientes')
-      .select('id, nome, data_nascimento')
-      .eq('usuario_id', user.id)
-    if (pats) {
-      const bdays = pats.filter((p) => {
-        if (!p.data_nascimento) return false
-        const [, month] = p.data_nascimento.split('-')
-        return parseInt(month) === currentMonth
-      })
-      setBirthdays(bdays)
+      const { data: appts, error: apptsError } = await supabase
+        .from('agendamentos')
+        .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
+        .eq('usuario_id', user.id)
+        .gte('data_hora', startOfDay.toISOString())
+        .lt('data_hora', endOfDay.toISOString())
+        .order('data_hora', { ascending: true })
+
+      if (!apptsError && appts) {
+        setAppointments(appts)
+      } else {
+        setAppointments([])
+      }
+
+      const currentMonth = new Date().getMonth() + 1
+      const { data: pats, error: patsError } = await supabase
+        .from('pacientes')
+        .select('id, nome, data_nascimento')
+        .eq('usuario_id', user.id)
+
+      if (!patsError && pats) {
+        const bdays = pats.filter((p) => {
+          if (!p.data_nascimento) return false
+          const [, month] = p.data_nascimento.split('-')
+          return parseInt(month) === currentMonth
+        })
+        setBirthdays(bdays)
+      } else {
+        setBirthdays([])
+      }
+
+      const { data: fin, error: finError } = await supabase
+        .from('financeiro')
+        .select('valor_recebido')
+        .eq('usuario_id', user.id)
+        .eq('mes', currentMonth)
+        .eq('ano', new Date().getFullYear())
+
+      if (!finError && fin) {
+        setRevenue(fin.reduce((s, f) => s + Number(f.valor_recebido), 0) || 0)
+      } else {
+        setRevenue(0)
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err)
+      // Fallbacks in case of unexpected errors
+      setAppointments([])
+      setBirthdays([])
+      setRevenue(0)
+    } finally {
+      setLoading(false)
     }
-
-    const { data: fin } = await supabase
-      .from('financeiro')
-      .select('valor_recebido')
-      .eq('usuario_id', user.id)
-      .eq('mes', currentMonth)
-      .eq('ano', new Date().getFullYear())
-    setRevenue(fin?.reduce((s, f) => s + Number(f.valor_recebido), 0) || 0)
-
-    setLoading(false)
   }, [user])
 
   useEffect(() => {
@@ -104,14 +128,28 @@ export default function Index() {
 
   const updateStatus = async (id: string, status: string) => {
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
-    const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
-    if (!error) toast({ title: `Status atualizado: ${status.toUpperCase()}` })
+    try {
+      const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
+      if (!error) {
+        toast({ title: `Status atualizado: ${status.toUpperCase()}` })
+      } else {
+        throw error
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro ao atualizar status', description: err.message, variant: 'destructive' })
+      // Revert optimism if needed, but for simplicity keeping it as is
+      fetchDashboardData()
+    }
   }
 
   const savePrefs = async (newPref: any) => {
     const updated = { ...prefs, ...newPref }
     setPrefs(updated)
-    await supabase.from('usuarios').update({ preferencias_dashboard: updated }).eq('id', user?.id)
+    try {
+      await supabase.from('usuarios').update({ preferencias_dashboard: updated }).eq('id', user?.id)
+    } catch (err) {
+      console.error('Error saving preferences:', err)
+    }
   }
 
   const getStatusColor = (status: string) => {
