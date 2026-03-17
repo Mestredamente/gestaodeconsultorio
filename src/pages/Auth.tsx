@@ -45,14 +45,29 @@ export default function Auth() {
       }
     } catch (error: any) {
       const isRateLimit =
-        error.status === 429 ||
-        error.message?.toLowerCase().includes('rate limit') ||
-        error.code === 'over_email_send_rate_limit'
+        error?.status === 429 ||
+        error?.message?.toLowerCase().includes('rate limit') ||
+        error?.code === 'over_email_send_rate_limit'
+
+      const isInvalidCredentials =
+        error?.message?.toLowerCase().includes('invalid login credentials') ||
+        error?.code === 'invalid_credentials' ||
+        (error?.status === 400 && action === 'login')
+
+      let title = 'Erro na autenticação'
+      let description = error?.message || 'Ocorreu um erro inesperado.'
+
+      if (isRateLimit) {
+        title = 'Limite de tentativas excedido'
+        description = 'Muitas requisições. Aguarde alguns minutos antes de tentar novamente.'
+      } else if (isInvalidCredentials) {
+        title = 'Acesso negado'
+        description = 'E-mail ou senha inválidos. Por favor, tente novamente.'
+      }
+
       toast({
-        title: isRateLimit ? 'Limite de tentativas excedido' : 'Erro na autenticação',
-        description: isRateLimit
-          ? 'Muitas requisições. Aguarde alguns minutos antes de tentar novamente.'
-          : error.message,
+        title,
+        description,
         variant: 'destructive',
       })
     } finally {
