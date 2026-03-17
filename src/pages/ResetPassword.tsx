@@ -33,6 +33,12 @@ export default function ResetPassword() {
             'Limite de envio de e-mail atingido. Por favor, aguarde alguns minutos antes de tentar solicitar uma nova senha novamente.',
           variant: 'destructive',
         })
+      } else if (error.code === 'email_provider_disabled') {
+        toast({
+          title: 'Serviço Indisponível',
+          description: error.message,
+          variant: 'destructive',
+        })
       } else {
         toast({
           title: 'Erro ao solicitar redefinição',

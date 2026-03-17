@@ -83,6 +83,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/atualizar-senha`,
     })
+
+    if (error && error.code === 'email_provider_disabled') {
+      return {
+        error: {
+          name: error.name,
+          message:
+            'O provedor de e-mail está desativado no momento. Por favor, entre em contato com o administrador.',
+          status: error.status,
+          code: error.code,
+        },
+      }
+    }
+
     return { error }
   }
 
