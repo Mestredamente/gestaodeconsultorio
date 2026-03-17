@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,7 +13,17 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { Save, Copy, Upload, ImageIcon, Trash2, Plus, Scale, Calendar } from 'lucide-react'
+import {
+  Save,
+  Copy,
+  Upload,
+  ImageIcon,
+  Trash2,
+  Plus,
+  Scale,
+  Calendar,
+  UserRound,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -25,6 +34,7 @@ export default function Settings() {
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [formData, setFormData] = useState({
     nome_consultorio: '',
     email: '',
@@ -110,6 +120,33 @@ export default function Settings() {
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    setUploadingLogo(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const path = `${user.id}/logo-${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage.from('logos').upload(path, file)
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('logos').getPublicUrl(path)
+
+      // Update local state and immediately persist the photo
+      setFormData((prev) => ({ ...prev, logo_url: data.publicUrl }))
+      await supabase.from('usuarios').update({ logo_url: data.publicUrl }).eq('id', user.id)
+
+      toast({ title: 'Foto atualizada com sucesso!' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao enviar foto', description: err.message, variant: 'destructive' })
+    } finally {
+      setUploadingLogo(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in-up pb-10">
       <h1 className="text-2xl font-bold tracking-tight text-slate-900">Configurações Gerais</h1>
@@ -121,9 +158,9 @@ export default function Settings() {
           <TabsList className="w-full flex flex-wrap justify-start rounded-none border-b border-slate-100 bg-slate-50/50 p-0 h-auto">
             <TabsTrigger
               value="perfil"
-              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
+              className="rounded-none py-3 px-4 sm:px-6 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
             >
-              Perfil
+              <UserRound className="w-4 h-4" /> Perfil do Profissional
             </TabsTrigger>
             <TabsTrigger
               value="especialidades"
@@ -157,85 +194,105 @@ export default function Settings() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="perfil" className="p-6 m-0 space-y-5">
-            <div className="flex flex-col sm:flex-row gap-6 items-start">
-              <div className="flex flex-col items-center gap-3">
-                <Avatar className="w-24 h-24 border-2 border-slate-200">
-                  <AvatarImage src={formData.logo_url} />
-                  <AvatarFallback>
-                    <ImageIcon className="w-8 h-8" />
-                  </AvatarFallback>
-                </Avatar>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-4 h-4 mr-2" /> Alterar Logo
-                </Button>
-                <input
-                  type="file"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (!file || !user) return
-                    const path = `${user.id}/logo-${Date.now()}`
-                    await supabase.storage.from('logos').upload(path, file)
-                    const { data } = supabase.storage.from('logos').getPublicUrl(path)
-                    setFormData({ ...formData, logo_url: data.publicUrl })
-                  }}
-                />
-              </div>
-              <div className="flex-1 space-y-4 w-full">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Nome do Consultório</Label>
-                    <Input
-                      value={formData.nome_consultorio}
-                      onChange={(e) =>
-                        setFormData({ ...formData, nome_consultorio: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>E-mail Contato</Label>
-                    <Input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Meta Mensal de Atendimentos</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={metaConsultas}
-                      onChange={(e) => setMetaConsultas(Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Chave PIX (Cobrança)</Label>
-                    <Input
-                      value={formData.chave_pix}
-                      onChange={(e) => setFormData({ ...formData, chave_pix: e.target.value })}
-                    />
+          <TabsContent value="perfil" className="p-6 m-0 space-y-6">
+            <div>
+              <h3 className="font-semibold text-slate-900 mb-1">Informações do Profissional</h3>
+              <p className="text-sm text-slate-500 mb-4">
+                Esta foto e nome serão exibidos no seu perfil e portal do paciente.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-8 items-start bg-slate-50/50 p-5 rounded-lg border border-slate-100">
+                <div className="flex flex-col items-center gap-3">
+                  <Avatar className="w-28 h-28 border-4 border-white shadow-sm">
+                    <AvatarImage src={formData.logo_url} className="object-cover" />
+                    <AvatarFallback className="bg-slate-100">
+                      {uploadingLogo ? (
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      ) : (
+                        <ImageIcon className="w-10 h-10 text-slate-400" />
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={uploadingLogo}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {uploadingLogo ? 'Enviando...' : 'Alterar Foto'}
+                  </Button>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                  />
+                  <p className="text-[10px] text-slate-400 text-center">
+                    JPG, PNG ou WebP. Máx 2MB.
+                  </p>
+                </div>
+
+                <div className="flex-1 space-y-4 w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Nome do Consultório / Profissional</Label>
+                      <Input
+                        value={formData.nome_consultorio}
+                        onChange={(e) =>
+                          setFormData({ ...formData, nome_consultorio: e.target.value })
+                        }
+                        required
+                        placeholder="Dr. João Silva"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>E-mail de Contato</Label>
+                      <Input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Meta Mensal de Atendimentos</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={metaConsultas}
+                        onChange={(e) => setMetaConsultas(Number(e.target.value))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Chave PIX (Cobrança)</Label>
+                      <Input
+                        value={formData.chave_pix}
+                        onChange={(e) => setFormData({ ...formData, chave_pix: e.target.value })}
+                        placeholder="CPF, E-mail ou Celular"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
             <div className="space-y-2 pt-4 border-t border-slate-100">
               <Label>Template de Cobrança WhatsApp</Label>
-              <p className="text-xs text-slate-500">
-                Variáveis: [Nome], [valor], [periodo], [chave_pix]
+              <p className="text-xs text-slate-500 mb-1">
+                Variáveis permitidas:{' '}
+                <span className="font-mono bg-slate-100 px-1 rounded">[Nome]</span>,{' '}
+                <span className="font-mono bg-slate-100 px-1 rounded">[valor]</span>,{' '}
+                <span className="font-mono bg-slate-100 px-1 rounded">[periodo]</span>,{' '}
+                <span className="font-mono bg-slate-100 px-1 rounded">[chave_pix]</span>
               </p>
               <Textarea
                 value={formData.template_cobranca}
                 onChange={(e) => setFormData({ ...formData, template_cobranca: e.target.value })}
+                className="min-h-[100px]"
               />
             </div>
           </TabsContent>
@@ -300,7 +357,7 @@ export default function Settings() {
                       }}
                     >
                       <SelectTrigger className="w-[200px] h-8 text-xs bg-white border-slate-200">
-                        <SelectValue placeholder="Carregar Template da Biblioteca" />
+                        <SelectValue placeholder="Carregar Template" />
                       </SelectTrigger>
                       <SelectContent>
                         {userTemplates.map((t) => (

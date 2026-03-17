@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Legend } from 'recharts'
-import { ArrowDownRight, ArrowUpRight, Wallet, Plus } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Wallet, Plus, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import {
@@ -33,6 +33,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { measurePerformance } from '@/lib/performance'
 
 const monthNames = [
   'Jan',
@@ -73,6 +74,7 @@ export default function Finances() {
   const [month, setMonth] = useState<string>(String(currentDate.getMonth() + 1))
   const [year, setYear] = useState<string>(String(currentDate.getFullYear()))
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   const [patients, setPatients] = useState<any[]>([])
   const [finances, setFinances] = useState<any[]>([])
@@ -88,27 +90,67 @@ export default function Finances() {
 
   const fetchYearData = useCallback(async () => {
     if (!user) return
+    setError(false)
     setLoading(true)
-    const yearNum = parseInt(year)
 
-    const [patientsRes, financeRes, despesasRes] = await Promise.all([
-      supabase
-        .from('pacientes')
-        .select('id, nome, valor_sessao, frequencia_pagamento, dia_pagamento')
-        .eq('usuario_id', user.id),
-      supabase.from('financeiro').select('*').eq('usuario_id', user.id).eq('ano', yearNum),
-      supabase
-        .from('despesas')
-        .select('*')
-        .eq('usuario_id', user.id)
-        .gte('data', `${yearNum}-01-01`)
-        .lt('data', `${yearNum + 1}-01-01`),
-    ])
+    const cacheKey = `finances_${user.id}_${year}`
+    const cachedData = localStorage.getItem(cacheKey)
 
-    if (patientsRes.data) setPatients(patientsRes.data)
-    if (financeRes.data) setFinances(financeRes.data)
-    if (despesasRes.data) setDespesas(despesasRes.data)
-    setLoading(false)
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData)
+        if (parsed.patients && parsed.finances && parsed.despesas) {
+          setPatients(parsed.patients)
+          setFinances(parsed.finances)
+          setDespesas(parsed.despesas)
+          setLoading(false)
+        }
+      } catch (e) {
+        console.error('Failed to parse cache', e)
+      }
+    }
+
+    try {
+      await measurePerformance(`fetchFinances_${year}`, async () => {
+        const yearNum = parseInt(year)
+
+        const [patientsRes, financeRes, despesasRes] = await Promise.all([
+          supabase
+            .from('pacientes')
+            .select('id, nome, valor_sessao, frequencia_pagamento, dia_pagamento')
+            .eq('usuario_id', user.id),
+          supabase.from('financeiro').select('*').eq('usuario_id', user.id).eq('ano', yearNum),
+          supabase
+            .from('despesas')
+            .select('*')
+            .eq('usuario_id', user.id)
+            .gte('data', `${yearNum}-01-01`)
+            .lt('data', `${yearNum + 1}-01-01`),
+        ])
+
+        if (patientsRes.error || financeRes.error || despesasRes.error) {
+          throw new Error('Falha ao carregar dados do supabase')
+        }
+
+        if (patientsRes.data) setPatients(patientsRes.data)
+        if (financeRes.data) setFinances(financeRes.data)
+        if (despesasRes.data) setDespesas(despesasRes.data)
+
+        localStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            patients: patientsRes.data || [],
+            finances: financeRes.data || [],
+            despesas: despesasRes.data || [],
+          }),
+        )
+      })
+    } catch (err) {
+      console.error(err)
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
   }, [user, year])
 
   useEffect(() => {
@@ -163,7 +205,12 @@ export default function Finances() {
       .select()
       .single()
     if (!error && data) {
-      setDespesas([...despesas, data])
+      const newDespesas = [...despesas, data]
+      setDespesas(newDespesas)
+
+      const cacheKey = `finances_${user.id}_${year}`
+      localStorage.setItem(cacheKey, JSON.stringify({ patients, finances, despesas: newDespesas }))
+
       setIsDespesaModalOpen(false)
       setNewDespesa({
         descricao: '',
@@ -173,6 +220,24 @@ export default function Finances() {
       })
       toast({ title: 'Despesa adicionada!' })
     }
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 animate-fade-in pb-10">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Gestão Financeira</h1>
+        <Card className="shadow-sm border-slate-200 bg-slate-50">
+          <CardContent className="p-10 flex flex-col items-center justify-center text-center">
+            <p className="text-slate-500 mb-4 font-medium">
+              Não foi possível carregar estes dados de forma confiável.
+            </p>
+            <Button onClick={fetchYearData} className="gap-2">
+              <RefreshCw className="w-4 h-4" /> Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -261,42 +326,51 @@ export default function Finances() {
         <TabsContent value="fluxo">
           <Card className="shadow-sm">
             <CardContent className="p-6 h-[400px]">
-              <ChartContainer
-                config={{
-                  recebido: { label: 'Entradas', color: '#10b981' },
-                  saida: { label: 'Saídas', color: '#f43f5e' },
-                }}
-                className="w-full h-full"
-              >
-                <ResponsiveContainer>
-                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis
-                      dataKey="month"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#64748b' }}
-                      dy={10}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Legend verticalAlign="top" height={36} />
-                    <Bar
-                      dataKey="recebido"
-                      name="Entradas"
-                      fill="var(--color-recebido)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={40}
-                    />
-                    <Bar
-                      dataKey="saida"
-                      name="Saídas"
-                      fill="var(--color-saida)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={40}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+              {loading && finances.length === 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : (
+                <ChartContainer
+                  config={{
+                    recebido: { label: 'Entradas', color: '#10b981' },
+                    saida: { label: 'Saídas', color: '#f43f5e' },
+                  }}
+                  className="w-full h-full"
+                >
+                  <ResponsiveContainer>
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="month"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#64748b' }}
+                        dy={10}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Legend verticalAlign="top" height={36} />
+                      <Bar
+                        dataKey="recebido"
+                        name="Entradas"
+                        fill="var(--color-recebido)"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={40}
+                      />
+                      <Bar
+                        dataKey="saida"
+                        name="Saídas"
+                        fill="var(--color-saida)"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={40}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

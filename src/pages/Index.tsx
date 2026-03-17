@@ -16,6 +16,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { ServiceGoalTracker } from '@/components/ServiceGoalTracker'
+import { measurePerformance } from '@/lib/performance'
 
 export default function Index() {
   const { user, signOut } = useAuth()
@@ -24,6 +25,7 @@ export default function Index() {
   const [birthdays, setBirthdays] = useState<any[]>([])
   const [revenue, setRevenue] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [prefs, setPrefs] = useState({
     show_agenda: true,
     show_birthdays: true,
@@ -39,69 +41,72 @@ export default function Index() {
   const fetchDashboardData = useCallback(async () => {
     if (!user) return
     setLoading(true)
+    setError(false)
 
     try {
-      const { data: u, error: uError } = await supabase
-        .from('usuarios')
-        .select('preferencias_dashboard')
-        .eq('id', user.id)
-        .maybeSingle()
+      await measurePerformance('dashboard_data', async () => {
+        const { data: u, error: uError } = await supabase
+          .from('usuarios')
+          .select('preferencias_dashboard')
+          .eq('id', user.id)
+          .maybeSingle()
 
-      if (!uError && u?.preferencias_dashboard) {
-        setPrefs(u.preferencias_dashboard)
-      }
+        if (!uError && u?.preferencias_dashboard) {
+          setPrefs(u.preferencias_dashboard)
+        }
 
-      const startOfDay = new Date()
-      startOfDay.setHours(0, 0, 0, 0)
-      const endOfDay = new Date(startOfDay)
-      endOfDay.setDate(endOfDay.getDate() + 1)
+        const startOfDay = new Date()
+        startOfDay.setHours(0, 0, 0, 0)
+        const endOfDay = new Date(startOfDay)
+        endOfDay.setDate(endOfDay.getDate() + 1)
 
-      const { data: appts, error: apptsError } = await supabase
-        .from('agendamentos')
-        .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
-        .eq('usuario_id', user.id)
-        .gte('data_hora', startOfDay.toISOString())
-        .lt('data_hora', endOfDay.toISOString())
-        .order('data_hora', { ascending: true })
+        const { data: appts, error: apptsError } = await supabase
+          .from('agendamentos')
+          .select('id, data_hora, status, paciente_id, pacientes(id, nome, valor_sessao)')
+          .eq('usuario_id', user.id)
+          .gte('data_hora', startOfDay.toISOString())
+          .lt('data_hora', endOfDay.toISOString())
+          .order('data_hora', { ascending: true })
 
-      if (!apptsError && appts) {
-        setAppointments(appts)
-      } else {
-        setAppointments([])
-      }
+        if (!apptsError && appts) {
+          setAppointments(appts)
+        } else {
+          setAppointments([])
+        }
 
-      const currentMonth = new Date().getMonth() + 1
-      const { data: pats, error: patsError } = await supabase
-        .from('pacientes')
-        .select('id, nome, data_nascimento')
-        .eq('usuario_id', user.id)
+        const currentMonth = new Date().getMonth() + 1
+        const { data: pats, error: patsError } = await supabase
+          .from('pacientes')
+          .select('id, nome, data_nascimento')
+          .eq('usuario_id', user.id)
 
-      if (!patsError && pats) {
-        const bdays = pats.filter((p) => {
-          if (!p.data_nascimento) return false
-          const [, month] = p.data_nascimento.split('-')
-          return parseInt(month) === currentMonth
-        })
-        setBirthdays(bdays)
-      } else {
-        setBirthdays([])
-      }
+        if (!patsError && pats) {
+          const bdays = pats.filter((p) => {
+            if (!p.data_nascimento) return false
+            const [, month] = p.data_nascimento.split('-')
+            return parseInt(month) === currentMonth
+          })
+          setBirthdays(bdays)
+        } else {
+          setBirthdays([])
+        }
 
-      const { data: fin, error: finError } = await supabase
-        .from('financeiro')
-        .select('valor_recebido')
-        .eq('usuario_id', user.id)
-        .eq('mes', currentMonth)
-        .eq('ano', new Date().getFullYear())
+        const { data: fin, error: finError } = await supabase
+          .from('financeiro')
+          .select('valor_recebido')
+          .eq('usuario_id', user.id)
+          .eq('mes', currentMonth)
+          .eq('ano', new Date().getFullYear())
 
-      if (!finError && fin) {
-        setRevenue(fin.reduce((s, f) => s + Number(f.valor_recebido), 0) || 0)
-      } else {
-        setRevenue(0)
-      }
+        if (!finError && fin) {
+          setRevenue(fin.reduce((s, f) => s + Number(f.valor_recebido), 0) || 0)
+        } else {
+          setRevenue(0)
+        }
+      })
     } catch (err) {
       console.error('Error fetching dashboard data:', err)
-      // Fallbacks in case of unexpected errors
+      setError(true)
       setAppointments([])
       setBirthdays([])
       setRevenue(0)
@@ -137,7 +142,6 @@ export default function Index() {
       }
     } catch (err: any) {
       toast({ title: 'Erro ao atualizar status', description: err.message, variant: 'destructive' })
-      // Revert optimism if needed, but for simplicity keeping it as is
       fetchDashboardData()
     }
   }
@@ -213,6 +217,17 @@ export default function Index() {
           </Button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex items-center justify-between">
+          <p className="text-red-600 text-sm font-medium">
+            Alguns dados não puderam ser carregados.
+          </p>
+          <Button variant="outline" size="sm" onClick={fetchDashboardData} className="bg-white">
+            Tentar novamente
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {prefs.show_agenda && (

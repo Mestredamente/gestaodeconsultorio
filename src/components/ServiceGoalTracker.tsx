@@ -1,27 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Target } from 'lucide-react'
+import { Target, RefreshCw } from 'lucide-react'
+import { measurePerformance } from '@/lib/performance'
+import { Button } from '@/components/ui/button'
 
 export function ServiceGoalTracker() {
   const { user } = useAuth()
   const [goal, setGoal] = useState(0)
   const [current, setCurrent] = useState(0)
+  const [error, setError] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchGoalData = useCallback(async () => {
     if (!user) return
-    const fetchGoalData = async () => {
-      try {
+    setError(false)
+    setLoading(true)
+
+    try {
+      await measurePerformance('fetchGoalData', async () => {
         const { data: u, error: uError } = await supabase
           .from('usuarios')
           .select('meta_mensal_consultas')
           .eq('id', user.id)
           .maybeSingle()
 
-        if (!uError && u && u.meta_mensal_consultas) {
+        if (uError) throw uError
+
+        if (u && u.meta_mensal_consultas) {
           setGoal(u.meta_mensal_consultas)
+        } else {
+          setGoal(0)
         }
 
         const start = new Date()
@@ -30,8 +41,7 @@ export function ServiceGoalTracker() {
         const end = new Date(start)
         end.setMonth(end.getMonth() + 1)
 
-        // Using limit(0) instead of head: true to avoid JSON parse errors on 204 No Content responses
-        const { count, error } = await supabase
+        const { count, error: countError } = await supabase
           .from('agendamentos')
           .select('id', { count: 'exact' })
           .eq('usuario_id', user.id)
@@ -40,15 +50,38 @@ export function ServiceGoalTracker() {
           .lt('data_hora', end.toISOString())
           .limit(0)
 
-        if (!error && count !== null) {
+        if (countError) throw countError
+
+        if (count !== null) {
           setCurrent(count)
         }
-      } catch (err) {
-        console.error('Error fetching goal data:', err)
-      }
+      })
+    } catch (err) {
+      console.error('Error fetching goal data:', err)
+      setError(true)
+    } finally {
+      setLoading(false)
     }
-    fetchGoalData()
   }, [user])
+
+  useEffect(() => {
+    fetchGoalData()
+  }, [fetchGoalData])
+
+  if (loading && !goal) return null
+
+  if (error) {
+    return (
+      <Card className="shadow-sm border-slate-200">
+        <CardContent className="p-6 flex flex-col items-center justify-center text-center">
+          <p className="text-sm text-slate-500 mb-3">Não foi possível carregar estes dados</p>
+          <Button variant="outline" size="sm" onClick={fetchGoalData} className="gap-2">
+            <RefreshCw className="w-3 h-3" /> Tentar novamente
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (!goal) return null
 
