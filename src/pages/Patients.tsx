@@ -37,13 +37,22 @@ export default function Patients() {
   }, [user])
 
   const filtered = patients.filter((p) => {
+    if (!search) return true
+
     const s = search.toLowerCase()
-    return (
-      p.nome?.toLowerCase().includes(s) ||
-      p.cpf?.toLowerCase().includes(s) ||
-      p.telefone?.toLowerCase().includes(s) ||
-      p.email?.toLowerCase().includes(s)
-    )
+    const sDigits = s.replace(/\D/g, '')
+
+    const matchName = p.nome?.toLowerCase().includes(s)
+    const matchEmail = p.email?.toLowerCase().includes(s)
+
+    const pCpfDigits = p.cpf?.replace(/\D/g, '')
+    const matchCpf = p.cpf?.toLowerCase().includes(s) || (sDigits && pCpfDigits?.includes(sDigits))
+
+    const pPhoneDigits = p.telefone?.replace(/\D/g, '')
+    const matchPhone =
+      p.telefone?.toLowerCase().includes(s) || (sDigits && pPhoneDigits?.includes(sDigits))
+
+    return matchName || matchEmail || matchCpf || matchPhone
   })
 
   return (
