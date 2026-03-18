@@ -36,7 +36,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Checkbox } from '@/components/ui/checkbox'
 
 export default function PublicPortal() {
   const { hash } = useParams()
@@ -95,9 +94,9 @@ export default function PublicPortal() {
     if (!hash) return
     const { error } = await supabase.rpc('accept_patient_contract', { p_hash: hash })
     if (!error) {
-      toast({ title: 'Contrato aceito com sucesso.' })
+      toast({ title: 'Contrato assinado com sucesso.' })
       fetchPortalData()
-    } else toast({ title: 'Erro ao aceitar contrato.', variant: 'destructive' })
+    } else toast({ title: 'Erro ao assinar contrato.', variant: 'destructive' })
   }
 
   const handleCancelAppointment = async () => {
@@ -644,25 +643,28 @@ export default function PublicPortal() {
                   <div className="flex items-center gap-3 text-emerald-700">
                     <CheckCircle className="w-6 h-6" />
                     <div>
-                      <p className="font-bold">Termos Aceitos</p>
+                      <p className="font-bold">Contrato Assinado</p>
                       <p className="text-sm opacity-80">
-                        Você já concordou com as políticas da clínica.
+                        Você assinou digitalmente os termos{' '}
+                        {data.data_aceite_contrato
+                          ? `em ${new Date(data.data_aceite_contrato).toLocaleDateString('pt-BR')}`
+                          : ''}
+                        .
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="terms"
-                      className="mt-1"
-                      onCheckedChange={(c) => c && handleAcceptContract()}
-                    />
-                    <label
-                      htmlFor="terms"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  <div className="flex flex-col gap-3 w-full">
+                    <p className="text-sm text-slate-600">
+                      Ao clicar no botão abaixo, você concorda com os termos do contrato e com a
+                      política de cancelamento da clínica.
+                    </p>
+                    <Button
+                      onClick={handleAcceptContract}
+                      className="gap-2 bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto self-start"
                     >
-                      Li e estou de acordo com os termos do contrato e a política de cancelamento.
-                    </label>
+                      <CheckCircle className="w-4 h-4" /> Aceitar e Assinar Digitalmente
+                    </Button>
                   </div>
                 )}
               </div>

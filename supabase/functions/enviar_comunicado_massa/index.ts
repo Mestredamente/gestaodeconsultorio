@@ -26,14 +26,27 @@ Deno.serve(async (req: Request) => {
 
     if (campError) throw campError
 
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
     // Busca emails dos pacientes do usuário logado
     const { data: pacientes } = await supabase
       .from('pacientes')
-      .select('email, nome')
+      .select('id, email, nome')
       .eq('usuario_id', user.id)
       .not('email', 'is', null)
 
-    const validPatients = (pacientes || []).filter((p) => p.email && p.email.trim() !== '')
+    const { data: agendamentos } = await supabase
+      .from('agendamentos')
+      .select('paciente_id')
+      .eq('usuario_id', user.id)
+      .gte('data_hora', ninetyDaysAgo.toISOString())
+
+    const activePatientIds = new Set(agendamentos?.map((a) => a.paciente_id) || [])
+
+    const validPatients = (pacientes || []).filter(
+      (p) => p.email && p.email.trim() !== '' && activePatientIds.has(p.id),
+    )
 
     // TODO: Integração real com provedor de email (SendGrid, Resend, etc.) para envio em massa.
     // Simulando o delay do envio

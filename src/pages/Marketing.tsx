@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { TemplatesManager } from '@/components/TemplatesManager'
+import { SelfCareNewsletter } from '@/components/SelfCareNewsletter'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
@@ -18,10 +19,19 @@ export default function Marketing() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4">
-          <TabsTrigger value="comunicacao">Comunicações e Emails</TabsTrigger>
-          <TabsTrigger value="testes">Testes Psicológicos</TabsTrigger>
-          <TabsTrigger value="juridico">Jurídico e Contratos</TabsTrigger>
+        <TabsList className="mb-4 flex-wrap h-auto">
+          <TabsTrigger value="comunicacao" className="py-2">
+            Comunicações e Emails
+          </TabsTrigger>
+          <TabsTrigger value="newsletter" className="py-2">
+            Newsletter Autocuidado
+          </TabsTrigger>
+          <TabsTrigger value="testes" className="py-2">
+            Testes Psicológicos
+          </TabsTrigger>
+          <TabsTrigger value="juridico" className="py-2">
+            Jurídico e Contratos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="comunicacao">
@@ -38,6 +48,10 @@ export default function Marketing() {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="newsletter">
+          <SelfCareNewsletter />
         </TabsContent>
 
         <TabsContent value="testes">

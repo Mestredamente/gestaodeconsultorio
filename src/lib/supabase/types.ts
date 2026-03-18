@@ -1477,6 +1477,8 @@ export const Constants = {
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: pacientes
+//   Policy "anon_select_pacientes" (SELECT, PERMISSIVE) roles={anon}
+//     USING: true
 //   Policy "pacientes_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())

@@ -29,6 +29,10 @@ const attendanceConfig = {
   faltou: { label: 'Faltou', color: '#f43f5e' },
   desmarcou: { label: 'Desmarcou', color: '#f59e0b' },
 }
+const retentionConfig = {
+  retidos: { label: 'Retidos', color: '#10b981' },
+  nao_retidos: { label: 'Não Retidos', color: '#64748b' },
+}
 
 export function PerformanceDashboard() {
   const { user } = useAuth()
@@ -40,6 +44,7 @@ export function PerformanceDashboard() {
     growthData: [] as any[],
     financeData: [] as any[],
     attendanceData: [] as any[],
+    retentionData: [] as any[],
   })
 
   useEffect(() => {
@@ -52,20 +57,29 @@ export function PerformanceDashboard() {
       const endCurrentMonth = endOfMonth(now)
       const sixMonthsAgo = subMonths(startCurrentMonth, 5)
 
-      const [{ data: pats }, { data: fins }, { data: apts }] = await Promise.all([
-        supabase.from('pacientes').select('id, data_criacao').eq('usuario_id', user.id),
-        supabase
-          .from('financeiro')
-          .select('mes, ano, valor_recebido, valor_a_receber')
-          .eq('usuario_id', user.id)
-          .gte('ano', sixMonthsAgo.getFullYear()),
-        supabase
-          .from('agendamentos')
-          .select('status')
-          .eq('usuario_id', user.id)
-          .gte('data_hora', startCurrentMonth.toISOString())
-          .lt('data_hora', endCurrentMonth.toISOString()),
-      ])
+      const [{ data: pats }, { data: fins }, { data: apts }, { data: allCompareceu }] =
+        await Promise.all([
+          supabase
+            .from('pacientes')
+            .select('id, data_criacao, recorrencia')
+            .eq('usuario_id', user.id),
+          supabase
+            .from('financeiro')
+            .select('mes, ano, valor_recebido, valor_a_receber')
+            .eq('usuario_id', user.id)
+            .gte('ano', sixMonthsAgo.getFullYear()),
+          supabase
+            .from('agendamentos')
+            .select('status')
+            .eq('usuario_id', user.id)
+            .gte('data_hora', startCurrentMonth.toISOString())
+            .lt('data_hora', endCurrentMonth.toISOString()),
+          supabase
+            .from('agendamentos')
+            .select('paciente_id')
+            .eq('usuario_id', user.id)
+            .eq('status', 'compareceu'),
+        ])
 
       const totalPatients = pats?.length || 0
       const currentMonthFins =
@@ -115,6 +129,32 @@ export function PerformanceDashboard() {
         { name: 'Desmarcou', value: statusCounts['desmarcou'] || 0, fill: '#f59e0b' },
       ].filter((d) => d.value > 0)
 
+      const compareceuCountByPatient =
+        allCompareceu?.reduce(
+          (acc, a) => {
+            acc[a.paciente_id] = (acc[a.paciente_id] || 0) + 1
+            return acc
+          },
+          {} as Record<string, number>,
+        ) || {}
+
+      let retainedCount = 0
+      const validPats = pats || []
+      validPats.forEach((p) => {
+        if (
+          (compareceuCountByPatient[p.id] && compareceuCountByPatient[p.id] > 1) ||
+          ['mensal', 'semanal'].includes(p.recorrencia?.toLowerCase() || '')
+        ) {
+          retainedCount++
+        }
+      })
+      const notRetainedCount = Math.max(validPats.length - retainedCount, 0)
+
+      const retentionData = [
+        { name: 'Retidos', value: retainedCount, fill: '#10b981' },
+        { name: 'Não Retidos', value: notRetainedCount, fill: '#64748b' },
+      ].filter((d) => d.value > 0)
+
       setMetrics({
         totalPatients,
         monthlyRevenue,
@@ -122,6 +162,7 @@ export function PerformanceDashboard() {
         growthData,
         financeData,
         attendanceData,
+        retentionData,
       })
       setLoading(false)
     }
@@ -180,11 +221,11 @@ export function PerformanceDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="shadow-sm border-slate-200 lg:col-span-1">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-sm border-slate-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-slate-800">
-              Crescimento (Últimos 6 meses)
+              Crescimento de Pacientes (6 meses)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -211,9 +252,11 @@ export function PerformanceDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200 lg:col-span-1">
+        <Card className="shadow-sm border-slate-200">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-800">Saúde Financeira</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-800">
+              Crescimento Mensal da Receita
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer config={financeConfig} className="h-[200px] w-full">
@@ -247,10 +290,45 @@ export function PerformanceDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200 lg:col-span-1">
+        <Card className="shadow-sm border-slate-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-slate-800">
-              Taxa de Comparecimento
+              Taxa de Retenção de Pacientes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {metrics.retentionData.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-sm text-slate-400">
+                Sem dados suficientes
+              </div>
+            ) : (
+              <ChartContainer config={retentionConfig} className="h-[200px] w-full">
+                <PieChart>
+                  <Pie
+                    data={metrics.retentionData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                  >
+                    {metrics.retentionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </PieChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-800">
+              Taxa de Comparecimento (Mês Atual)
             </CardTitle>
           </CardHeader>
           <CardContent>

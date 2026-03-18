@@ -3,7 +3,7 @@
     "enviar_cobranca_whatsapp": 6,
     "enviar_lembrete_consulta": 10,
     "emitir_nota_fiscal": 2,
-    "enviar_comunicado_massa": 1,
+    "enviar_comunicado_massa": 2,
     "transcrever_audio": 1
   }
 }
