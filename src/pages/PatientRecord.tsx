@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { PrescriptionsList } from '@/components/PrescriptionsList'
+import { QuickMessageDialog } from '@/components/QuickMessageDialog'
 
 type HistoricoEntry = { id: string; date: string; content: string }
 
@@ -159,9 +160,16 @@ export default function PatientRecord() {
               Paciente: <span className="font-semibold text-slate-700">{patient.nome}</span>
             </p>
           </div>
-          <Button variant="outline" onClick={() => window.print()} className="gap-2 shadow-sm">
-            <Printer className="w-4 h-4" /> Exportar PDF
-          </Button>
+          <div className="flex gap-2 items-center">
+            <QuickMessageDialog patient={patient} />
+            <Button
+              variant="outline"
+              onClick={() => window.print()}
+              className="gap-2 shadow-sm shrink-0"
+            >
+              <Printer className="w-4 h-4" /> Exportar PDF
+            </Button>
+          </div>
         </div>
 
         <Card className="shadow-sm border-slate-200 border-t-4 border-t-primary overflow-hidden">

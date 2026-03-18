@@ -420,7 +420,7 @@ export default function Settings() {
                       className="bg-white"
                     />
                     <p className="text-xs text-slate-500">
-                      Variáveis: [Nome], [data], [hora], [link_portal]
+                      Variáveis: [Nome], [data], [hora], [TipoSessao], [link_portal]
                     </p>
                   </div>
                 )}
@@ -448,7 +448,7 @@ export default function Settings() {
                       className="bg-white"
                     />
                     <p className="text-xs text-slate-500">
-                      Variáveis: [Nome], [data], [hora], [link_portal]
+                      Variáveis: [Nome], [data], [hora], [TipoSessao], [link_portal]
                     </p>
                   </div>
                 )}

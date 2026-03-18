@@ -12,6 +12,9 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   Video,
+  CheckCircle2,
+  AlertCircle,
+  MessageCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -54,6 +57,7 @@ import { ptBR } from 'date-fns/locale'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 
 export default function Agenda() {
   const navigate = useNavigate()
@@ -106,7 +110,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, is_online, pacientes (id, nome, valor_sessao)`,
+        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, is_online, status_whatsapp_lembrete, pacientes (id, nome, valor_sessao)`,
       )
       .eq('usuario_id', user.id)
       .gte('data_hora', s.toISOString())
@@ -174,7 +178,12 @@ export default function Agenda() {
       .channel('agendamentos_changes')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'agendamentos', filter: `usuario_id=eq.${user.id}` },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agendamentos',
+          filter: `usuario_id=eq.${user.id}`,
+        },
         () => fetchAppointments(),
       )
       .subscribe()
@@ -357,6 +366,13 @@ export default function Agenda() {
       desmarcou: 'border-l-amber-500',
     }
 
+    const wpStatus = apt.status_whatsapp_lembrete || 'pendente'
+    const getWpIcon = () => {
+      if (wpStatus === 'enviado') return <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+      if (wpStatus === 'falha') return <AlertCircle className="w-4 h-4 text-red-500" />
+      return <MessageCircle className="w-4 h-4 text-slate-300" />
+    }
+
     return (
       <Card
         key={apt.id}
@@ -367,8 +383,22 @@ export default function Agenda() {
       >
         <CardContent className="p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div className="flex items-start lg:items-center gap-5 w-full lg:w-auto">
-            <div className="bg-slate-50 min-w-[70px] py-2 rounded-lg text-center border border-slate-100 shrink-0">
-              <span className="font-bold text-slate-700 text-lg">{timeStr}</span>
+            <div className="bg-slate-50 min-w-[70px] py-2 rounded-lg flex flex-col items-center justify-center border border-slate-100 shrink-0 group">
+              <span className="font-bold text-slate-700 text-lg leading-none mb-1">{timeStr}</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <span className="cursor-help flex items-center justify-center">
+                      {getWpIcon()}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p className="text-xs">
+                      Lembrete: <span className="font-semibold capitalize">{wpStatus}</span>
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">

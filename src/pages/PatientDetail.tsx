@@ -3,15 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   ArrowLeft,
   FileText,
   Calendar,
-  Phone,
   Mail,
   MapPin,
   DollarSign,
   HeartPulse,
+  CheckCircle2,
+  AlertCircle,
+  MessageCircle,
 } from 'lucide-react'
 import PatientEditForm from '@/components/PatientEditForm'
 import PatientHeader from '@/components/PatientHeader'
@@ -33,6 +36,7 @@ export default function PatientDetail() {
   const navigate = useNavigate()
   const [patient, setPatient] = useState<any>(null)
   const [template, setTemplate] = useState<any[]>([])
+  const [nextAppt, setNextAppt] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
 
@@ -46,6 +50,16 @@ export default function PatientDetail() {
         .eq('id', data.usuario_id)
         .single()
       if (uData) setTemplate(uData.anamnese_template || [])
+
+      const { data: aptData } = await supabase
+        .from('agendamentos')
+        .select('id, data_hora, status_whatsapp_lembrete')
+        .eq('paciente_id', id)
+        .gte('data_hora', new Date().toISOString())
+        .order('data_hora', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (aptData) setNextAppt(aptData)
     }
   }
 
@@ -95,6 +109,57 @@ export default function PatientDetail() {
         />
       ) : (
         <div className="space-y-6">
+          {nextAppt && (
+            <Card className="shadow-sm border-slate-200">
+              <CardContent className="p-4 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white rounded-md shadow-sm text-primary shrink-0 border border-slate-100">
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
+                      Próxima Consulta
+                    </p>
+                    <p className="text-sm font-bold text-slate-900">
+                      {new Date(nextAppt.data_hora).toLocaleString('pt-BR', {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      })}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-100 rounded-full shadow-sm cursor-help">
+                          <span className="text-xs font-medium text-slate-600 hidden sm:inline-block">
+                            Lembrete
+                          </span>
+                          {nextAppt.status_whatsapp_lembrete === 'enviado' ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                          ) : nextAppt.status_whatsapp_lembrete === 'falha' ? (
+                            <AlertCircle className="w-4 h-4 text-red-500" />
+                          ) : (
+                            <MessageCircle className="w-4 h-4 text-slate-400" />
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          Status do Lembrete:{' '}
+                          <span className="font-semibold capitalize">
+                            {nextAppt.status_whatsapp_lembrete || 'pendente'}
+                          </span>
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="pb-4 border-b border-slate-100">
               <CardTitle className="text-lg">Informações Demográficas</CardTitle>

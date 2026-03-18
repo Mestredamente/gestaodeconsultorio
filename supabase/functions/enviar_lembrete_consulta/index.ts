@@ -14,7 +14,7 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, pacientes (nome, telefone, hash_anamnese), usuarios (nome_consultorio, lembrete_whatsapp_ativo, template_lembrete)`,
+        `id, data_hora, status, tipo_pagamento, pacientes (nome, telefone, hash_anamnese), usuarios (nome_consultorio, lembrete_whatsapp_ativo, template_lembrete)`,
       )
       .eq('status', 'agendado')
 
@@ -34,6 +34,8 @@ Deno.serve(async (req: Request) => {
     if (error) throw error
 
     const sentMessages = []
+    const sentApptIds = []
+    const failedApptIds = []
     const reqUrl = new URL(req.url)
     const origin = req.headers.get('origin') || `${reqUrl.protocol}//${reqUrl.host}`
 
@@ -41,23 +43,42 @@ Deno.serve(async (req: Request) => {
       const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
       const u = Array.isArray(apt.usuarios) ? apt.usuarios[0] : apt.usuarios
 
-      if (p && u && u.lembrete_whatsapp_ativo && p.telefone) {
-        const d = new Date(apt.data_hora)
-        const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        const dateStr = d.toLocaleDateString('pt-BR')
-        const template =
-          u.template_lembrete || 'Olá [Nome], você tem uma consulta marcada às [hora].'
-        const portalLink = `${origin}/portal/${p.hash_anamnese}`
+      if (p && u && u.lembrete_whatsapp_ativo) {
+        if (p.telefone) {
+          const d = new Date(apt.data_hora)
+          const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          const dateStr = d.toLocaleDateString('pt-BR')
+          const template =
+            u.template_lembrete || 'Olá [Nome], você tem uma consulta marcada às [hora].'
+          const portalLink = `${origin}/portal/${p.hash_anamnese}`
 
-        let message = template
-          .replace(/\[Nome\]/gi, p.nome)
-          .replace(/\[hora\]/gi, timeStr)
-          .replace(/\[data\]/gi, dateStr)
-        message += `\n\nAcesse seu portal do paciente: ${portalLink}`
+          let message = template
+            .replace(/\[Nome\]/gi, p.nome)
+            .replace(/\[hora\]/gi, timeStr)
+            .replace(/\[data\]/gi, dateStr)
+            .replace(/\[TipoSessao\]/gi, apt.tipo_pagamento || 'Consulta')
+          message += `\n\nAcesse seu portal do paciente: ${portalLink}`
 
-        console.log(`[Lembrete Sent] To: ${p.telefone} -> ${message}`)
-        sentMessages.push({ patient: p.nome, phone: p.telefone, time: apt.data_hora, message })
+          console.log(`[Lembrete Sent] To: ${p.telefone} -> ${message}`)
+          sentMessages.push({ patient: p.nome, phone: p.telefone, time: apt.data_hora, message })
+          sentApptIds.push(apt.id)
+        } else {
+          failedApptIds.push(apt.id)
+        }
       }
+    }
+
+    if (sentApptIds.length > 0) {
+      await supabase
+        .from('agendamentos')
+        .update({ status_whatsapp_lembrete: 'enviado' })
+        .in('id', sentApptIds)
+    }
+    if (failedApptIds.length > 0) {
+      await supabase
+        .from('agendamentos')
+        .update({ status_whatsapp_lembrete: 'falha' })
+        .in('id', failedApptIds)
     }
 
     return new Response(

@@ -749,6 +749,7 @@ export type Database = {
           template_lembrete: string | null
           texto_contrato: string | null
           whatsapp_confirmacao_ativa: boolean | null
+          whatsapp_tipo: string | null
         }
         Insert: {
           agendamento_publico_ativo?: boolean | null
@@ -769,6 +770,7 @@ export type Database = {
           template_lembrete?: string | null
           texto_contrato?: string | null
           whatsapp_confirmacao_ativa?: boolean | null
+          whatsapp_tipo?: string | null
         }
         Update: {
           agendamento_publico_ativo?: boolean | null
@@ -789,6 +791,7 @@ export type Database = {
           template_lembrete?: string | null
           texto_contrato?: string | null
           whatsapp_confirmacao_ativa?: boolean | null
+          whatsapp_tipo?: string | null
         }
         Relationships: []
       }
@@ -1143,6 +1146,7 @@ export const Constants = {
 //   agendamento_publico_ativo: boolean (nullable, default: false)
 //   whatsapp_confirmacao_ativa: boolean (nullable, default: false)
 //   template_confirmacao: text (nullable, default: 'Olá [Nome], sua consulta foi agendada para [data] às [hora].'::text)
+//   whatsapp_tipo: text (nullable, default: 'personal'::text)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
