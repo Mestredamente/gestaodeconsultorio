@@ -25,7 +25,7 @@ CREATE OR REPLACE FUNCTION public.confirm_appointment_portal(p_hash uuid, p_agen
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-AS $
+AS $$
 DECLARE
     v_paciente record;
     v_clinica text;
@@ -47,5 +47,4 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Agendamento não encontrado, já foi atualizado ou já ocorreu.', 'consultorio', v_clinica);
     END IF;
 END;
-$;
-
+$$;
