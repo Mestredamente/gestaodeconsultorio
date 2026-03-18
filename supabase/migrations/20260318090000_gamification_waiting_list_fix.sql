@@ -1,4 +1,4 @@
-CREATE TABLE public.lista_espera (
+CREATE TABLE IF NOT EXISTS public.lista_espera (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id uuid NOT NULL REFERENCES public.usuarios(id) ON DELETE CASCADE,
   paciente_id uuid NOT NULL REFERENCES public.pacientes(id) ON DELETE CASCADE,
@@ -7,7 +7,7 @@ CREATE TABLE public.lista_espera (
   created_at timestamptz NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE public.conquistas (
+CREATE TABLE IF NOT EXISTS public.conquistas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id uuid NOT NULL REFERENCES public.usuarios(id) ON DELETE CASCADE,
   titulo text NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE public.conquistas (
   created_at timestamptz NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE public.pacientes_conquistas (
+CREATE TABLE IF NOT EXISTS public.pacientes_conquistas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   paciente_id uuid NOT NULL REFERENCES public.pacientes(id) ON DELETE CASCADE,
   conquista_id uuid NOT NULL REFERENCES public.conquistas(id) ON DELETE CASCADE,
@@ -26,22 +26,27 @@ CREATE TABLE public.pacientes_conquistas (
 );
 
 ALTER TABLE public.lista_espera ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "lista_espera_policy" ON public.lista_espera;
 CREATE POLICY "lista_espera_policy" ON public.lista_espera FOR ALL TO authenticated USING (usuario_id = auth.uid()) WITH CHECK (usuario_id = auth.uid());
 
 ALTER TABLE public.conquistas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "conquistas_policy" ON public.conquistas;
 CREATE POLICY "conquistas_policy" ON public.conquistas FOR ALL TO authenticated USING (usuario_id = auth.uid()) WITH CHECK (usuario_id = auth.uid());
 
 ALTER TABLE public.pacientes_conquistas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "pacientes_conquistas_auth" ON public.pacientes_conquistas;
 CREATE POLICY "pacientes_conquistas_auth" ON public.pacientes_conquistas FOR ALL TO authenticated 
 USING (paciente_id IN (SELECT id FROM public.pacientes WHERE usuario_id = auth.uid())) 
 WITH CHECK (paciente_id IN (SELECT id FROM public.pacientes WHERE usuario_id = auth.uid()));
 
+DROP POLICY IF EXISTS "pacientes_conquistas_anon" ON public.pacientes_conquistas;
 CREATE POLICY "pacientes_conquistas_anon" ON public.pacientes_conquistas FOR SELECT TO anon USING (true);
 
 CREATE OR REPLACE FUNCTION public.check_waiting_list_on_cancel()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path = public
 AS $function$
 DECLARE
   v_dow integer;
@@ -95,6 +100,7 @@ CREATE OR REPLACE FUNCTION public.evaluate_patient_achievements(p_paciente_id uu
  RETURNS void
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path = public
 AS $function$
 DECLARE
   v_usuario_id uuid;
@@ -157,6 +163,7 @@ CREATE OR REPLACE FUNCTION public.get_patient_portal_data(p_hash uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path = public
 AS $function$
 DECLARE
     v_result jsonb;
@@ -293,4 +300,3 @@ INSERT INTO public.templates_documentos (usuario_id, titulo, conteudo, tipo)
 SELECT u.id, 'Manutenção / Acompanhamento', 'Olá [Nome], já faz 15 dias desde nosso último encontro. Como você tem passado com as ferramentas que discutimos?', 'mensagem_rapida'
 FROM public.usuarios u
 WHERE NOT EXISTS (SELECT 1 FROM public.templates_documentos t WHERE t.usuario_id = u.id AND t.titulo = 'Manutenção / Acompanhamento');
-
