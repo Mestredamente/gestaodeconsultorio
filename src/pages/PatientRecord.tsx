@@ -4,7 +4,18 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Save, FileText, Plus, Printer, Calendar, Edit2, Clock } from 'lucide-react'
+import {
+  ArrowLeft,
+  Save,
+  FileText,
+  Plus,
+  Printer,
+  Calendar,
+  Edit2,
+  Clock,
+  MessageSquare,
+  CheckCircle2,
+} from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,6 +32,13 @@ import { PrescriptionsList } from '@/components/PrescriptionsList'
 import { QuickMessageDialog } from '@/components/QuickMessageDialog'
 
 type HistoricoEntry = { id: string; date: string; content: string }
+type MensagemEntry = {
+  id: string
+  tipo: string
+  conteudo: string
+  data_envio: string
+  status_envio: string
+}
 
 export default function PatientRecord() {
   const { id } = useParams()
@@ -35,6 +53,7 @@ export default function PatientRecord() {
   const [queixa, setQueixa] = useState('')
   const [isEditingQueixa, setIsEditingQueixa] = useState(false)
   const [historico, setHistorico] = useState<HistoricoEntry[]>([])
+  const [mensagens, setMensagens] = useState<MensagemEntry[]>([])
 
   const [isEvolModalOpen, setIsEvolModalOpen] = useState(false)
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
@@ -66,6 +85,15 @@ export default function PatientRecord() {
           rawHistorico.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
         )
       }
+
+      const { data: msgData } = await supabase
+        .from('historico_mensagens' as any)
+        .select('*')
+        .eq('paciente_id', id)
+        .order('data_envio', { ascending: false })
+
+      if (msgData) setMensagens(msgData)
+
       setLoading(false)
     }
     fetchData()
@@ -217,12 +245,15 @@ export default function PatientRecord() {
         </Card>
 
         <Tabs defaultValue="historico" className="w-full">
-          <TabsList className="mb-6 h-auto p-1 bg-slate-100/50 border border-slate-200">
+          <TabsList className="mb-6 h-auto p-1 flex-wrap bg-slate-100/50 border border-slate-200">
             <TabsTrigger value="historico" className="gap-2 py-2.5 px-4">
               <Clock className="w-4 h-4" /> Histórico Clínico
             </TabsTrigger>
             <TabsTrigger value="prescricoes" className="gap-2 py-2.5 px-4">
-              <FileText className="w-4 h-4" /> Prescrições
+              <FileText className="w-4 h-4" /> Documentos
+            </TabsTrigger>
+            <TabsTrigger value="mensagens" className="gap-2 py-2.5 px-4">
+              <MessageSquare className="w-4 h-4" /> Mensagens
             </TabsTrigger>
           </TabsList>
 
@@ -272,6 +303,41 @@ export default function PatientRecord() {
 
           <TabsContent value="prescricoes">
             <PrescriptionsList pacienteId={id} clinicInfo={clinicInfo} patientName={patient.nome} />
+          </TabsContent>
+
+          <TabsContent value="mensagens" className="space-y-4">
+            {mensagens.length === 0 ? (
+              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                <MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                Nenhuma mensagem registrada no histórico para este paciente.
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {mensagens.map((msg) => (
+                  <Card key={msg.id} className="shadow-sm border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50/50 p-3 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-emerald-500" />
+                        <span className="text-sm font-semibold text-slate-700 capitalize">
+                          {msg.tipo}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-500 font-medium">
+                          {new Date(msg.data_envio).toLocaleString('pt-BR')}
+                        </span>
+                        {msg.status_envio === 'enviado' && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        )}
+                      </div>
+                    </div>
+                    <CardContent className="p-4 text-sm text-slate-700 whitespace-pre-wrap">
+                      {msg.conteudo}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

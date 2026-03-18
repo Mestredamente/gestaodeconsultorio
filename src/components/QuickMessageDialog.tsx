@@ -66,12 +66,16 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
     if (templates && patient) {
       const tpl = templates[`template_${selectedTemplate}`] || ''
       const link = `${window.location.origin}/portal/${patient.hash_anamnese}`
+      const confirmLink = nextAppt?.id
+        ? `${window.location.origin}/confirmar/${patient.hash_anamnese}/${nextAppt.id}`
+        : ''
 
       const parsed = parseWhatsAppTemplate(tpl, {
         nome: patient.nome,
         dataHora: nextAppt?.data_hora,
         tipoSessao: nextAppt?.tipo_pagamento,
         link_portal: link,
+        link_confirmacao: confirmLink,
         chave_pix: templates.chave_pix || '',
       })
       setMessage(parsed)
@@ -85,6 +89,16 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
     }
     const link = generateWhatsAppLink(patient.telefone, message, waType)
     window.open(link, '_blank')
+
+    if (user && patient.id) {
+      await supabase.from('historico_mensagens' as any).insert({
+        usuario_id: user.id,
+        paciente_id: patient.id,
+        tipo: selectedTemplate,
+        conteudo: message,
+        status_envio: 'enviado',
+      })
+    }
 
     if (nextAppt?.id && selectedTemplate === 'lembrete') {
       await supabase

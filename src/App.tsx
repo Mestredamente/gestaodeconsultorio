@@ -21,6 +21,7 @@ import PublicBooking from './pages/PublicBooking'
 import PublicAnamnesis from './pages/PublicAnamnesis'
 import PublicPortal from './pages/PublicPortal'
 import PublicPrescription from './pages/PublicPrescription'
+import PublicConfirmation from './pages/PublicConfirmation'
 import NotFound from './pages/NotFound'
 import Auth from './pages/Auth'
 import ResetPassword from './pages/ResetPassword'
@@ -50,6 +51,7 @@ const AppRoutes = () => (
     <Route path="/portal/:hash" element={<PublicPortal />} />
     <Route path="/sessao/:hash" element={<PublicTelehealth />} />
     <Route path="/validar-prescricao/:hash" element={<PublicPrescription />} />
+    <Route path="/confirmar/:hash/:appointmentId" element={<PublicConfirmation />} />
 
     <Route
       path="/atendimento/:agendamentoId"

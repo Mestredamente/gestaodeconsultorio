@@ -14,7 +14,7 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, tipo_pagamento, pacientes (nome, telefone, hash_anamnese), usuarios (nome_consultorio, lembrete_whatsapp_ativo, template_lembrete)`,
+        `id, data_hora, status, tipo_pagamento, usuario_id, paciente_id, pacientes (id, nome, telefone, hash_anamnese), usuarios (id, nome_consultorio, lembrete_whatsapp_ativo, template_lembrete)`,
       )
       .eq('status', 'agendado')
 
@@ -36,6 +36,7 @@ Deno.serve(async (req: Request) => {
     const sentMessages = []
     const sentApptIds = []
     const failedApptIds = []
+    const historyLogs = []
     const reqUrl = new URL(req.url)
     const origin = req.headers.get('origin') || `${reqUrl.protocol}//${reqUrl.host}`
 
@@ -51,23 +52,36 @@ Deno.serve(async (req: Request) => {
           const template =
             u.template_lembrete || 'Olá [Nome], você tem uma consulta marcada às [hora].'
           const portalLink = `${origin}/portal/${p.hash_anamnese}`
+          const confirmLink = `${origin}/confirmar/${p.hash_anamnese}/${apt.id}`
 
           let message = template
             .replace(/\[Nome\]/gi, p.nome)
             .replace(/\[hora\]/gi, timeStr)
             .replace(/\[data\]/gi, dateStr)
             .replace(/\[TipoSessao\]/gi, apt.tipo_pagamento || 'Consulta')
-          message += `\n\nAcesse seu portal do paciente: ${portalLink}`
+            .replace(/\[link_confirmacao\]/gi, confirmLink)
+            .replace(/\[link_portal\]/gi, portalLink)
 
           console.log(`[Lembrete Sent] To: ${p.telefone} -> ${message}`)
           sentMessages.push({ patient: p.nome, phone: p.telefone, time: apt.data_hora, message })
           sentApptIds.push(apt.id)
+
+          historyLogs.push({
+            usuario_id: apt.usuario_id,
+            paciente_id: apt.paciente_id,
+            tipo: 'lembrete',
+            conteudo: message,
+            status_envio: 'enviado',
+          })
         } else {
           failedApptIds.push(apt.id)
         }
       }
     }
 
+    if (historyLogs.length > 0) {
+      await supabase.from('historico_mensagens').insert(historyLogs)
+    }
     if (sentApptIds.length > 0) {
       await supabase
         .from('agendamentos')

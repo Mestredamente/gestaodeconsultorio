@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   MessageCircle,
+  TrendingUp,
 } from 'lucide-react'
 import PatientEditForm from '@/components/PatientEditForm'
 import PatientHeader from '@/components/PatientHeader'
@@ -39,6 +40,7 @@ export default function PatientDetail() {
   const [nextAppt, setNextAppt] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+  const [financeSummary, setFinanceSummary] = useState({ recebido: 0, a_receber: 0 })
 
   const fetchPatient = async () => {
     const { data } = await supabase.from('pacientes').select('*').eq('id', id).single()
@@ -53,13 +55,27 @@ export default function PatientDetail() {
 
       const { data: aptData } = await supabase
         .from('agendamentos')
-        .select('id, data_hora, status_whatsapp_lembrete')
+        .select('id, data_hora, status_whatsapp_lembrete, status')
         .eq('paciente_id', id)
+        .in('status', ['agendado', 'confirmado'])
         .gte('data_hora', new Date().toISOString())
         .order('data_hora', { ascending: true })
         .limit(1)
         .maybeSingle()
       if (aptData) setNextAppt(aptData)
+
+      const { data: finData } = await supabase
+        .from('financeiro')
+        .select('valor_recebido, valor_a_receber')
+        .eq('paciente_id', id)
+
+      let totalR = 0,
+        totalP = 0
+      finData?.forEach((f) => {
+        totalR += Number(f.valor_recebido)
+        totalP += Number(f.valor_a_receber)
+      })
+      setFinanceSummary({ recebido: totalR, a_receber: totalP })
     }
   }
 
@@ -109,56 +125,77 @@ export default function PatientDetail() {
         />
       ) : (
         <div className="space-y-6">
-          {nextAppt && (
-            <Card className="shadow-sm border-slate-200">
-              <CardContent className="p-4 flex items-center justify-between bg-slate-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white rounded-md shadow-sm text-primary shrink-0 border border-slate-100">
-                    <Calendar className="w-5 h-5" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {nextAppt ? (
+              <Card className="shadow-sm border-slate-200 md:col-span-1">
+                <CardContent className="p-4 h-full flex flex-col justify-center bg-slate-50/50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-md shadow-sm text-primary shrink-0 border border-slate-100">
+                      <Calendar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
+                        Próxima Consulta
+                      </p>
+                      <p className="text-sm font-bold text-slate-900">
+                        {new Date(nextAppt.data_hora).toLocaleString('pt-BR', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">
-                      Próxima Consulta
-                    </p>
-                    <p className="text-sm font-bold text-slate-900">
-                      {new Date(nextAppt.data_hora).toLocaleString('pt-BR', {
-                        dateStyle: 'short',
-                        timeStyle: 'short',
-                      })}
-                    </p>
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-200/60 pt-3">
+                    <span className="text-xs text-slate-500 font-medium">Status da Sessão:</span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${nextAppt.status === 'confirmado' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}
+                    >
+                      {nextAppt.status}
+                    </span>
                   </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="shadow-sm border-slate-200 md:col-span-1 border-dashed bg-transparent">
+                <CardContent className="p-4 h-full flex items-center justify-center text-slate-400 text-sm font-medium">
+                  Sem consultas futuras
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="shadow-sm border-slate-200 md:col-span-2">
+              <CardContent className="p-4 h-full flex flex-col justify-center bg-white">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                    Resumo Financeiro
+                  </h3>
                 </div>
-                <div>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-100 rounded-full shadow-sm cursor-help">
-                          <span className="text-xs font-medium text-slate-600 hidden sm:inline-block">
-                            Lembrete
-                          </span>
-                          {nextAppt.status_whatsapp_lembrete === 'enviado' ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                          ) : nextAppt.status_whatsapp_lembrete === 'falha' ? (
-                            <AlertCircle className="w-4 h-4 text-red-500" />
-                          ) : (
-                            <MessageCircle className="w-4 h-4 text-slate-400" />
-                          )}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          Status do Lembrete:{' '}
-                          <span className="font-semibold capitalize">
-                            {nextAppt.status_whatsapp_lembrete || 'pendente'}
-                          </span>
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
+                    <p className="text-xs font-medium text-emerald-700 mb-1">Total Recebido</p>
+                    <p className="text-lg font-bold text-emerald-900">
+                      {formatBRL(financeSummary.recebido)}
+                    </p>
+                  </div>
+                  <div
+                    className={`p-3 rounded-lg border ${financeSummary.a_receber > 0 ? 'bg-rose-50/50 border-rose-100' : 'bg-slate-50/50 border-slate-100'}`}
+                  >
+                    <p
+                      className={`text-xs font-medium mb-1 ${financeSummary.a_receber > 0 ? 'text-rose-700' : 'text-slate-600'}`}
+                    >
+                      Saldo Pendente
+                    </p>
+                    <p
+                      className={`text-lg font-bold ${financeSummary.a_receber > 0 ? 'text-rose-900' : 'text-slate-900'}`}
+                    >
+                      {formatBRL(financeSummary.a_receber)}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          )}
+          </div>
 
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="pb-4 border-b border-slate-100">

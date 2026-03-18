@@ -25,6 +25,7 @@ export type Database = {
           status: string
           status_nota_fiscal: string | null
           status_reembolso: string | null
+          status_whatsapp_lembrete: string | null
           tipo_pagamento: string | null
           usuario_id: string
           valor_sinal: number | null
@@ -45,6 +46,7 @@ export type Database = {
           status?: string
           status_nota_fiscal?: string | null
           status_reembolso?: string | null
+          status_whatsapp_lembrete?: string | null
           tipo_pagamento?: string | null
           usuario_id: string
           valor_sinal?: number | null
@@ -65,6 +67,7 @@ export type Database = {
           status?: string
           status_nota_fiscal?: string | null
           status_reembolso?: string | null
+          status_whatsapp_lembrete?: string | null
           tipo_pagamento?: string | null
           usuario_id?: string
           valor_sinal?: number | null
@@ -994,6 +997,7 @@ export const Constants = {
 //   data_faturamento: date (nullable)
 //   is_online: boolean (nullable, default: false)
 //   room_id: text (nullable)
+//   status_whatsapp_lembrete: text (nullable, default: 'pendente'::text)
 // Table: appointments
 //   id: uuid (not null, default: gen_random_uuid())
 //   patient_name: text (not null)

@@ -36,7 +36,7 @@ Deno.serve(async (req: Request) => {
     // 1. Fetch Paciente
     const { data: paciente, error: pacienteError } = await supabaseClient
       .from('pacientes')
-      .select('nome, telefone')
+      .select('id, nome, telefone')
       .eq('id', paciente_id)
       .single()
 
@@ -102,6 +102,14 @@ Deno.serve(async (req: Request) => {
       valor_cobrado: valor_a_receber,
       mes_referencia: mes,
       ano_referencia: ano,
+    })
+
+    await supabaseClient.from('historico_mensagens').insert({
+      usuario_id: user.id,
+      paciente_id: paciente_id,
+      tipo: 'cobrança',
+      conteudo: message,
+      status_envio: 'enviado',
     })
 
     return new Response(JSON.stringify({ message, telefone: paciente.telefone }), {

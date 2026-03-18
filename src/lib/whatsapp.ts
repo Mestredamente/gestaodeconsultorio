@@ -8,6 +8,7 @@ export function parseWhatsAppTemplate(
     dataHora?: string | Date | null
     tipoSessao?: string | null
     link_portal?: string
+    link_confirmacao?: string
     valor?: string | number
     periodo?: string
     chave_pix?: string
@@ -37,6 +38,10 @@ export function parseWhatsAppTemplate(
 
   if (data.link_portal) {
     text = text.replace(/\[link_portal\]/gi, data.link_portal)
+  }
+
+  if (data.link_confirmacao) {
+    text = text.replace(/\[link_confirmacao\]/gi, data.link_confirmacao)
   }
 
   if (data.valor !== undefined) {

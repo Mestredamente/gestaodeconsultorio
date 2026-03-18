@@ -260,11 +260,13 @@ export default function Index() {
                                 'text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider mt-1 inline-block',
                                 apt.status === 'compareceu'
                                   ? 'bg-emerald-100 text-emerald-700'
-                                  : apt.status === 'faltou'
-                                    ? 'bg-red-100 text-red-700'
-                                    : apt.status === 'desmarcou'
-                                      ? 'bg-amber-100 text-amber-700'
-                                      : 'bg-slate-100 text-slate-700',
+                                  : apt.status === 'confirmado'
+                                    ? 'bg-indigo-100 text-indigo-700'
+                                    : apt.status === 'faltou'
+                                      ? 'bg-red-100 text-red-700'
+                                      : apt.status === 'desmarcou'
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-slate-100 text-slate-700',
                               )}
                             >
                               {apt.status}
@@ -272,15 +274,16 @@ export default function Index() {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                          {apt.is_online && apt.status === 'agendado' && (
-                            <Button
-                              size="sm"
-                              className="bg-indigo-600 hover:bg-indigo-700"
-                              onClick={() => navigate(`/consulta-online/${apt.id}`)}
-                            >
-                              <Video className="w-4 h-4 mr-1" /> Sala
-                            </Button>
-                          )}
+                          {apt.is_online &&
+                            (apt.status === 'agendado' || apt.status === 'confirmado') && (
+                              <Button
+                                size="sm"
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                                onClick={() => navigate(`/consulta-online/${apt.id}`)}
+                              >
+                                <Video className="w-4 h-4 mr-1" /> Sala
+                              </Button>
+                            )}
                           <Button
                             size="sm"
                             variant="outline"

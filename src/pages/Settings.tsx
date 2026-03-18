@@ -68,7 +68,7 @@ export default function Settings() {
   const [questions, setQuestions] = useState<any[]>([])
   const [lembreteAtivo, setLembreteAtivo] = useState(false)
   const [templateLembrete, setTemplateLembrete] = useState(
-    'Olá [Nome], você tem uma consulta marcada conosco para [data] às [hora].',
+    'Olá [Nome], você tem uma consulta marcada conosco para [data] às [hora]. Confirme presena clicando aqui: [link_confirmacao]',
   )
   const [especialidades, setEspecialidades] = useState<string[]>([])
   const [novaEspecialidade, setNovaEspecialidade] = useState('')
@@ -420,7 +420,8 @@ export default function Settings() {
                       className="bg-white"
                     />
                     <p className="text-xs text-slate-500">
-                      Variáveis: [Nome], [data], [hora], [TipoSessao], [link_portal]
+                      Variáveis: [Nome], [data], [hora], [TipoSessao], [link_portal],
+                      [link_confirmacao]
                     </p>
                   </div>
                 )}
@@ -448,7 +449,8 @@ export default function Settings() {
                       className="bg-white"
                     />
                     <p className="text-xs text-slate-500">
-                      Variáveis: [Nome], [data], [hora], [TipoSessao], [link_portal]
+                      Variáveis: [Nome], [data], [hora], [TipoSessao], [link_portal],
+                      [link_confirmacao]
                     </p>
                   </div>
                 )}

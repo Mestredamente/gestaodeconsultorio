@@ -361,6 +361,7 @@ export default function Agenda() {
     ).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     const statusColors: Record<string, string> = {
       agendado: 'border-l-slate-200',
+      confirmado: 'border-l-indigo-400',
       compareceu: 'border-l-emerald-500',
       faltou: 'border-l-red-500',
       desmarcou: 'border-l-amber-500',
@@ -424,12 +425,20 @@ export default function Agenda() {
                     <Video className="w-3 h-3" /> Online
                   </Badge>
                 )}
+                {apt.status === 'confirmado' && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] bg-indigo-100 text-indigo-700 border-transparent h-5"
+                  >
+                    Confirmado
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-slate-500 font-medium">Valor: {valueStr}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
-            {apt.status === 'agendado' && apt.is_online && (
+            {(apt.status === 'agendado' || apt.status === 'confirmado') && apt.is_online && (
               <Button
                 size="sm"
                 variant="outline"
