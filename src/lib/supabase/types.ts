@@ -17,8 +17,10 @@ export type Database = {
           data_hora: string
           especialidade: string | null
           id: string
+          is_online: boolean | null
           justificativa_falta: string | null
           paciente_id: string
+          room_id: string | null
           sinal_pago: boolean | null
           status: string
           status_nota_fiscal: string | null
@@ -35,8 +37,10 @@ export type Database = {
           data_hora: string
           especialidade?: string | null
           id?: string
+          is_online?: boolean | null
           justificativa_falta?: string | null
           paciente_id: string
+          room_id?: string | null
           sinal_pago?: boolean | null
           status?: string
           status_nota_fiscal?: string | null
@@ -53,8 +57,10 @@ export type Database = {
           data_hora?: string
           especialidade?: string | null
           id?: string
+          is_online?: boolean | null
           justificativa_falta?: string | null
           paciente_id?: string
+          room_id?: string | null
           sinal_pago?: boolean | null
           status?: string
           status_nota_fiscal?: string | null
@@ -813,6 +819,10 @@ export type Database = {
       }
       get_patient_portal_data: { Args: { p_hash: string }; Returns: Json }
       get_prescricao_publica: { Args: { p_hash: string }; Returns: Json }
+      pay_appointment_portal: {
+        Args: { p_agendamento_id: string; p_hash: string }
+        Returns: boolean
+      }
       request_medical_record: { Args: { p_hash: string }; Returns: boolean }
       update_anamnese: {
         Args: { p_anamnese: Json; p_hash: string }
@@ -976,6 +986,8 @@ export const Constants = {
 //   codigo_autorizacao: text (nullable)
 //   status_reembolso: text (nullable, default: 'pendente'::text)
 //   data_faturamento: date (nullable)
+//   is_online: boolean (nullable, default: false)
+//   room_id: text (nullable)
 // Table: appointments
 //   id: uuid (not null, default: gen_random_uuid())
 //   patient_name: text (not null)
@@ -1450,7 +1462,7 @@ export const Constants = {
 //           RETURN '{}'::jsonb;
 //       END IF;
 //
-//       SELECT nome_consultorio, texto_contrato, politica_cancelamento INTO v_clinica
+//       SELECT nome_consultorio, texto_contrato, politica_cancelamento, chave_pix INTO v_clinica
 //       FROM public.usuarios
 //       WHERE id = v_paciente.usuario_id LIMIT 1;
 //
@@ -1459,7 +1471,11 @@ export const Constants = {
 //           'data_hora', a.data_hora,
 //           'status', a.status,
 //           'especialidade', a.especialidade,
-//           'valor_total', a.valor_total
+//           'valor_total', a.valor_total,
+//           'sinal_pago', a.sinal_pago,
+//           'is_online', a.is_online,
+//           'room_id', a.room_id,
+//           'convenio_id', a.convenio_id
 //       ) ORDER BY a.data_hora ASC), '[]'::jsonb) INTO v_agendamentos
 //       FROM public.agendamentos a
 //       WHERE a.paciente_id = v_paciente.id AND a.data_hora >= NOW() AND a.status = 'agendado';
@@ -1506,6 +1522,7 @@ export const Constants = {
 //           'paciente_cpf', v_paciente.cpf,
 //           'contrato_aceito', v_paciente.contrato_aceito,
 //           'consultorio', v_clinica.nome_consultorio,
+//           'chave_pix', v_clinica.chave_pix,
 //           'texto_contrato', v_clinica.texto_contrato,
 //           'politica_cancelamento', v_clinica.politica_cancelamento,
 //           'agendamentos', v_agendamentos,
@@ -1639,6 +1656,47 @@ export const Constants = {
 //       END IF;
 //     END IF;
 //     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION pay_appointment_portal(uuid, uuid)
+//   CREATE OR REPLACE FUNCTION public.pay_appointment_portal(p_hash uuid, p_agendamento_id uuid)
+//    RETURNS boolean
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//       v_paciente_id uuid;
+//       v_usuario_id uuid;
+//       v_agendamento record;
+//       v_month integer;
+//       v_year integer;
+//   BEGIN
+//       SELECT id, usuario_id INTO v_paciente_id, v_usuario_id FROM public.pacientes WHERE hash_anamnese = p_hash LIMIT 1;
+//       IF v_paciente_id IS NULL THEN
+//           RETURN false;
+//       END IF;
+//
+//       SELECT * INTO v_agendamento FROM public.agendamentos
+//       WHERE id = p_agendamento_id AND paciente_id = v_paciente_id AND status = 'agendado';
+//
+//       IF v_agendamento.id IS NULL THEN
+//           RETURN false;
+//       END IF;
+//
+//       UPDATE public.agendamentos
+//       SET sinal_pago = true
+//       WHERE id = p_agendamento_id;
+//
+//       v_month := EXTRACT(MONTH FROM v_agendamento.data_hora);
+//       v_year := EXTRACT(YEAR FROM v_agendamento.data_hora);
+//
+//       INSERT INTO public.financeiro (usuario_id, paciente_id, mes, ano, valor_recebido, valor_a_receber)
+//       VALUES (v_usuario_id, v_paciente_id, v_month, v_year, v_agendamento.valor_total, 0)
+//       ON CONFLICT (usuario_id, paciente_id, mes, ano)
+//       DO UPDATE SET valor_recebido = financeiro.valor_recebido + EXCLUDED.valor_recebido;
+//
+//       RETURN FOUND;
 //   END;
 //   $function$
 //

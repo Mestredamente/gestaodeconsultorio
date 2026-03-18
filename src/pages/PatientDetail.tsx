@@ -3,11 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import {
   ArrowLeft,
-  Edit3,
   FileText,
   Calendar,
   Phone,
@@ -15,13 +12,9 @@ import {
   MapPin,
   DollarSign,
   HeartPulse,
-  Copy,
-  Link as LinkIcon,
 } from 'lucide-react'
 import PatientEditForm from '@/components/PatientEditForm'
-import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
-import SendContractDialog from '@/components/SendContractDialog'
-import { useToast } from '@/hooks/use-toast'
+import PatientHeader from '@/components/PatientHeader'
 
 const InfoItem = ({ icon: Icon, label, value }: any) => (
   <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50/50 border border-slate-100">
@@ -38,7 +31,6 @@ const InfoItem = ({ icon: Icon, label, value }: any) => (
 export default function PatientDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { toast } = useToast()
   const [patient, setPatient] = useState<any>(null)
   const [template, setTemplate] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -74,10 +66,6 @@ export default function PatientDetail() {
 
   const formatBRL = (val: number) =>
     Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  const copyLink = (path: string, msg: string) => {
-    navigator.clipboard.writeText(`${window.location.origin}/${path}/${patient.hash_anamnese}`)
-    toast({ title: msg })
-  }
 
   return (
     <div className="space-y-6 animate-fade-in-up pb-10">
@@ -88,59 +76,13 @@ export default function PatientDetail() {
       >
         <ArrowLeft className="w-4 h-4" /> Voltar
       </Button>
-      <Card className="shadow-sm border-slate-200 overflow-hidden">
-        <div className="bg-gradient-to-r from-primary/10 to-primary/5 h-32 w-full"></div>
-        <CardContent className="px-6 pb-6 relative pt-0">
-          <Avatar className="w-24 h-24 border-4 border-white absolute -top-12 shadow-sm bg-white">
-            <AvatarFallback className="text-3xl font-bold bg-primary/10 text-primary">
-              {patient.nome.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="mt-14 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-2xl font-bold text-slate-900">{patient.nome}</h1>
-                {patient.contrato_aceito ? (
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-none shadow-none">
-                    Contrato Aceito
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
-                    Contrato Pendente
-                  </Badge>
-                )}
-              </div>
-              <p className="text-sm text-slate-500 flex items-center gap-2">
-                <Phone className="w-4 h-4" /> {patient.telefone || 'Sem telefone'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-              <SendContractDialog
-                patientName={patient.nome}
-                patientPhone={patient.telefone}
-                hash={patient.hash_anamnese}
-                accepted={patient.contrato_aceito}
-              />
-              <WhatsAppBillingDialog pacienteId={patient.id} patientName={patient.nome} />
-              <Button
-                variant="outline"
-                className="gap-2 text-indigo-600 border-indigo-200 bg-indigo-50/50"
-                onClick={() => copyLink('portal', 'Link do Portal copiado!')}
-              >
-                <LinkIcon className="w-4 h-4" /> Portal
-              </Button>
-              {!isEditing && (
-                <Button variant="outline" className="gap-2" onClick={() => setIsEditing(true)}>
-                  <Edit3 className="w-4 h-4" /> Editar
-                </Button>
-              )}
-              <Button className="gap-2" onClick={() => navigate(`/pacientes/${id}/prontuario`)}>
-                <FileText className="w-4 h-4" /> Prontuário
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+
+      <PatientHeader
+        patient={patient}
+        onUpdate={setPatient}
+        isEditing={isEditing}
+        setIsEditing={setIsEditing}
+      />
 
       {isEditing ? (
         <PatientEditForm
