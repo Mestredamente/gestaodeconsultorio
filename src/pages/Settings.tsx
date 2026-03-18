@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useToast } from '@/hooks/use-toast'
 import {
   Save,
@@ -61,6 +62,7 @@ export default function Settings() {
     agendamento_publico_ativo: false,
     whatsapp_confirmacao_ativa: false,
     template_confirmacao: 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
+    whatsapp_tipo: 'personal',
   })
 
   const [questions, setQuestions] = useState<any[]>([])
@@ -99,6 +101,7 @@ export default function Settings() {
               template_confirmacao:
                 (data as any).template_confirmacao ||
                 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
+              whatsapp_tipo: (data as any).whatsapp_tipo || 'personal',
             })
             setQuestions(data.anamnese_template || [])
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
@@ -361,6 +364,33 @@ export default function Settings() {
             </div>
 
             <div className="space-y-6">
+              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
+                <div>
+                  <Label className="text-base font-semibold text-slate-800">Tipo de WhatsApp</Label>
+                  <p className="text-sm text-slate-500 mb-3">
+                    Selecione qual versão do aplicativo você utiliza para as mensagens.
+                  </p>
+                </div>
+                <RadioGroup
+                  value={formData.whatsapp_tipo}
+                  onValueChange={(v) => setFormData({ ...formData, whatsapp_tipo: v })}
+                  className="flex flex-col sm:flex-row gap-4 sm:gap-6"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="personal" id="settings-personal" />
+                    <Label htmlFor="settings-personal" className="cursor-pointer">
+                      WhatsApp Pessoal
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="business" id="settings-business" />
+                    <Label htmlFor="settings-business" className="cursor-pointer">
+                      WhatsApp Business
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>

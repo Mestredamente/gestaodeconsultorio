@@ -534,6 +534,7 @@ export type Database = {
           email: string | null
           endereco: string | null
           estado: string | null
+          foto_url: string | null
           frequencia_pagamento: string | null
           hash_anamnese: string | null
           id: string
@@ -565,6 +566,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           estado?: string | null
+          foto_url?: string | null
           frequencia_pagamento?: string | null
           hash_anamnese?: string | null
           id?: string
@@ -596,6 +598,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           estado?: string | null
+          foto_url?: string | null
           frequencia_pagamento?: string | null
           hash_anamnese?: string | null
           id?: string
@@ -1100,6 +1103,7 @@ export const Constants = {
 //   dia_fixo: text (nullable)
 //   convenio_id: uuid (nullable)
 //   numero_carteira: text (nullable)
+//   foto_url: text (nullable)
 // Table: prescricoes
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)

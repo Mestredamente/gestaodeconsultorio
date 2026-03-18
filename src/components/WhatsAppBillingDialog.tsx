@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -18,9 +18,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { MessageCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { gerarCobrancaWhatsapp } from '@/services/whatsapp'
+import { supabase } from '@/lib/supabase/client'
 
 export default function WhatsAppBillingDialog({
   pacienteId,
@@ -33,11 +35,31 @@ export default function WhatsAppBillingDialog({
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [whatsappTipo, setWhatsappTipo] = useState('personal')
 
   const currentDate = new Date()
   const [mes, setMes] = useState(String(currentDate.getMonth() + 1))
   const [ano, setAno] = useState(String(currentDate.getFullYear()))
   const { toast } = useToast()
+
+  useEffect(() => {
+    if (open) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          supabase
+            .from('usuarios')
+            .select('whatsapp_tipo')
+            .eq('id', user.id)
+            .single()
+            .then(({ data }) => {
+              if (data && (data as any).whatsapp_tipo) {
+                setWhatsappTipo((data as any).whatsapp_tipo)
+              }
+            })
+        }
+      })
+    }
+  }, [open])
 
   const handleGenerate = async () => {
     setLoading(true)
@@ -59,7 +81,13 @@ export default function WhatsAppBillingDialog({
       }
 
       const encodedMessage = encodeURIComponent(data.message)
-      const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+      let url = ''
+
+      if (whatsappTipo === 'business') {
+        url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+      } else {
+        url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
+      }
 
       window.open(url, '_blank')
       setOpen(false)
@@ -90,7 +118,7 @@ export default function WhatsAppBillingDialog({
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="mes" className="text-right">
+            <Label htmlFor="mes" className="text-right text-slate-700">
               Mês
             </Label>
             <div className="col-span-3">
@@ -109,7 +137,7 @@ export default function WhatsAppBillingDialog({
             </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="ano" className="text-right">
+            <Label htmlFor="ano" className="text-right text-slate-700">
               Ano
             </Label>
             <Input
@@ -120,6 +148,29 @@ export default function WhatsAppBillingDialog({
               className="col-span-3"
             />
           </div>
+          <div className="grid grid-cols-4 items-center gap-4 pt-2 border-t border-slate-100">
+            <Label className="text-right text-slate-700">Enviar via</Label>
+            <div className="col-span-3">
+              <RadioGroup
+                value={whatsappTipo}
+                onValueChange={setWhatsappTipo}
+                className="flex items-center gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="personal" id="personal" />
+                  <Label htmlFor="personal" className="font-normal cursor-pointer text-slate-700">
+                    WhatsApp
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="business" id="business" />
+                  <Label htmlFor="business" className="font-normal cursor-pointer text-slate-700">
+                    WhatsApp Business
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
@@ -128,7 +179,7 @@ export default function WhatsAppBillingDialog({
           <Button
             onClick={handleGenerate}
             disabled={loading}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
           >
             {loading ? 'Gerando...' : 'Gerar e Abrir WhatsApp'}
           </Button>
