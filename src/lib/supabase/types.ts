@@ -517,6 +517,41 @@ export type Database = {
           },
         ]
       }
+      laudos: {
+        Row: {
+          conteudo: string
+          data_emissao: string
+          id: string
+          paciente_id: string
+          tipo: string
+          usuario_id: string
+        }
+        Insert: {
+          conteudo: string
+          data_emissao?: string
+          id?: string
+          paciente_id: string
+          tipo?: string
+          usuario_id: string
+        }
+        Update: {
+          conteudo?: string
+          data_emissao?: string
+          id?: string
+          paciente_id?: string
+          tipo?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'laudos_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       lista_espera: {
         Row: {
           created_at: string
@@ -1306,6 +1341,13 @@ export const Constants = {
 //   conteudo: text (not null)
 //   status_envio: text (not null, default: 'enviado'::text)
 //   data_envio: timestamp with time zone (not null, default: now())
+// Table: laudos
+//   id: uuid (not null, default: gen_random_uuid())
+//   paciente_id: uuid (not null)
+//   usuario_id: uuid (not null)
+//   conteudo: text (not null)
+//   tipo: text (not null, default: 'psicologico'::text)
+//   data_emissao: timestamp with time zone (not null, default: now())
 // Table: lista_espera
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -1464,6 +1506,10 @@ export const Constants = {
 //   FOREIGN KEY historico_mensagens_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY historico_mensagens_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY historico_mensagens_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: laudos
+//   FOREIGN KEY laudos_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY laudos_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY laudos_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES auth.users(id) ON DELETE CASCADE
 // Table: lista_espera
 //   FOREIGN KEY lista_espera_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY lista_espera_pkey: PRIMARY KEY (id)
@@ -1562,6 +1608,10 @@ export const Constants = {
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: historico_mensagens
 //   Policy "historico_mensagens_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: laudos
+//   Policy "laudos_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: lista_espera

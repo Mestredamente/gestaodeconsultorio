@@ -19,12 +19,18 @@ export default function Patients() {
     if (!user) return
     const fetchPatients = async () => {
       setLoading(true)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('pacientes')
-        .select('*, pacientes_conquistas(id)')
+        .select('*, testes_pacientes(id)')
         .eq('usuario_id', user.id)
         .order('nome')
-      if (data) setPatients(data)
+
+      if (error) {
+        console.error('Error fetching patients:', error)
+      } else if (data) {
+        setPatients(data)
+      }
+
       setLoading(false)
     }
     fetchPatients()
@@ -77,7 +83,7 @@ export default function Patients() {
           ) : (
             <div className="divide-y divide-slate-100">
               {filtered.map((p) => {
-                const achievementsCount = p.pacientes_conquistas?.length || 0
+                const achievementsCount = p.testes_pacientes?.length || 0
                 return (
                   <div
                     key={p.id}
