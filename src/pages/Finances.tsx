@@ -12,6 +12,7 @@ import {
   FileText,
   Printer,
   AlertCircle,
+  Download,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -294,6 +295,27 @@ export default function Finances() {
     }
   }
 
+  const handleExportOverdueCSV = () => {
+    const headers = ['Paciente', 'Dias em Atraso', 'Referencia', 'Valor Pendente']
+    const csvData = overdueAlerts.map((alert) => {
+      const pInfo = Array.isArray(alert.pacientes) ? alert.pacientes[0] : alert.pacientes
+      return [
+        `"${pInfo?.nome || 'Desconhecido'}"`,
+        alert.daysOpen,
+        `${String(alert.mes).padStart(2, '0')}/${alert.ano}`,
+        alert.valor_a_receber,
+      ].join(';')
+    })
+    const blob = new Blob(['\uFEFF' + [headers.join(';'), ...csvData].join('\n')], {
+      type: 'text/csv;charset=utf-8;',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `inadimplencia_${month}_${year}.csv`
+    a.click()
+  }
+
   if (error) {
     return (
       <div className="space-y-6 animate-fade-in pb-10">
@@ -330,26 +352,27 @@ export default function Finances() {
             <thead>
               <tr className="border-b-2 border-gray-300">
                 <th className="py-2">Paciente</th>
-                <th className="py-2">Frequência</th>
+                <th className="py-2 text-center">Dias em Atraso</th>
                 <th className="py-2 text-right">Valor Pendente</th>
               </tr>
             </thead>
             <tbody>
-              {patientsSummary
-                .filter((p) => p.valor_a_receber > 0)
-                .map((p) => (
-                  <tr key={p.id} className="border-b border-gray-100">
-                    <td className="py-3 font-medium">{p.nome}</td>
-                    <td className="py-3 text-gray-600 capitalize">{p.frequencia_pagamento}</td>
+              {overdueAlerts.map((alert) => {
+                const pInfo = Array.isArray(alert.pacientes) ? alert.pacientes[0] : alert.pacientes
+                return (
+                  <tr key={alert.id} className="border-b border-gray-100">
+                    <td className="py-3 font-medium">{pInfo?.nome}</td>
+                    <td className="py-3 text-center text-gray-600">{alert.daysOpen} dias</td>
                     <td className="py-3 text-right font-bold text-red-600">
-                      {formatBRL(p.valor_a_receber)}
+                      {formatBRL(alert.valor_a_receber)}
                     </td>
                   </tr>
-                ))}
-              {patientsSummary.filter((p) => p.valor_a_receber > 0).length === 0 && (
+                )
+              })}
+              {overdueAlerts.length === 0 && (
                 <tr>
                   <td colSpan={3} className="py-4 text-center text-gray-500">
-                    Nenhuma pendência encontrada.
+                    Nenhuma pendência acima de 30 dias.
                   </td>
                 </tr>
               )}
@@ -395,19 +418,6 @@ export default function Finances() {
           <p className="text-slate-500 mt-1 text-sm">Controle de receitas e despesas</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="bg-white gap-2"
-            onClick={() => {
-              setIsPrinting(true)
-              setTimeout(() => {
-                window.print()
-                setIsPrinting(false)
-              }, 300)
-            }}
-          >
-            <Printer className="w-4 h-4" /> Exportar Pendências
-          </Button>
           <Select value={month} onValueChange={setMonth}>
             <SelectTrigger className="w-[120px] bg-white">
               <SelectValue />
@@ -478,11 +488,35 @@ export default function Finances() {
       </div>
 
       {overdueAlerts.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50/50 shadow-sm mb-6">
-          <CardHeader className="pb-3 border-b border-amber-100/50">
+        <Card className="border-amber-200 bg-amber-50/50 shadow-sm mb-6 print:hidden">
+          <CardHeader className="pb-3 border-b border-amber-100/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle className="text-sm font-bold text-amber-800 flex items-center gap-2">
               <AlertCircle className="w-4 h-4" /> Alertas de Inadimplência (Acima de 30 dias)
             </CardTitle>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 bg-white flex-1 sm:flex-none"
+                onClick={() => {
+                  setIsPrinting(true)
+                  setTimeout(() => {
+                    window.print()
+                    setIsPrinting(false)
+                  }, 300)
+                }}
+              >
+                <Printer className="w-4 h-4" /> Exportar PDF
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 bg-white flex-1 sm:flex-none"
+                onClick={handleExportOverdueCSV}
+              >
+                <Download className="w-4 h-4" /> Exportar Excel
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-4">
             {overdueAlerts.map((alert) => {

@@ -14,6 +14,8 @@ import {
   GripVertical,
   ArrowUp,
   ArrowDown,
+  AlertTriangle,
+  Package,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -33,6 +35,7 @@ import { ServiceGoalTracker } from '@/components/ServiceGoalTracker'
 import { PerformanceDashboard } from '@/components/PerformanceDashboard'
 import { MentalHealthIndicators } from '@/components/MentalHealthIndicators'
 import { measurePerformance } from '@/lib/performance'
+import { Badge } from '@/components/ui/badge'
 
 const DEFAULT_WIDGETS = [
   { id: 'agenda', label: 'Agenda de Hoje', visible: true, order: 0 },
@@ -48,6 +51,7 @@ export default function Index() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
   const [waitlist, setWaitlist] = useState<any[]>([])
+  const [lowStockItems, setLowStockItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
@@ -165,6 +169,15 @@ export default function Index() {
           .limit(5)
 
         if (wlData) setWaitlist(wlData)
+
+        const { data: stockData } = await supabase
+          .from('estoque')
+          .select('id, nome_item, quantidade, quantidade_minima')
+          .eq('usuario_id', user.id)
+
+        if (stockData) {
+          setLowStockItems(stockData.filter((item) => item.quantidade <= item.quantidade_minima))
+        }
       })
     } catch (err) {
       setError(true)
@@ -319,6 +332,40 @@ export default function Index() {
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </CardContent>
             </Card>
+
+            {lowStockItems.length > 0 && (
+              <Card className="shadow-sm border-red-200">
+                <CardHeader className="border-b border-red-100 bg-red-50/50 pb-4 flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm font-semibold text-red-800 flex items-center gap-2 uppercase tracking-wide">
+                    <AlertTriangle className="w-4 h-4 text-red-600" /> Estoque Baixo
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-100"
+                    onClick={() => navigate('/estoque')}
+                  >
+                    Ver Estoque
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-red-100 max-h-[250px] overflow-y-auto">
+                    {lowStockItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-4 bg-red-50/30 flex justify-between items-center gap-2"
+                      >
+                        <p className="font-semibold text-sm text-slate-800">{item.nome_item}</p>
+                        <Badge variant="destructive" className="text-xs">
+                          {item.quantidade} / {item.quantidade_minima}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="shadow-sm border-slate-200">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
