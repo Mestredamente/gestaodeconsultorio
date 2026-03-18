@@ -51,7 +51,7 @@ export default function MobileNav() {
           <div className="bg-indigo-600 p-1.5 rounded-lg">
             <Brain className="w-5 h-5 text-white" />
           </div>
-          Gestão<span className="text-indigo-600">Clínica</span>
+          Gestão<span className="text-indigo-600">Consultório</span>
         </div>
         <button
           onClick={() => setIsOpen(!isOpen)}
