@@ -40,6 +40,16 @@ export default function TelehealthSession() {
   useEffect(() => {
     const fetchApt = async () => {
       if (!agendamentoId) return
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        agendamentoId,
+      )
+
+      if (agendamentoId === 'nova' || !isUUID) {
+        setLoading(false)
+        return
+      }
+
       const { data } = await supabase
         .from('agendamentos')
         .select('*, pacientes(nome, id)')
