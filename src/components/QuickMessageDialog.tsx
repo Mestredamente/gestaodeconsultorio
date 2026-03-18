@@ -16,6 +16,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from '@/components/ui/select'
 import { MessageCircle, Send } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
@@ -28,6 +30,7 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
   const [templates, setTemplates] = useState<any>(null)
+  const [customTemplates, setCustomTemplates] = useState<any[]>([])
   const [nextAppt, setNextAppt] = useState<any>(null)
   const [selectedTemplate, setSelectedTemplate] = useState('lembrete')
   const [message, setMessage] = useState('')
@@ -48,6 +51,16 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
             setWaType((data.whatsapp_tipo as any) || 'personal')
           }
         })
+
+      supabase
+        .from('templates_documentos')
+        .select('id, titulo, conteudo')
+        .eq('usuario_id', user.id)
+        .eq('tipo', 'mensagem_rapida')
+        .then(({ data }) => {
+          if (data) setCustomTemplates(data)
+        })
+
       supabase
         .from('agendamentos')
         .select('id, data_hora, tipo_pagamento')
@@ -64,7 +77,14 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
 
   useEffect(() => {
     if (templates && patient) {
-      const tpl = templates[`template_${selectedTemplate}`] || ''
+      let tpl = ''
+      if (['lembrete', 'confirmacao', 'cobranca'].includes(selectedTemplate)) {
+        tpl = templates[`template_${selectedTemplate}`] || ''
+      } else {
+        const custom = customTemplates.find((t) => t.id === selectedTemplate)
+        if (custom) tpl = custom.conteudo
+      }
+
       const link = `${window.location.origin}/portal/${patient.hash_anamnese}`
       const confirmLink = nextAppt?.id
         ? `${window.location.origin}/confirmar/${patient.hash_anamnese}/${nextAppt.id}`
@@ -80,7 +100,7 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
       })
       setMessage(parsed)
     }
-  }, [selectedTemplate, templates, nextAppt, patient])
+  }, [selectedTemplate, templates, nextAppt, patient, customTemplates])
 
   const handleSend = async () => {
     if (!patient?.telefone) {
@@ -130,13 +150,30 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
           <div className="space-y-2">
             <Label>Tipo de Mensagem</Label>
             <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-              <SelectTrigger>
+              <SelectTrigger className="bg-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="lembrete">Lembrete de Consulta</SelectItem>
-                <SelectItem value="confirmacao">Confirmação de Agendamento</SelectItem>
-                <SelectItem value="cobranca">Cobrança</SelectItem>
+                <SelectGroup>
+                  <SelectLabel className="text-xs text-slate-500 uppercase tracking-wider">
+                    Padrões do Sistema
+                  </SelectLabel>
+                  <SelectItem value="lembrete">Lembrete de Consulta</SelectItem>
+                  <SelectItem value="confirmacao">Confirmação de Agendamento</SelectItem>
+                  <SelectItem value="cobranca">Cobrança</SelectItem>
+                </SelectGroup>
+                {customTemplates.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel className="text-xs text-slate-500 uppercase tracking-wider mt-2 border-t pt-2">
+                      Meus Modelos Especiais
+                    </SelectLabel>
+                    {customTemplates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.titulo}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -153,7 +190,7 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
           <div className="space-y-2">
             <Label>Abrir via</Label>
             <Select value={waType} onValueChange={(v: any) => setWaType(v)}>
-              <SelectTrigger>
+              <SelectTrigger className="bg-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

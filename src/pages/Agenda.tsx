@@ -18,6 +18,7 @@ import {
   Lock,
   Send,
   RefreshCw,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -63,18 +64,23 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { generateWhatsAppLink, parseWhatsAppTemplate } from '@/lib/whatsapp'
 
+const DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
+const PERIODOS = ['manha', 'tarde', 'noite']
+
 export default function Agenda() {
   const navigate = useNavigate()
   const [appointments, setAppointments] = useState<any[]>([])
   const [externalEvents, setExternalEvents] = useState<any[]>([])
   const [blocks, setBlocks] = useState<any[]>([])
+  const [waitlist, setWaitlist] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [view, setView] = useState<'daily' | 'weekly' | 'monthly' | 'waitlist'>('daily')
 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false)
+  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
   const [patients, setPatients] = useState<any[]>([])
   const [especialidades, setEspecialidades] = useState<string[]>([])
   const [convenios, setConvenios] = useState<any[]>([])
@@ -95,6 +101,11 @@ export default function Agenda() {
   })
 
   const [blockData, setBlockData] = useState({ data_inicio: '', data_fim: '', descricao: '' })
+  const [wlFormData, setWlFormData] = useState({
+    paciente_id: '',
+    dias_semana: [] as string[],
+    periodos: [] as string[],
+  })
 
   const { toast } = useToast()
   const { user } = useAuth()
@@ -135,6 +146,12 @@ export default function Agenda() {
       .lt('data_inicio', e.toISOString())
 
     if (bData) setBlocks(bData)
+
+    const { data: wlData } = await supabase
+      .from('lista_espera' as any)
+      .select('id, dias_semana, periodos, paciente_id, pacientes(nome)')
+      .eq('usuario_id', user.id)
+    if (wlData) setWaitlist(wlData)
 
     const { data: uData } = await supabase
       .from('usuarios')
@@ -235,6 +252,35 @@ export default function Agenda() {
       fetchAppointments()
     } else {
       toast({ title: 'Erro ao bloquear', description: error.message, variant: 'destructive' })
+    }
+  }
+
+  const handleCreateWaitlist = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    if (
+      !wlFormData.paciente_id ||
+      wlFormData.dias_semana.length === 0 ||
+      wlFormData.periodos.length === 0
+    ) {
+      toast({ title: 'Preencha todos os campos obrigatórios', variant: 'destructive' })
+      return
+    }
+    setIsSubmitting(true)
+    const { error } = await supabase.from('lista_espera' as any).insert({
+      usuario_id: user.id,
+      paciente_id: wlFormData.paciente_id,
+      dias_semana: wlFormData.dias_semana,
+      periodos: wlFormData.periodos,
+    })
+    setIsSubmitting(false)
+    if (!error) {
+      toast({ title: 'Paciente adicionado à lista de espera!' })
+      setIsWaitlistModalOpen(false)
+      fetchAppointments()
+      setWlFormData({ paciente_id: '', dias_semana: [], periodos: [] })
+    } else {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
     }
   }
 
@@ -357,7 +403,7 @@ export default function Agenda() {
   }
 
   const getDaysForView = () => {
-    if (view === 'daily') return [currentDate]
+    if (view === 'daily' || view === 'waitlist') return [currentDate]
     if (view === 'weekly')
       return eachDayOfInterval({
         start: startOfWeek(currentDate, { weekStartsOn: 0 }),
@@ -594,6 +640,7 @@ export default function Agenda() {
               <TabsTrigger value="daily">Dia</TabsTrigger>
               <TabsTrigger value="weekly">Semana</TabsTrigger>
               <TabsTrigger value="monthly">Mês</TabsTrigger>
+              <TabsTrigger value="waitlist">Espera</TabsTrigger>
             </TabsList>
           </Tabs>
           <Button
@@ -626,7 +673,71 @@ export default function Agenda() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {view === 'monthly' ? (
+          {view === 'waitlist' ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                <div>
+                  <h3 className="font-semibold text-slate-800">Lista de Espera Inteligente</h3>
+                  <p className="text-sm text-slate-500">
+                    Seja notificado quando um paciente desmarcar um horário compatível.
+                  </p>
+                </div>
+                <Button onClick={() => setIsWaitlistModalOpen(true)} className="gap-2">
+                  <Plus className="w-4 h-4" /> Adicionar
+                </Button>
+              </div>
+
+              {waitlist.length === 0 ? (
+                <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                  Nenhum paciente na lista de espera.
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {waitlist.map((wl) => (
+                    <Card key={wl.id} className="shadow-sm">
+                      <CardContent className="p-4 flex justify-between items-start gap-4">
+                        <div>
+                          <h4 className="font-semibold text-slate-800">{wl.pacientes?.nome}</h4>
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            {wl.dias_semana.map((d: string) => (
+                              <Badge key={d} variant="secondary" className="capitalize text-xs">
+                                {d}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="flex gap-2 mt-1 flex-wrap">
+                            {wl.periodos.map((p: string) => (
+                              <Badge
+                                key={p}
+                                variant="outline"
+                                className="capitalize text-xs border-indigo-200 text-indigo-700 bg-indigo-50"
+                              >
+                                {p}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:bg-red-50"
+                          onClick={async () => {
+                            await supabase
+                              .from('lista_espera' as any)
+                              .delete()
+                              .eq('id', wl.id)
+                            fetchAppointments()
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : view === 'monthly' ? (
             <div className="grid grid-cols-7 gap-2">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((wd) => (
                 <div
@@ -854,6 +965,102 @@ export default function Agenda() {
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? 'Salvando...' : 'Salvar Agendamento'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Waitlist Modal */}
+      <Dialog open={isWaitlistModalOpen} onOpenChange={setIsWaitlistModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar à Lista de Espera</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateWaitlist} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Paciente</Label>
+              <Select
+                value={wlFormData.paciente_id}
+                onValueChange={(v) => setWlFormData({ ...wlFormData, paciente_id: v })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o paciente..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {patients.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Dias da Semana (Preferência)</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {DIAS_SEMANA.map((dia) => (
+                  <div key={dia} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`dia-${dia}`}
+                      checked={wlFormData.dias_semana.includes(dia)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setWlFormData({
+                            ...wlFormData,
+                            dias_semana: [...wlFormData.dias_semana, dia],
+                          })
+                        } else {
+                          setWlFormData({
+                            ...wlFormData,
+                            dias_semana: wlFormData.dias_semana.filter((d) => d !== dia),
+                          })
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`dia-${dia}`} className="capitalize font-normal">
+                      {dia}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Períodos</Label>
+              <div className="flex gap-4">
+                {PERIODOS.map((per) => (
+                  <div key={per} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`per-${per}`}
+                      checked={wlFormData.periodos.includes(per)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setWlFormData({
+                            ...wlFormData,
+                            periodos: [...wlFormData.periodos, per],
+                          })
+                        } else {
+                          setWlFormData({
+                            ...wlFormData,
+                            periodos: wlFormData.periodos.filter((p) => p !== per),
+                          })
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`per-${per}`} className="capitalize font-normal">
+                      {per}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsWaitlistModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Salvando...' : 'Salvar'}
               </Button>
             </DialogFooter>
           </form>

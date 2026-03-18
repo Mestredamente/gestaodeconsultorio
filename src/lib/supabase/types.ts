@@ -1700,7 +1700,7 @@ export const Constants = {
 //       v_past_appointments jsonb;
 //       v_all_past jsonb;
 //   BEGIN
-//       SELECT p.id, p.nome, p.cpf, p.usuario_id, p.contrato_aceito INTO v_paciente
+//       SELECT p.id, p.nome, p.cpf, p.usuario_id, p.contrato_aceito, p.data_aceite_contrato INTO v_paciente
 //       FROM public.pacientes p
 //       WHERE p.hash_anamnese = p_hash LIMIT 1;
 //
@@ -1778,6 +1778,7 @@ export const Constants = {
 //           'paciente_nome', v_paciente.nome,
 //           'paciente_cpf', v_paciente.cpf,
 //           'contrato_aceito', v_paciente.contrato_aceito,
+//           'data_aceite_contrato', v_paciente.data_aceite_contrato,
 //           'consultorio', v_clinica.nome_consultorio,
 //           'chave_pix', v_clinica.chave_pix,
 //           'texto_contrato', v_clinica.texto_contrato,

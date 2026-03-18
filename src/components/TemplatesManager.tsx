@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash2, Save, FileText } from 'lucide-react'
+import { Plus, Trash2, Save, FileText, MessageSquare } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import {
 export function TemplatesManager({
   defaultTipo = 'contrato',
   title = 'Modelos de Documentos',
-  description = 'Crie templates de contratos, laudos, e-mails e testes psicológicos',
+  description = 'Crie templates de contratos, laudos, e-mails e mensagens',
 }: {
   defaultTipo?: string
   title?: string
@@ -143,7 +143,7 @@ export function TemplatesManager({
                     value={formData.tipo}
                     onValueChange={(v) => setFormData({ ...formData, tipo: v })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -152,6 +152,9 @@ export function TemplatesManager({
                       <SelectItem value="prescricao">Prescrição</SelectItem>
                       <SelectItem value="email_marketing">Email / Comunicado</SelectItem>
                       <SelectItem value="teste">Teste Psicológico / Escala</SelectItem>
+                      <SelectItem value="mensagem_rapida">
+                        Mensagem Especializada / WhatsApp
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -160,12 +163,13 @@ export function TemplatesManager({
                 <Label>Conteúdo</Label>
                 <Textarea
                   required
-                  className="min-h-[250px]"
+                  className="min-h-[250px] bg-white"
                   value={formData.conteudo}
                   onChange={(e) => setFormData({ ...formData, conteudo: e.target.value })}
                 />
                 <p className="text-xs text-slate-500">
-                  Dica: Use variáveis como [Nome do Paciente], [CPF], [Nome do Consultório]
+                  Dica: Use variáveis como [Nome do Paciente], [CPF], [Nome do Consultório],
+                  [link_portal]
                 </p>
               </div>
               <Button type="submit" className="w-full gap-2">
@@ -183,7 +187,11 @@ export function TemplatesManager({
               <div>
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <h4 className="font-semibold text-slate-800 line-clamp-1 flex-1 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-primary shrink-0" />
+                    {t.tipo === 'mensagem_rapida' ? (
+                      <MessageSquare className="w-4 h-4 text-emerald-500 shrink-0" />
+                    ) : (
+                      <FileText className="w-4 h-4 text-primary shrink-0" />
+                    )}
                     {t.titulo}
                   </h4>
                   <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">

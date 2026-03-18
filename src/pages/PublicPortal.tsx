@@ -23,6 +23,8 @@ import {
   BrainCircuit,
   Save,
   QrCode,
+  Trophy,
+  TrendingUp,
 } from 'lucide-react'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
@@ -191,12 +193,13 @@ export default function PublicPortal() {
     : []
   const hasTests = data.testes && data.testes.length > 0
   const pendingTests = hasTests ? data.testes.filter((t: any) => t.status === 'pendente') : []
+  const hasAchievements = data.conquistas && data.conquistas.length > 0
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 animate-fade-in">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-center sm:text-left">
+          <div className="text-center sm:flex-1 sm:text-left">
             <h3 className="font-bold">Baixe nosso Aplicativo!</h3>
             <p className="text-indigo-100 text-sm">
               Acompanhe seus dados e agendamentos diretamente do celular.
@@ -286,6 +289,11 @@ export default function PublicPortal() {
             <TabsTrigger value="historico" className="gap-2 py-2">
               <Activity className="w-4 h-4" /> Meu Histórico
             </TabsTrigger>
+            {hasAchievements && (
+              <TabsTrigger value="desafios" className="gap-2 py-2">
+                <Trophy className="w-4 h-4 text-amber-500" /> Meus Desafios
+              </TabsTrigger>
+            )}
             {hasTests && (
               <TabsTrigger value="testes" className="gap-2 py-2 relative">
                 <BrainCircuit className="w-4 h-4" /> Testes / Avaliações
@@ -296,7 +304,7 @@ export default function PublicPortal() {
             )}
             {hasDocuments && (
               <TabsTrigger value="documentos" className="gap-2 py-2">
-                <FileText className="w-4 h-4" /> Laudos e Prescrições
+                <FileText className="w-4 h-4" /> Laudos / Prescrições
               </TabsTrigger>
             )}
             {showLegalTab && (
@@ -524,6 +532,62 @@ export default function PublicPortal() {
               </div>
             )}
           </TabsContent>
+
+          {hasAchievements && (
+            <TabsContent value="desafios" className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {data.conquistas.map((c: any) => (
+                  <Card
+                    key={c.id}
+                    className={cn(
+                      'shadow-sm overflow-hidden',
+                      c.conquistada
+                        ? 'border-amber-200 bg-amber-50/20'
+                        : 'border-slate-200 bg-slate-50/50 opacity-70 grayscale-[0.8]',
+                    )}
+                  >
+                    <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+                      <div
+                        className={cn(
+                          'p-4 rounded-full mb-1',
+                          c.conquistada
+                            ? 'bg-amber-100 text-amber-500 shadow-sm'
+                            : 'bg-slate-100 text-slate-400',
+                        )}
+                      >
+                        {c.icone_name === 'Star' && <Star className="w-8 h-8" />}
+                        {c.icone_name === 'BrainCircuit' && <BrainCircuit className="w-8 h-8" />}
+                        {c.icone_name === 'TrendingUp' && <TrendingUp className="w-8 h-8" />}
+                        {!['Star', 'BrainCircuit', 'TrendingUp'].includes(c.icone_name) && (
+                          <Trophy className="w-8 h-8" />
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800 text-lg leading-tight">
+                          {c.titulo}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-2 font-medium">{c.descricao}</p>
+                      </div>
+                      <div className="mt-auto pt-2 w-full flex justify-center">
+                        {c.conquistada ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-100 border-amber-200 text-amber-700 gap-1.5 px-3 py-1 text-xs"
+                          >
+                            <CheckCircle className="w-3 h-3" /> Conquistado
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-slate-400 border-slate-200">
+                            Pendente
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+          )}
 
           {hasTests && (
             <TabsContent value="testes" className="space-y-4">
