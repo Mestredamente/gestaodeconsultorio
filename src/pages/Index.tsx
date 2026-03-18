@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Check, X, LogOut, Settings2, AlertTriangle, Video } from 'lucide-react'
+import { Calendar, Check, X, LogOut, Settings2, Bell } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -25,7 +25,7 @@ export default function Index() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const [appointments, setAppointments] = useState<any[]>([])
-  const [lowStockCount, setLowStockCount] = useState(0)
+  const [notifications, setNotifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [prefs, setPrefs] = useState({
@@ -41,31 +41,57 @@ export default function Index() {
   }).format(new Date())
 
   useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault()
-      const visits = parseInt(localStorage.getItem('visits') || '0')
-      if (visits > 0 && !localStorage.getItem('pwa_prompt_dismissed')) {
-        toast({
-          title: 'Instale nosso App',
-          description: 'Adicione a Gestão de Clínica à sua tela inicial.',
-          action: (
-            <Button
-              variant="outline"
-              onClick={() => {
-                e.prompt()
-                localStorage.setItem('pwa_prompt_dismissed', '1')
-              }}
-            >
-              Instalar
-            </Button>
-          ),
-        })
-      }
-      localStorage.setItem('visits', (visits + 1).toString())
+    if (!user) return
+    const fetchNotifs = async () => {
+      const { data } = await supabase
+        .from('notificacoes')
+        .select('*')
+        .eq('usuario_id', user.id)
+        .order('data_criacao', { ascending: false })
+        .limit(6)
+      if (data) setNotifications(data)
     }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [toast])
+    fetchNotifs()
+
+    const channelNotif = supabase
+      .channel('notificacoes_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notificacoes',
+          filter: `usuario_id=eq.${user.id}`,
+        },
+        (payload) => {
+          setNotifications((prev) => [payload.new, ...prev].slice(0, 6))
+          toast({ title: payload.new.titulo, description: payload.new.mensagem })
+        },
+      )
+      .subscribe()
+
+    const channelApt = supabase
+      .channel('dashboard_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agendamentos',
+          filter: `usuario_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.new.status === 'confirmado' && payload.old.status !== 'confirmado')
+            fetchIndexData()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channelNotif)
+      supabase.removeChannel(channelApt)
+    }
+  }, [user, toast])
 
   const fetchIndexData = useCallback(async () => {
     if (!user) return
@@ -74,42 +100,31 @@ export default function Index() {
 
     try {
       await measurePerformance('index_data', async () => {
-        const { data: u, error: uError } = await supabase
+        const { data: u } = await supabase
           .from('usuarios')
           .select('preferencias_dashboard')
           .eq('id', user.id)
           .maybeSingle()
-        if (!uError && u?.preferencias_dashboard) setPrefs(u.preferencias_dashboard)
+        if (u?.preferencias_dashboard) setPrefs(u.preferencias_dashboard)
 
         const startOfDay = new Date()
         startOfDay.setHours(0, 0, 0, 0)
         const endOfDay = new Date(startOfDay)
         endOfDay.setDate(endOfDay.getDate() + 1)
 
-        const [apptsRes, stockRes] = await Promise.all([
-          supabase
-            .from('agendamentos')
-            .select(
-              'id, data_hora, status, is_online, paciente_id, pacientes(id, nome, valor_sessao)',
-            )
-            .eq('usuario_id', user.id)
-            .gte('data_hora', startOfDay.toISOString())
-            .lt('data_hora', endOfDay.toISOString())
-            .order('data_hora', { ascending: true }),
-          supabase
-            .from('estoque')
-            .select('quantidade, quantidade_minima')
-            .eq('usuario_id', user.id),
-        ])
+        const apptsRes = await supabase
+          .from('agendamentos')
+          .select(
+            'id, data_hora, status, is_online, paciente_id, pacientes(id, nome, valor_sessao)',
+          )
+          .eq('usuario_id', user.id)
+          .gte('data_hora', startOfDay.toISOString())
+          .lt('data_hora', endOfDay.toISOString())
+          .order('data_hora', { ascending: true })
 
         if (apptsRes.data) setAppointments(apptsRes.data)
-        if (stockRes.data)
-          setLowStockCount(
-            stockRes.data.filter((s) => s.quantidade <= (s.quantidade_minima || 0)).length,
-          )
       })
     } catch (err) {
-      console.error('Error fetching index data:', err)
       setError(true)
     } finally {
       setLoading(false)
@@ -122,14 +137,9 @@ export default function Index() {
 
   const updateStatus = async (id: string, status: string) => {
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
-    try {
-      const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
-      if (!error) toast({ title: `Status atualizado: ${status.toUpperCase()}` })
-      else throw error
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-      fetchIndexData()
-    }
+    const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
+    if (!error) toast({ title: `Status atualizado: ${status.toUpperCase()}` })
+    else fetchIndexData()
   }
 
   const savePrefs = async (newPref: any) => {
@@ -158,7 +168,7 @@ export default function Index() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="flex items-center justify-between">
-                  <Label>Mostrar Dashboard de Performance</Label>
+                  <Label>Mostrar Dashboard</Label>
                   <Switch
                     checked={prefs.show_dashboard !== false}
                     onCheckedChange={(v) => savePrefs({ show_dashboard: v })}
@@ -171,13 +181,6 @@ export default function Index() {
                     onCheckedChange={(v) => savePrefs({ show_agenda: v })}
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label>Mostrar Alertas de Estoque</Label>
-                  <Switch
-                    checked={prefs.show_stock_alert !== false}
-                    onCheckedChange={(v) => savePrefs({ show_stock_alert: v })}
-                  />
-                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -187,34 +190,38 @@ export default function Index() {
         </div>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex justify-between">
-          <p className="text-red-600 text-sm">Alguns dados não puderam ser carregados.</p>
-          <Button variant="outline" size="sm" onClick={fetchIndexData}>
-            Tentar novamente
-          </Button>
-        </div>
-      )}
-
       {prefs.show_dashboard !== false && <PerformanceDashboard />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-6">
           <ServiceGoalTracker />
 
-          {prefs.show_stock_alert !== false && lowStockCount > 0 && (
-            <Card className="shadow-sm border-amber-200 h-fit bg-amber-50/50">
-              <CardHeader className="border-b border-amber-100/50 pb-4">
-                <CardTitle className="text-lg flex items-center gap-2 text-amber-800">
-                  <AlertTriangle className="w-5 h-5" /> Alertas de Estoque
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 text-center">
-                <h2 className="text-4xl font-bold text-amber-600">{lowStockCount}</h2>
-                <p className="text-amber-800 font-medium text-sm mt-1">Itens em nível crítico</p>
-              </CardContent>
-            </Card>
-          )}
+          <Card className="shadow-sm border-slate-200">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+              <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                <Bell className="w-4 h-4 text-primary" /> Notificações Recentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-slate-500">Nenhuma notificação.</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors">
+                      <p className="font-semibold text-sm text-slate-800 leading-tight">
+                        {n.titulo}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{n.mensagem}</p>
+                      <p className="text-[10px] text-slate-400 mt-1.5">
+                        {new Date(n.data_criacao).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {prefs.show_agenda !== false && (
@@ -249,12 +256,9 @@ export default function Index() {
                             {time}
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-semibold text-slate-900">
-                                {pInfo?.nome || 'Paciente Excluído'}
-                              </p>
-                              {apt.is_online && <Video className="w-4 h-4 text-indigo-500" />}
-                            </div>
+                            <p className="font-semibold text-slate-900">
+                              {pInfo?.nome || 'Paciente Excluído'}
+                            </p>
                             <span
                               className={cn(
                                 'text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider mt-1 inline-block',
@@ -262,28 +266,14 @@ export default function Index() {
                                   ? 'bg-emerald-100 text-emerald-700'
                                   : apt.status === 'confirmado'
                                     ? 'bg-indigo-100 text-indigo-700'
-                                    : apt.status === 'faltou'
-                                      ? 'bg-red-100 text-red-700'
-                                      : apt.status === 'desmarcou'
-                                        ? 'bg-amber-100 text-amber-700'
-                                        : 'bg-slate-100 text-slate-700',
+                                    : 'bg-slate-100 text-slate-700',
                               )}
                             >
                               {apt.status}
                             </span>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                          {apt.is_online &&
-                            (apt.status === 'agendado' || apt.status === 'confirmado') && (
-                              <Button
-                                size="sm"
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                                onClick={() => navigate(`/consulta-online/${apt.id}`)}
-                              >
-                                <Video className="w-4 h-4 mr-1" /> Sala
-                              </Button>
-                            )}
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             size="sm"
                             variant="outline"

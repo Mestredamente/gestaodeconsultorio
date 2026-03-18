@@ -20,6 +20,8 @@ import {
   DollarSign,
   Copy,
   CreditCard,
+  BrainCircuit,
+  Save,
 } from 'lucide-react'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
@@ -52,6 +54,9 @@ export default function PublicPortal() {
 
   const [payApt, setPayApt] = useState<any>(null)
   const [paying, setPaying] = useState(false)
+
+  const [activeTest, setActiveTest] = useState<any>(null)
+  const [testAnswers, setTestAnswers] = useState<Record<string, string>>({})
 
   const fetchPortalData = async () => {
     if (!hash) return
@@ -138,6 +143,23 @@ export default function PublicPortal() {
     }
   }
 
+  const handleSubmitTest = async () => {
+    if (!hash || !activeTest) return
+    const { data: success, error } = await supabase.rpc('submit_patient_test', {
+      p_hash: hash,
+      p_teste_id: activeTest.id,
+      p_respostas: testAnswers,
+    })
+    if (success && !error) {
+      toast({ title: 'Respostas enviadas com sucesso!' })
+      setActiveTest(null)
+      setTestAnswers({})
+      fetchPortalData()
+    } else {
+      toast({ title: 'Erro ao enviar respostas.', variant: 'destructive' })
+    }
+  }
+
   const isToday = (d: Date) => {
     const today = new Date()
     return (
@@ -167,6 +189,8 @@ export default function PublicPortal() {
   const pendingPayments = data.agendamentos
     ? data.agendamentos.filter((a: any) => Number(a.valor_total) > 0 && !a.sinal_pago)
     : []
+  const hasTests = data.testes && data.testes.length > 0
+  const pendingTests = hasTests ? data.testes.filter((t: any) => t.status === 'pendente') : []
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 animate-fade-in">
@@ -207,9 +231,6 @@ export default function PublicPortal() {
                 <br />
                 Clínica: <strong className="text-slate-800">{data.consultorio}</strong>
               </CardDescription>
-            </div>
-            <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center">
-              <UserSquare className="w-6 h-6" />
             </div>
           </CardHeader>
         </Card>
@@ -265,6 +286,14 @@ export default function PublicPortal() {
             <TabsTrigger value="historico" className="gap-2 py-2">
               <Activity className="w-4 h-4" /> Meu Histórico
             </TabsTrigger>
+            {hasTests && (
+              <TabsTrigger value="testes" className="gap-2 py-2 relative">
+                <BrainCircuit className="w-4 h-4" /> Testes / Avaliações
+                {pendingTests.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                )}
+              </TabsTrigger>
+            )}
             {hasDocuments && (
               <TabsTrigger value="documentos" className="gap-2 py-2">
                 <FileText className="w-4 h-4" /> Laudos e Prescrições
@@ -496,6 +525,43 @@ export default function PublicPortal() {
             )}
           </TabsContent>
 
+          {hasTests && (
+            <TabsContent value="testes" className="space-y-4">
+              {data.testes.map((t: any) => (
+                <Card key={t.id} className="shadow-sm border-slate-200">
+                  <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+                    <div>
+                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                        {t.titulo}
+                        {t.status === 'pendente' && (
+                          <Badge variant="destructive" className="text-[10px]">
+                            Ação Necessária
+                          </Badge>
+                        )}
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-1">
+                        Enviado em {new Date(t.data_envio).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    {t.status === 'pendente' ? (
+                      <Button onClick={() => setActiveTest(t)} className="gap-2">
+                        Preencher Agora <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        disabled
+                        className="text-emerald-600 border-emerald-200 bg-emerald-50"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" /> Concluído
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+          )}
+
           {hasDocuments && (
             <TabsContent value="documentos" className="space-y-4">
               {data.documentos.map((doc: any) => (
@@ -690,6 +756,53 @@ export default function PublicPortal() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {paying ? 'Processando...' : 'Confirmar Pagamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!activeTest} onOpenChange={(v) => !v && setActiveTest(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{activeTest?.titulo}</DialogTitle>
+            <DialogDescription>
+              Por favor, responda as perguntas abaixo com sinceridade.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-6">
+            {activeTest &&
+              activeTest.conteudo
+                .split('\n')
+                .filter((l: string) => l.trim().length > 0)
+                .map((q: string, i: number) => {
+                  const isQuestion = q.trim().endsWith('?') || /^\d+\./.test(q.trim())
+                  if (!isQuestion)
+                    return (
+                      <p key={i} className="text-sm text-slate-600">
+                        {q}
+                      </p>
+                    )
+                  return (
+                    <div key={i} className="space-y-2">
+                      <p className="font-medium text-slate-800">{q}</p>
+                      <Textarea
+                        placeholder="Sua resposta..."
+                        value={testAnswers[i] || ''}
+                        onChange={(e) => setTestAnswers({ ...testAnswers, [i]: e.target.value })}
+                      />
+                    </div>
+                  )
+                })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActiveTest(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmitTest}
+              className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              <Save className="w-4 h-4" /> Enviar Respostas
             </Button>
           </DialogFooter>
         </DialogContent>

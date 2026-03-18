@@ -26,6 +26,7 @@ import {
   UserRound,
   MessageCircle,
   Building2,
+  MapPin,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -63,6 +64,9 @@ export default function Settings() {
     whatsapp_confirmacao_ativa: false,
     template_confirmacao: 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
     whatsapp_tipo: 'personal',
+    pre_consulta_ativa: false,
+    template_pre_consulta:
+      'Olá [Nome], sua consulta está confirmada para [data] às [hora]. Nosso endereço é [Endereco]. Por favor, toque a campainha e aguarde na recepção.',
   })
 
   const [questions, setQuestions] = useState<any[]>([])
@@ -102,6 +106,10 @@ export default function Settings() {
                 (data as any).template_confirmacao ||
                 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
               whatsapp_tipo: (data as any).whatsapp_tipo || 'personal',
+              pre_consulta_ativa: (data as any).pre_consulta_ativa || false,
+              template_pre_consulta:
+                (data as any).template_pre_consulta ||
+                'Olá [Nome], sua consulta está confirmada para [data] às [hora]. Nosso endereço é [Endereco]. Por favor, toque a campainha e aguarde na recepção.',
             })
             setQuestions(data.anamnese_template || [])
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
@@ -395,10 +403,10 @@ export default function Settings() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-base font-semibold text-slate-800">
-                      Confirmação Automática de Agendamento
+                      Confirmação de Agendamento
                     </Label>
                     <p className="text-sm text-slate-500">
-                      Envia uma mensagem assim que a consulta é marcada.
+                      Mensagem disparada assim que a consulta é marcada.
                     </p>
                   </div>
                   <Switch
@@ -419,9 +427,38 @@ export default function Settings() {
                       rows={3}
                       className="bg-white"
                     />
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-indigo-500" /> Instruções Pré-Consulta
+                    </Label>
+                    <p className="text-sm text-slate-500">
+                      Mensagem de boas-vindas com endereço, enviada ao confirmar a consulta.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.pre_consulta_ativa}
+                    onCheckedChange={(v) => setFormData({ ...formData, pre_consulta_ativa: v })}
+                  />
+                </div>
+                {formData.pre_consulta_ativa && (
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    <Label>Template de Pré-Consulta</Label>
+                    <Textarea
+                      value={formData.template_pre_consulta}
+                      onChange={(e) =>
+                        setFormData({ ...formData, template_pre_consulta: e.target.value })
+                      }
+                      rows={3}
+                      className="bg-white"
+                    />
                     <p className="text-xs text-slate-500">
-                      Variáveis: [Nome], [data], [hora], [TipoSessao], [link_portal],
-                      [link_confirmacao]
+                      Variáveis: [Nome], [data], [hora], [Endereco]
                     </p>
                   </div>
                 )}
@@ -431,10 +468,10 @@ export default function Settings() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-base font-semibold text-slate-800">
-                      Lembretes de Sessões (24h antes)
+                      Lembretes Automáticos (24h antes)
                     </Label>
                     <p className="text-sm text-slate-500">
-                      Envia um lembrete automático 1 dia antes da consulta.
+                      Envia um lembrete 1 dia antes via servidor.
                     </p>
                   </div>
                   <Switch checked={lembreteAtivo} onCheckedChange={setLembreteAtivo} />
@@ -448,36 +485,8 @@ export default function Settings() {
                       rows={3}
                       className="bg-white"
                     />
-                    <p className="text-xs text-slate-500">
-                      Variáveis: [Nome], [data], [hora], [TipoSessao], [link_portal],
-                      [link_confirmacao]
-                    </p>
                   </div>
                 )}
-              </div>
-
-              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
-                <div>
-                  <Label className="text-base font-semibold text-slate-800">
-                    Cobrança de Valores Pendentes
-                  </Label>
-                  <p className="text-sm text-slate-500 mb-3">
-                    Template utilizado ao acionar a cobrança manual na aba do paciente.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Textarea
-                    value={formData.template_cobranca}
-                    onChange={(e) =>
-                      setFormData({ ...formData, template_cobranca: e.target.value })
-                    }
-                    rows={3}
-                    className="bg-white"
-                  />
-                  <p className="text-xs text-slate-500">
-                    Variáveis: [Nome], [valor], [periodo], [chave_pix]
-                  </p>
-                </div>
               </div>
             </div>
           </TabsContent>

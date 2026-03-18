@@ -1,9 +1,8 @@
 {
   "_versions": {
-    "enviar_cobranca_whatsapp": 6,
-    "enviar_lembrete_consulta": 10,
+    "enviar_cobranca_whatsapp": 4,
+    "enviar_lembrete_consulta": 5,
     "emitir_nota_fiscal": 2,
-    "enviar_comunicado_massa": 1,
-    "functions": 1
+    "enviar_comunicado_massa": 1
   }
 }

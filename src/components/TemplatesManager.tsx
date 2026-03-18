@@ -26,7 +26,7 @@ import {
 export function TemplatesManager({
   defaultTipo = 'contrato',
   title = 'Modelos de Documentos',
-  description = 'Crie templates de contratos, laudos e e-mails',
+  description = 'Crie templates de contratos, laudos, e-mails e testes psicológicos',
 }: {
   defaultTipo?: string
   title?: string
@@ -151,6 +151,7 @@ export function TemplatesManager({
                       <SelectItem value="laudo">Laudo / Atestado</SelectItem>
                       <SelectItem value="prescricao">Prescrição</SelectItem>
                       <SelectItem value="email_marketing">Email / Comunicado</SelectItem>
+                      <SelectItem value="teste">Teste Psicológico / Escala</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

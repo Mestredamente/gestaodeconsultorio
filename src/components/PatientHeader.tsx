@@ -3,13 +3,20 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Phone, Edit3, FileText, Link as LinkIcon, Camera } from 'lucide-react'
+import { Phone, Edit3, FileText, Link as LinkIcon, Camera, Gift, AlertCircle } from 'lucide-react'
 import SendContractDialog from '@/components/SendContractDialog'
 import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
 import { useToast } from '@/hooks/use-toast'
 import { useNavigate } from 'react-router-dom'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
-export default function PatientHeader({ patient, onUpdate, isEditing, setIsEditing }: any) {
+export default function PatientHeader({
+  patient,
+  onUpdate,
+  isEditing,
+  setIsEditing,
+  hasDebt,
+}: any) {
   const { toast } = useToast()
   const navigate = useNavigate()
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -74,40 +81,76 @@ export default function PatientHeader({ patient, onUpdate, isEditing, setIsEditi
     }
   }
 
+  const isBirthdayMonth = () => {
+    if (!patient?.data_nascimento) return false
+    const birthDate = new Date(patient.data_nascimento)
+    const today = new Date()
+    return birthDate.getMonth() === today.getMonth()
+  }
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative mb-6">
-      <div className="bg-gradient-to-r from-primary/10 to-primary/5 h-24 w-full"></div>
+      <div className="bg-gradient-to-r from-primary/10 to-primary/5 h-24 w-full relative">
+        {isBirthdayMonth() && (
+          <div className="absolute top-4 right-4 bg-white/80 backdrop-blur text-indigo-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-sm border border-indigo-100">
+            <Gift className="w-3.5 h-3.5 text-indigo-500" /> Aniversariante do Mês
+          </div>
+        )}
+      </div>
 
       <div className="px-6 pb-6 pt-0 relative z-10">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 -mt-12">
           <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-end w-full lg:w-auto">
-            <div
-              className="relative group cursor-pointer shrink-0 rounded-full bg-white shadow-sm ring-4 ring-white"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Avatar className="w-24 h-24">
-                {patient.foto_url && (
-                  <AvatarImage src={patient.foto_url} alt={patient.nome} className="object-cover" />
-                )}
-                <AvatarFallback className="text-3xl font-bold bg-primary/10 text-primary">
-                  {getInitials(patient.nome)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Camera className="w-6 h-6 text-white" />
-              </div>
-              {uploadingImage && (
-                <div className="absolute inset-0 bg-white/60 rounded-full flex items-center justify-center z-10">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <div className="relative">
+              <div
+                className="relative group cursor-pointer shrink-0 rounded-full bg-white shadow-sm ring-4 ring-white"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Avatar className="w-24 h-24">
+                  {patient.foto_url && (
+                    <AvatarImage
+                      src={patient.foto_url}
+                      alt={patient.nome}
+                      className="object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="text-3xl font-bold bg-primary/10 text-primary">
+                    {getInitials(patient.nome)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Camera className="w-6 h-6 text-white" />
                 </div>
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-white/60 rounded-full flex items-center justify-center z-10">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/webp"
+                />
+              </div>
+
+              {hasDebt && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
+                        <div className="bg-red-500 text-white rounded-full p-1">
+                          <AlertCircle className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Pagamento Pendente</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImageUpload}
-                className="hidden"
-                accept="image/jpeg,image/png,image/webp"
-              />
             </div>
 
             <div className="flex-1 pb-1">

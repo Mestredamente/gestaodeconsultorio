@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   AlertCircle,
   MessageCircle,
+  Lock,
+  Send,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -58,17 +60,20 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import { generateWhatsAppLink, parseWhatsAppTemplate } from '@/lib/whatsapp'
 
 export default function Agenda() {
   const navigate = useNavigate()
   const [appointments, setAppointments] = useState<any[]>([])
   const [externalEvents, setExternalEvents] = useState<any[]>([])
+  const [blocks, setBlocks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [view, setView] = useState<'daily' | 'weekly' | 'monthly'>('daily')
 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false)
   const [patients, setPatients] = useState<any[]>([])
   const [especialidades, setEspecialidades] = useState<string[]>([])
   const [convenios, setConvenios] = useState<any[]>([])
@@ -87,6 +92,8 @@ export default function Agenda() {
     codigo_autorizacao: '',
     is_online: false,
   })
+
+  const [blockData, setBlockData] = useState({ data_inicio: '', data_fim: '', descricao: '' })
 
   const { toast } = useToast()
   const { user } = useAuth()
@@ -110,7 +117,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, is_online, status_whatsapp_lembrete, pacientes (id, nome, valor_sessao)`,
+        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, is_online, status_whatsapp_lembrete, pacientes (id, nome, valor_sessao, telefone)`,
       )
       .eq('usuario_id', user.id)
       .gte('data_hora', s.toISOString())
@@ -118,6 +125,15 @@ export default function Agenda() {
       .order('data_hora', { ascending: true })
 
     if (!error && data) setAppointments(data)
+
+    const { data: bData } = await supabase
+      .from('bloqueios_agenda')
+      .select('*')
+      .eq('usuario_id', user.id)
+      .gte('data_fim', s.toISOString())
+      .lt('data_inicio', e.toISOString())
+
+    if (bData) setBlocks(bData)
 
     const { data: uData } = await supabase
       .from('usuarios')
@@ -134,7 +150,7 @@ export default function Agenda() {
             data_hora: mockDate.toISOString(),
             status: 'external',
             titulo: 'Compromisso Externo (Sincronizado)',
-            pacientes: { nome: 'Bloqueio de Agenda' },
+            pacientes: { nome: 'Bloqueio Externo' },
           },
         ])
       } else setExternalEvents([])
@@ -151,11 +167,7 @@ export default function Agenda() {
         .select('id, nome, valor_sessao, convenio_id')
         .eq('usuario_id', user.id)
         .order('nome'),
-      supabase
-        .from('usuarios')
-        .select('especialidades_disponiveis, nome_consultorio, whatsapp_confirmacao_ativa')
-        .eq('id', user.id)
-        .single(),
+      supabase.from('usuarios').select('*').eq('id', user.id).single(),
       supabase
         .from('convenios' as any)
         .select('*')
@@ -178,12 +190,7 @@ export default function Agenda() {
       .channel('agendamentos_changes')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agendamentos',
-          filter: `usuario_id=eq.${user.id}`,
-        },
+        { event: '*', schema: 'public', table: 'agendamentos', filter: `usuario_id=eq.${user.id}` },
         () => fetchAppointments(),
       )
       .subscribe()
@@ -204,6 +211,26 @@ export default function Agenda() {
     else setCurrentDate(subDays(currentDate, 1))
   }
 
+  const handleCreateBlock = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    setIsSubmitting(true)
+    const { error } = await supabase.from('bloqueios_agenda').insert({
+      usuario_id: user.id,
+      data_inicio: blockData.data_inicio,
+      data_fim: blockData.data_fim,
+      descricao: blockData.descricao,
+    })
+    setIsSubmitting(false)
+    if (!error) {
+      toast({ title: 'Horário bloqueado com sucesso!' })
+      setIsBlockModalOpen(false)
+      fetchAppointments()
+    } else {
+      toast({ title: 'Erro ao bloquear', description: error.message, variant: 'destructive' })
+    }
+  }
+
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
@@ -211,7 +238,6 @@ export default function Agenda() {
 
     const baseDate = new Date(formData.data_hora)
     const appointmentsToInsert = []
-
     const count =
       formData.recorrencia === 'semanal'
         ? 12
@@ -261,17 +287,6 @@ export default function Agenda() {
           count > 1 ? `${count} sessões agendadas com sucesso!` : 'Agendamento salvo com sucesso!',
       })
       setIsNewModalOpen(false)
-      setFormData({
-        paciente_id: '',
-        data_hora: '',
-        especialidade: '',
-        valor_total: '0',
-        recorrencia: 'único',
-        tipo_pagamento: 'particular',
-        convenio_id: '',
-        codigo_autorizacao: '',
-        is_online: false,
-      })
     }
     setIsSubmitting(false)
   }
@@ -304,16 +319,36 @@ export default function Agenda() {
             })
             .eq('id', finData.id)
         else
-          await supabase.from('financeiro').insert({
-            usuario_id: user.id,
-            paciente_id: apt.paciente_id,
-            mes: now.getMonth() + 1,
-            ano: now.getFullYear(),
-            valor_recebido: 0,
-            valor_a_receber: valorToAdd,
-          })
+          await supabase
+            .from('financeiro')
+            .insert({
+              usuario_id: user.id,
+              paciente_id: apt.paciente_id,
+              mes: now.getMonth() + 1,
+              ano: now.getFullYear(),
+              valor_recebido: 0,
+              valor_a_receber: valorToAdd,
+            })
       }
     }
+  }
+
+  const sendPreConsulta = (apt: any) => {
+    const pInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+    if (!pInfo?.telefone) {
+      toast({ title: 'Paciente sem telefone', variant: 'destructive' })
+      return
+    }
+    const template =
+      usrSettings?.template_pre_consulta ||
+      'Olá [Nome], sua consulta está confirmada para [data] às [hora].'
+    const msg = parseWhatsAppTemplate(template, {
+      nome: pInfo.nome,
+      dataHora: apt.data_hora,
+      Endereco: 'Consultório Principal', // Pode ser melhorado se endereço salvo
+    })
+    const link = generateWhatsAppLink(pInfo.telefone, msg, usrSettings?.whatsapp_tipo || 'personal')
+    window.open(link, '_blank')
   }
 
   const getDaysForView = () => {
@@ -328,15 +363,57 @@ export default function Agenda() {
     return []
   }
 
-  const renderAppointmentCard = (apt: any) => {
-    const timeStr = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    if (apt.status === 'external') {
+  const renderAppointmentCard = (item: any, type: 'apt' | 'block' | 'ext') => {
+    if (type === 'block') {
+      const timeStart = new Date(item.data_inicio).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+      const timeEnd = new Date(item.data_fim).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
       return (
         <Card
-          key={apt.id}
+          key={item.id}
+          className="bg-slate-50/80 border-l-4 border-slate-400 shadow-none border-t-0 border-r-0 border-b-0 border-dashed"
+        >
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="bg-slate-200 min-w-[80px] py-1.5 rounded text-center border border-slate-300 shrink-0">
+              <span className="font-bold text-slate-600 text-sm">
+                {timeStart} - {timeEnd}
+              </span>
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                <Lock className="w-4 h-4" /> Horário Bloqueado
+              </h3>
+              {item.descricao && <p className="text-xs text-slate-500 mt-0.5">{item.descricao}</p>}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-500"
+              onClick={async () => {
+                await supabase.from('bloqueios_agenda').delete().eq('id', item.id)
+                fetchAppointments()
+              }}
+            >
+              Desbloquear
+            </Button>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    if (type === 'ext') {
+      const timeStr = new Date(item.data_hora).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+      return (
+        <Card
+          key={item.id}
           className="bg-slate-50 border-l-4 border-indigo-400 opacity-80 shadow-none border-t-0 border-r-0 border-b-0"
         >
           <CardContent className="p-5 flex items-center gap-4">
@@ -344,9 +421,9 @@ export default function Agenda() {
               <span className="font-bold text-slate-600 text-lg">{timeStr}</span>
             </div>
             <div>
-              <h3 className="font-semibold text-slate-700">{apt.pacientes.nome}</h3>
+              <h3 className="font-semibold text-slate-700">{item.pacientes.nome}</h3>
               <p className="text-xs font-medium text-slate-500 mt-1 flex items-center gap-1">
-                <CalendarIcon className="w-3 h-3" /> {apt.titulo}
+                <CalendarIcon className="w-3 h-3" /> {item.titulo}
               </p>
             </div>
           </CardContent>
@@ -354,6 +431,11 @@ export default function Agenda() {
       )
     }
 
+    const apt = item
+    const timeStr = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
     const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
     const patientName = pacienteInfo?.nome || 'Paciente Desconhecido'
     const valueStr = Number(
@@ -365,13 +447,6 @@ export default function Agenda() {
       compareceu: 'border-l-emerald-500',
       faltou: 'border-l-red-500',
       desmarcou: 'border-l-amber-500',
-    }
-
-    const wpStatus = apt.status_whatsapp_lembrete || 'pendente'
-    const getWpIcon = () => {
-      if (wpStatus === 'enviado') return <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-      if (wpStatus === 'falha') return <AlertCircle className="w-4 h-4 text-red-500" />
-      return <MessageCircle className="w-4 h-4 text-slate-300" />
     }
 
     return (
@@ -386,20 +461,6 @@ export default function Agenda() {
           <div className="flex items-start lg:items-center gap-5 w-full lg:w-auto">
             <div className="bg-slate-50 min-w-[70px] py-2 rounded-lg flex flex-col items-center justify-center border border-slate-100 shrink-0 group">
               <span className="font-bold text-slate-700 text-lg leading-none mb-1">{timeStr}</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <span className="cursor-help flex items-center justify-center">
-                      {getWpIcon()}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p className="text-xs">
-                      Lembrete: <span className="font-semibold capitalize">{wpStatus}</span>
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             </div>
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -407,14 +468,6 @@ export default function Agenda() {
                 {apt.especialidade && (
                   <Badge variant="secondary" className="text-xs">
                     {apt.especialidade}
-                  </Badge>
-                )}
-                {apt.tipo_pagamento === 'convenio' && (
-                  <Badge
-                    variant="outline"
-                    className="text-xs bg-blue-50 text-blue-700 border-blue-200"
-                  >
-                    Convênio
                   </Badge>
                 )}
                 {apt.is_online && (
@@ -438,35 +491,32 @@ export default function Agenda() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
+            {apt.status === 'confirmado' && usrSettings?.pre_consulta_ativa && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                onClick={() => sendPreConsulta(apt)}
+              >
+                <Send className="w-4 h-4" /> Pré-Consulta
+              </Button>
+            )}
             {(apt.status === 'agendado' || apt.status === 'confirmado') && apt.is_online && (
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-2 bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-colors"
+                className="gap-2 bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white"
                 onClick={() => navigate(`/consulta-online/${apt.id}`)}
               >
-                <Video className="w-4 h-4" /> Entrar Sessão
+                <Video className="w-4 h-4" /> Entrar
               </Button>
             )}
-            <Button
-              size="icon"
-              variant="outline"
-              className="text-slate-400 hover:text-primary"
-              onClick={() =>
-                window.open(
-                  formatGoogleCalendarLink(`Consulta: ${patientName}`, clinicName, apt.data_hora),
-                  '_blank',
-                )
-              }
-            >
-              <ExternalLink className="w-4 h-4" />
-            </Button>
             <div className="w-px h-8 bg-slate-200 mx-1 hidden sm:block"></div>
             <Button
               size="icon"
               variant="outline"
               className={cn(
-                'hover:bg-emerald-50 hover:border-emerald-200',
+                'hover:bg-emerald-50',
                 apt.status === 'compareceu' && 'bg-emerald-50 border-emerald-200',
               )}
               onClick={() => handleUpdateStatus(apt, 'compareceu')}
@@ -477,7 +527,7 @@ export default function Agenda() {
               size="icon"
               variant="outline"
               className={cn(
-                'hover:bg-red-50 hover:border-red-200',
+                'hover:bg-red-50',
                 apt.status === 'faltou' && 'bg-red-50 border-red-200',
               )}
               onClick={() => handleUpdateStatus(apt, 'faltou')}
@@ -488,7 +538,7 @@ export default function Agenda() {
               size="icon"
               variant="outline"
               className={cn(
-                'hover:bg-amber-50 hover:border-amber-200 font-bold text-lg text-amber-500',
+                'hover:bg-amber-50 font-bold text-amber-500',
                 apt.status === 'desmarcou' && 'bg-amber-50 border-amber-200',
               )}
               onClick={() => handleUpdateStatus(apt, 'desmarcou')}
@@ -542,9 +592,18 @@ export default function Agenda() {
             </TabsList>
           </Tabs>
         </div>
-        <Button onClick={() => setIsNewModalOpen(true)} className="gap-2 rounded-full shadow-sm">
-          <Plus className="w-4 h-4" /> Novo Agendamento
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsBlockModalOpen(true)}
+            className="gap-2 text-slate-600"
+          >
+            <Lock className="w-4 h-4" /> Bloquear Horário
+          </Button>
+          <Button onClick={() => setIsNewModalOpen(true)} className="gap-2 rounded-full shadow-sm">
+            <Plus className="w-4 h-4" /> Agendar
+          </Button>
+        </div>
       </header>
 
       {loading ? (
@@ -567,9 +626,11 @@ export default function Agenda() {
                 <div key={`empty-${i}`} />
               ))}
               {getDaysForView().map((d) => {
-                const dayAppts = [...appointments, ...externalEvents].filter((a) =>
-                  isSameDay(new Date(a.data_hora), d),
-                )
+                const dayAppts = [...appointments, ...externalEvents, ...blocks].filter((a) => {
+                  if (a.data_hora) return isSameDay(new Date(a.data_hora), d)
+                  if (a.data_inicio) return isSameDay(new Date(a.data_inicio), d)
+                  return false
+                })
                 return (
                   <div
                     key={d.toISOString()}
@@ -596,7 +657,11 @@ export default function Agenda() {
                           key={a.id}
                           className={cn(
                             'w-2 h-2 rounded-full',
-                            a.status === 'external' ? 'bg-indigo-400' : 'bg-primary',
+                            a.data_inicio
+                              ? 'bg-slate-400'
+                              : a.status === 'external'
+                                ? 'bg-indigo-400'
+                                : 'bg-primary',
                           )}
                         />
                       ))}
@@ -613,18 +678,38 @@ export default function Agenda() {
           ) : (
             <div className="space-y-8">
               {getDaysForView().map((d) => {
-                const dayAppts = [...appointments, ...externalEvents]
-                  .filter((a) => isSameDay(new Date(a.data_hora), d))
-                  .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime())
-                if (dayAppts.length === 0)
+                const dayAppts = appointments.filter((a) => isSameDay(new Date(a.data_hora), d))
+                const dayExts = externalEvents.filter((a) => isSameDay(new Date(a.data_hora), d))
+                const dayBlocks = blocks.filter((b) => isSameDay(new Date(b.data_inicio), d))
+
+                const allDayItems = [
+                  ...dayAppts.map((a) => ({
+                    ...a,
+                    sortTime: new Date(a.data_hora).getTime(),
+                    type: 'apt',
+                  })),
+                  ...dayExts.map((a) => ({
+                    ...a,
+                    sortTime: new Date(a.data_hora).getTime(),
+                    type: 'ext',
+                  })),
+                  ...dayBlocks.map((b) => ({
+                    ...b,
+                    sortTime: new Date(b.data_inicio).getTime(),
+                    type: 'block',
+                  })),
+                ].sort((a, b) => a.sortTime - b.sortTime)
+
+                if (allDayItems.length === 0)
                   return view === 'daily' ? (
                     <div
                       key={d.toISOString()}
                       className="text-center p-12 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500"
                     >
-                      Nenhuma sessão agendada.
+                      Nenhum agendamento ou bloqueio.
                     </div>
                   ) : null
+
                 return (
                   <div key={d.toISOString()} className="space-y-4">
                     {view === 'weekly' && (
@@ -632,7 +717,7 @@ export default function Agenda() {
                         {format(d, 'EEEE, dd/MM/yyyy', { locale: ptBR })}
                       </h3>
                     )}
-                    {dayAppts.map((apt) => renderAppointmentCard(apt))}
+                    {allDayItems.map((item) => renderAppointmentCard(item, item.type as any))}
                   </div>
                 )
               })}
@@ -641,6 +726,51 @@ export default function Agenda() {
         </div>
       )}
 
+      {/* Block Modal */}
+      <Dialog open={isBlockModalOpen} onOpenChange={setIsBlockModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bloquear Horário na Agenda</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateBlock} className="space-y-4 pt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Início</Label>
+                <Input
+                  type="datetime-local"
+                  required
+                  value={blockData.data_inicio}
+                  onChange={(e) => setBlockData({ ...blockData, data_inicio: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Fim</Label>
+                <Input
+                  type="datetime-local"
+                  required
+                  value={blockData.data_fim}
+                  onChange={(e) => setBlockData({ ...blockData, data_fim: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Motivo / Descrição</Label>
+              <Input
+                placeholder="Ex: Supervisão, Almoço, Folga"
+                value={blockData.descricao}
+                onChange={(e) => setBlockData({ ...blockData, descricao: e.target.value })}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Salvando...' : 'Confirmar Bloqueio'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Appointment Modal */}
       <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -687,7 +817,7 @@ export default function Agenda() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Recorrência (Frequência Fixa)</Label>
+                <Label>Recorrência</Label>
                 <Select
                   value={formData.recorrencia}
                   onValueChange={(v) => setFormData({ ...formData, recorrencia: v })}
@@ -697,114 +827,13 @@ export default function Agenda() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="único">Único</SelectItem>
-                    <SelectItem value="semanal">Semanal (Próximas 12 semanas)</SelectItem>
-                    <SelectItem value="quinzenal">Quinzenal (Próximas 6 sessões)</SelectItem>
-                    <SelectItem value="mensal">Mensal (Próximos 3 meses)</SelectItem>
+                    <SelectItem value="semanal">Semanal</SelectItem>
+                    <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                    <SelectItem value="mensal">Mensal</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {especialidades.length > 0 && (
-                <div className="space-y-2 sm:col-span-2">
-                  <Label>Especialidade / Abordagem</Label>
-                  <Select
-                    value={formData.especialidade}
-                    onValueChange={(v) => setFormData({ ...formData, especialidade: v })}
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue placeholder="Opcional..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {especialidades.map((esp) => (
-                        <SelectItem key={esp} value={esp}>
-                          {esp}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
-
-            <div className="flex items-center space-x-2 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
-              <Checkbox
-                id="is_online"
-                checked={formData.is_online}
-                onCheckedChange={(c) => setFormData({ ...formData, is_online: c as boolean })}
-              />
-              <Label
-                htmlFor="is_online"
-                className="cursor-pointer text-indigo-900 flex items-center gap-2"
-              >
-                <Video className="w-4 h-4" /> Atendimento Online (Telemedicina)
-              </Label>
-            </div>
-
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-lg space-y-4">
-              <h4 className="font-semibold text-slate-800 text-sm">Cobrança</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Tipo de Pagamento</Label>
-                  <Select
-                    value={formData.tipo_pagamento}
-                    onValueChange={(v) => setFormData({ ...formData, tipo_pagamento: v })}
-                  >
-                    <SelectTrigger className="bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="particular">Particular</SelectItem>
-                      <SelectItem value="convenio">Convênio</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Valor da Sessão / Coparticipação (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.valor_total}
-                    onChange={(e) => setFormData({ ...formData, valor_total: e.target.value })}
-                    className="bg-white"
-                  />
-                </div>
-                {formData.tipo_pagamento === 'convenio' && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Operadora do Convênio</Label>
-                      <Select
-                        value={formData.convenio_id}
-                        onValueChange={(v) => setFormData({ ...formData, convenio_id: v })}
-                        required={formData.tipo_pagamento === 'convenio'}
-                      >
-                        <SelectTrigger className="bg-white">
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {convenios.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Código de Autorização</Label>
-                      <Input
-                        value={formData.codigo_autorizacao}
-                        onChange={(e) =>
-                          setFormData({ ...formData, codigo_autorizacao: e.target.value })
-                        }
-                        className="bg-white"
-                        placeholder="Opcional"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setIsNewModalOpen(false)}>
                 Cancelar

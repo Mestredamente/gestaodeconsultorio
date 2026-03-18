@@ -10,6 +10,7 @@ import {
   RefreshCw,
   CheckCircle,
   FileText,
+  Printer,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -83,6 +84,7 @@ export default function Finances() {
   const [year, setYear] = useState<string>(String(currentDate.getFullYear()))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [isPrinting, setIsPrinting] = useState(false)
 
   const [patients, setPatients] = useState<any[]>([])
   const [finances, setFinances] = useState<any[]>([])
@@ -282,6 +284,81 @@ export default function Finances() {
     )
   }
 
+  if (isPrinting) {
+    return (
+      <div className="bg-white p-8 max-w-4xl mx-auto text-black" style={{ minHeight: '100vh' }}>
+        <div className="text-center mb-8 border-b pb-4">
+          <h1 className="text-2xl font-bold uppercase tracking-widest">
+            Relatório de Inadimplência
+          </h1>
+          <p className="text-gray-500 mt-2">
+            Gerado em {new Date().toLocaleDateString('pt-BR')} (Referência: {month}/{year})
+          </p>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-xl font-bold mb-4">Pacientes com Pagamentos Pendentes</h2>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b-2 border-gray-300">
+                <th className="py-2">Paciente</th>
+                <th className="py-2">Frequência</th>
+                <th className="py-2 text-right">Valor Pendente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {patientsSummary
+                .filter((p) => p.valor_a_receber > 0)
+                .map((p) => (
+                  <tr key={p.id} className="border-b border-gray-100">
+                    <td className="py-3 font-medium">{p.nome}</td>
+                    <td className="py-3 text-gray-600 capitalize">{p.frequencia_pagamento}</td>
+                    <td className="py-3 text-right font-bold text-red-600">
+                      {formatBRL(p.valor_a_receber)}
+                    </td>
+                  </tr>
+                ))}
+              {patientsSummary.filter((p) => p.valor_a_receber > 0).length === 0 && (
+                <tr>
+                  <td colSpan={3} className="py-4 text-center text-gray-500">
+                    Nenhuma pendência encontrada.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-bold mb-4">Pendências de Convênio (A Receber)</h2>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b-2 border-gray-300">
+                <th className="py-2">Convênio</th>
+                <th className="py-2 text-right">Valor Pendente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendenciasReembolso.map((g: any, i: number) => (
+                <tr key={i} className="border-b border-gray-100">
+                  <td className="py-3 font-medium">{g.operadora}</td>
+                  <td className="py-3 text-right font-bold text-amber-600">{formatBRL(g.total)}</td>
+                </tr>
+              ))}
+              {pendenciasReembolso.length === 0 && (
+                <tr>
+                  <td colSpan={2} className="py-4 text-center text-gray-500">
+                    Nenhuma pendência de convênio.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -290,6 +367,19 @@ export default function Finances() {
           <p className="text-slate-500 mt-1 text-sm">Controle de receitas e despesas</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="bg-white gap-2"
+            onClick={() => {
+              setIsPrinting(true)
+              setTimeout(() => {
+                window.print()
+                setIsPrinting(false)
+              }, 300)
+            }}
+          >
+            <Printer className="w-4 h-4" /> Exportar Pendências
+          </Button>
           <Select value={month} onValueChange={setMonth}>
             <SelectTrigger className="w-[120px] bg-white">
               <SelectValue />

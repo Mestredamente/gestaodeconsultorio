@@ -402,6 +402,51 @@ export type Database = {
           },
         ]
       }
+      historico_mensagens: {
+        Row: {
+          conteudo: string
+          data_envio: string
+          id: string
+          paciente_id: string
+          status_envio: string
+          tipo: string
+          usuario_id: string
+        }
+        Insert: {
+          conteudo: string
+          data_envio?: string
+          id?: string
+          paciente_id: string
+          status_envio?: string
+          tipo: string
+          usuario_id: string
+        }
+        Update: {
+          conteudo?: string
+          data_envio?: string
+          id?: string
+          paciente_id?: string
+          status_envio?: string
+          tipo?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'historico_mensagens_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'historico_mensagens_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       logs_auditoria: {
         Row: {
           acao: string
@@ -812,6 +857,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      confirm_appointment_portal: {
+        Args: { p_agendamento_id: string; p_hash: string }
+        Returns: Json
+      }
       create_public_booking: {
         Args: {
           p_clinic_id: string
@@ -1058,6 +1107,14 @@ export const Constants = {
 //   valor_cobrado: numeric (not null)
 //   mes_referencia: integer (not null)
 //   ano_referencia: integer (not null)
+// Table: historico_mensagens
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   paciente_id: uuid (not null)
+//   tipo: text (not null)
+//   conteudo: text (not null)
+//   status_envio: text (not null, default: 'enviado'::text)
+//   data_envio: timestamp with time zone (not null, default: now())
 // Table: logs_auditoria
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -1158,7 +1215,7 @@ export const Constants = {
 //   FOREIGN KEY agendamentos_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY agendamentos_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY agendamentos_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-//   CHECK valid_status: CHECK ((status = ANY (ARRAY['agendado'::text, 'compareceu'::text, 'faltou'::text, 'desmarcou'::text])))
+//   CHECK valid_status: CHECK ((status = ANY (ARRAY['agendado'::text, 'confirmado'::text, 'compareceu'::text, 'faltou'::text, 'desmarcou'::text])))
 // Table: appointments
 //   PRIMARY KEY appointments_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY appointments_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
@@ -1188,6 +1245,10 @@ export const Constants = {
 //   FOREIGN KEY historico_cobrancas_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY historico_cobrancas_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY historico_cobrancas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: historico_mensagens
+//   FOREIGN KEY historico_mensagens_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY historico_mensagens_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY historico_mensagens_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: logs_auditoria
 //   PRIMARY KEY logs_auditoria_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY logs_auditoria_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -1265,6 +1326,10 @@ export const Constants = {
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: historico_cobrancas
 //   Policy "historico_cobrancas_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: historico_mensagens
+//   Policy "historico_mensagens_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: logs_auditoria
@@ -1363,6 +1428,35 @@ export const Constants = {
 //       VALUES (NEW.usuario_id, 'Alerta de Estoque Baixo', 'O item ' || NEW.nome_item || ' atingiu o nível crítico (' || NEW.quantidade || '/' || NEW.quantidade_minima || ').');
 //     END IF;
 //     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION confirm_appointment_portal(uuid, uuid)
+//   CREATE OR REPLACE FUNCTION public.confirm_appointment_portal(p_hash uuid, p_agendamento_id uuid)
+//    RETURNS jsonb
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//       v_paciente record;
+//       v_clinica text;
+//   BEGIN
+//       SELECT p.id, p.usuario_id INTO v_paciente FROM public.pacientes p WHERE p.hash_anamnese = p_hash LIMIT 1;
+//       IF v_paciente.id IS NULL THEN
+//           RETURN jsonb_build_object('success', false, 'error', 'Link inválido ou paciente não encontrado.');
+//       END IF;
+//
+//       SELECT nome_consultorio INTO v_clinica FROM public.usuarios WHERE id = v_paciente.usuario_id;
+//
+//       UPDATE public.agendamentos
+//       SET status = 'confirmado'
+//       WHERE id = p_agendamento_id AND paciente_id = v_paciente.id AND status = 'agendado';
+//
+//       IF FOUND THEN
+//           RETURN jsonb_build_object('success', true, 'consultorio', v_clinica);
+//       ELSE
+//           RETURN jsonb_build_object('success', false, 'error', 'Agendamento não encontrado, já foi atualizado ou já ocorreu.', 'consultorio', v_clinica);
+//       END IF;
 //   END;
 //   $function$
 //
