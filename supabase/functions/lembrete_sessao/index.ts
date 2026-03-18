@@ -36,20 +36,27 @@ Deno.serve(async (req: Request) => {
       const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
       const u = Array.isArray(apt.usuarios) ? apt.usuarios[0] : apt.usuarios
 
-      if (p?.telefone && u?.lembrete_whatsapp_ativo) {
+      if (p?.telefone && u?.lembrete_whatsapp_ativo === true) {
         const d = new Date(apt.data_hora)
-        const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        const timeStr = d.toLocaleTimeString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
 
         const message = `Olá ${p.nome}, lembrando da sua sessão amanhã às ${timeStr}. Qualquer dúvida, entre em contato.`
+        const cleanPhone = p.telefone.replace(/[^\d]/g, '')
+        const encodedMessage = encodeURIComponent(message)
+        const deepLink = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
 
-        sentMessages.push({ patient: p.nome, phone: p.telefone, time: timeStr })
+        sentMessages.push({ patient: p.nome, phone: p.telefone, time: timeStr, deepLink })
 
         historyLogs.push({
           usuario_id: apt.usuario_id,
           paciente_id: apt.paciente_id,
-          tipo: 'lembrete',
-          conteudo: message,
-          status_envio: 'enviado',
+          tipo: 'lembrete_whatsapp',
+          conteudo: deepLink,
+          status_envio: 'gerado',
         })
       }
     }

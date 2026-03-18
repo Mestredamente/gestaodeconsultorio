@@ -497,7 +497,32 @@ export default function Settings() {
                       Envia um lembrete 1 dia antes via servidor.
                     </p>
                   </div>
-                  <Switch checked={lembreteAtivo} onCheckedChange={setLembreteAtivo} />
+                  <Switch
+                    checked={lembreteAtivo}
+                    onCheckedChange={async (v) => {
+                      setLembreteAtivo(v)
+                      if (user) {
+                        const { error } = await supabase
+                          .from('usuarios')
+                          .update({ lembrete_whatsapp_ativo: v })
+                          .eq('id', user.id)
+                        if (error) {
+                          toast({
+                            title: 'Erro ao atualizar',
+                            description: error.message,
+                            variant: 'destructive',
+                          })
+                          setLembreteAtivo(!v)
+                        } else {
+                          toast({
+                            title: v
+                              ? 'Lembretes automáticos ativados'
+                              : 'Lembretes automáticos desativados',
+                          })
+                        }
+                      }
+                    }}
+                  />
                 </div>
                 {lembreteAtivo && (
                   <div className="space-y-2 pt-2 border-t border-slate-200">

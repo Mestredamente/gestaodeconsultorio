@@ -3,7 +3,16 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Phone, Edit3, FileText, Link as LinkIcon, Camera, Gift, AlertCircle } from 'lucide-react'
+import {
+  Phone,
+  Edit3,
+  FileText,
+  Link as LinkIcon,
+  Camera,
+  Gift,
+  AlertCircle,
+  Calendar,
+} from 'lucide-react'
 import SendContractDialog from '@/components/SendContractDialog'
 import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
 import { useToast } from '@/hooks/use-toast'
@@ -173,6 +182,21 @@ export default function PatientHeader({
           </div>
 
           <div className="flex flex-wrap gap-2 w-full lg:w-auto shrink-0 lg:pb-1">
+            <Button
+              variant="outline"
+              className="gap-2 text-blue-600 border-blue-200 bg-blue-50/50 hover:bg-blue-100"
+              onClick={() => navigate(`/agenda?paciente=${patient.id}`)}
+            >
+              <Calendar className="w-4 h-4" /> Novo Agendamento
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2 text-violet-600 border-violet-200 bg-violet-50/50 hover:bg-violet-100"
+              onClick={() => navigate(`/pacientes/${patient.id}/prontuario?tab=laudos&action=novo`)}
+            >
+              <FileText className="w-4 h-4" /> Novo Laudo
+            </Button>
+
             <SendContractDialog
               patientName={patient.nome}
               patientPhone={patient.telefone}

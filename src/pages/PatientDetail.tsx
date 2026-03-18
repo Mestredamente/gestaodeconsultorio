@@ -54,10 +54,16 @@ export default function PatientDetail() {
   const [isEditing, setIsEditing] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
   const [financeSummary, setFinanceSummary] = useState({ recebido: 0, a_receber: 0 })
+  const [visibleSessionsCount, setVisibleSessionsCount] = useState(5)
 
   const fetchPatient = async () => {
     if (!id || !user) return
-    const { data } = await supabase.from('pacientes').select('*').eq('id', id).single()
+    const { data } = await supabase
+      .from('pacientes')
+      .select('*')
+      .eq('id', id)
+      .eq('usuario_id', user.id)
+      .single()
     if (data) {
       setPatient(data)
       const { data: uData } = await supabase
@@ -71,6 +77,7 @@ export default function PatientDetail() {
         .from('agendamentos')
         .select('id, data_hora, status_whatsapp_lembrete, status')
         .eq('paciente_id', id)
+        .eq('usuario_id', user.id)
         .in('status', ['agendado', 'confirmado'])
         .gte('data_hora', new Date().toISOString())
         .order('data_hora', { ascending: true })
@@ -82,6 +89,7 @@ export default function PatientDetail() {
         .from('financeiro')
         .select('valor_recebido, valor_a_receber')
         .eq('paciente_id', id)
+        .eq('usuario_id', user.id)
       let totalR = 0,
         totalP = 0
       finData?.forEach((f) => {
@@ -94,6 +102,7 @@ export default function PatientDetail() {
         .from('prontuarios')
         .select('historico_sessoes')
         .eq('paciente_id', id)
+        .eq('usuario_id', user.id)
         .maybeSingle()
       if (prontData) setProntuario(prontData)
 
@@ -110,6 +119,7 @@ export default function PatientDetail() {
           'id, status, data_envio, data_conclusao, respostas_json, templates_documentos(titulo)',
         )
         .eq('paciente_id', id)
+        .eq('usuario_id', user.id)
         .order('data_envio', { ascending: false })
       if (pTsts) setPatientTests(pTsts)
     }
@@ -430,7 +440,7 @@ export default function PatientDetail() {
             )}
           </TabsContent>
 
-          <TabsContent value="evolucao">
+          <TabsContent value="evolucao" className="space-y-6">
             <Card className="shadow-sm border-slate-200">
               <CardHeader className="pb-4 border-b border-slate-100">
                 <CardTitle className="text-lg">Evolução Clínica Estimada</CardTitle>
@@ -469,6 +479,49 @@ export default function PatientDetail() {
                       </LineChart>
                     </ResponsiveContainer>
                   </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm border-slate-200">
+              <CardHeader className="pb-4 border-b border-slate-100">
+                <CardTitle className="text-lg">Histórico de Sessões</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                {!prontuario?.historico_sessoes || prontuario.historico_sessoes.length === 0 ? (
+                  <div className="text-center py-6 text-slate-500 border border-dashed rounded-lg">
+                    Nenhum registro encontrado.
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4">
+                      {prontuario.historico_sessoes
+                        .slice(0, visibleSessionsCount)
+                        .map((entry: any, i: number) => (
+                          <div
+                            key={entry.id || i}
+                            className="pb-4 border-b border-slate-100 last:border-0 last:pb-0"
+                          >
+                            <p className="font-semibold text-sm text-slate-800 mb-1">
+                              {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                            </p>
+                            <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
+                              {entry.content}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                    {visibleSessionsCount < prontuario.historico_sessoes.length && (
+                      <div className="pt-4 text-center">
+                        <Button
+                          variant="outline"
+                          onClick={() => setVisibleSessionsCount((prev) => prev + 10)}
+                        >
+                          Carregar mais registros
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
