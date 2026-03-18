@@ -12,6 +12,7 @@ import {
   Pie,
   Cell,
   XAxis,
+  YAxis,
   CartesianGrid,
   Legend,
 } from 'recharts'
@@ -33,6 +34,10 @@ const retentionConfig = {
   retidos: { label: 'Retidos', color: '#10b981' },
   nao_retidos: { label: 'Não Retidos', color: '#64748b' },
 }
+const attendanceAnalyticsConfig = {
+  compareceu: { label: 'Compareceu', color: '#10b981' },
+  faltou_desmarcou: { label: 'Não Compareceu', color: '#f43f5e' },
+}
 
 export function PerformanceDashboard() {
   const { user } = useAuth()
@@ -45,6 +50,7 @@ export function PerformanceDashboard() {
     financeData: [] as any[],
     attendanceData: [] as any[],
     retentionData: [] as any[],
+    analyticsChartData: [] as any[],
   })
 
   useEffect(() => {
@@ -57,29 +63,40 @@ export function PerformanceDashboard() {
       const endCurrentMonth = endOfMonth(now)
       const sixMonthsAgo = subMonths(startCurrentMonth, 5)
 
-      const [{ data: pats }, { data: fins }, { data: apts }, { data: allCompareceu }] =
-        await Promise.all([
-          supabase
-            .from('pacientes')
-            .select('id, data_criacao, recorrencia')
-            .eq('usuario_id', user.id),
-          supabase
-            .from('financeiro')
-            .select('mes, ano, valor_recebido, valor_a_receber')
-            .eq('usuario_id', user.id)
-            .gte('ano', sixMonthsAgo.getFullYear()),
-          supabase
-            .from('agendamentos')
-            .select('status')
-            .eq('usuario_id', user.id)
-            .gte('data_hora', startCurrentMonth.toISOString())
-            .lt('data_hora', endCurrentMonth.toISOString()),
-          supabase
-            .from('agendamentos')
-            .select('paciente_id')
-            .eq('usuario_id', user.id)
-            .eq('status', 'compareceu'),
-        ])
+      const [
+        { data: pats },
+        { data: fins },
+        { data: apts },
+        { data: allCompareceu },
+        { data: msgs },
+      ] = await Promise.all([
+        supabase
+          .from('pacientes')
+          .select('id, data_criacao, recorrencia')
+          .eq('usuario_id', user.id),
+        supabase
+          .from('financeiro')
+          .select('mes, ano, valor_recebido, valor_a_receber')
+          .eq('usuario_id', user.id)
+          .gte('ano', sixMonthsAgo.getFullYear()),
+        supabase
+          .from('agendamentos')
+          .select('status, data_hora, paciente_id')
+          .eq('usuario_id', user.id)
+          .gte('data_hora', startCurrentMonth.toISOString())
+          .lt('data_hora', endCurrentMonth.toISOString()),
+        supabase
+          .from('agendamentos')
+          .select('paciente_id')
+          .eq('usuario_id', user.id)
+          .eq('status', 'compareceu'),
+        supabase
+          .from('historico_mensagens')
+          .select('paciente_id, data_envio')
+          .eq('usuario_id', user.id)
+          .in('tipo', ['lembrete', 'pre_consulta', 'lembrete_whatsapp'])
+          .gte('data_envio', subMonths(startCurrentMonth, 1).toISOString()),
+      ])
 
       const totalPatients = pats?.length || 0
       const currentMonthFins =
@@ -155,6 +172,43 @@ export function PerformanceDashboard() {
         { name: 'Não Retidos', value: notRetainedCount, fill: '#64748b' },
       ].filter((d) => d.value > 0)
 
+      const appointmentsWithReminder =
+        apts
+          ?.filter((a) => ['compareceu', 'faltou', 'desmarcou'].includes(a.status))
+          .map((apt) => {
+            const aptDate = new Date(apt.data_hora).getTime()
+            const hasReminder = msgs?.some((m) => {
+              if (m.paciente_id !== apt.paciente_id) return false
+              const msgDate = new Date(m.data_envio).getTime()
+              const diff = aptDate - msgDate
+              return diff > 0 && diff <= 3 * 24 * 60 * 60 * 1000
+            })
+            return { ...apt, hasReminder }
+          }) || []
+
+      const attendedWithReminder = appointmentsWithReminder.filter(
+        (a) => a.hasReminder && a.status === 'compareceu',
+      ).length
+      const totalWithReminder = appointmentsWithReminder.filter((a) => a.hasReminder).length
+
+      const attendedWithoutReminder = appointmentsWithReminder.filter(
+        (a) => !a.hasReminder && a.status === 'compareceu',
+      ).length
+      const totalWithoutReminder = appointmentsWithReminder.filter((a) => !a.hasReminder).length
+
+      const analyticsChartData = [
+        {
+          name: 'Com Lembrete',
+          compareceu: attendedWithReminder,
+          faltou_desmarcou: totalWithReminder - attendedWithReminder,
+        },
+        {
+          name: 'Sem Lembrete',
+          compareceu: attendedWithoutReminder,
+          faltou_desmarcou: totalWithoutReminder - attendedWithoutReminder,
+        },
+      ].filter((d) => d.compareceu + d.faltou_desmarcou > 0)
+
       setMetrics({
         totalPatients,
         monthlyRevenue,
@@ -163,6 +217,7 @@ export function PerformanceDashboard() {
         financeData,
         attendanceData,
         retentionData,
+        analyticsChartData,
       })
       setLoading(false)
     }
@@ -355,6 +410,57 @@ export function PerformanceDashboard() {
                   </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
                 </PieChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-slate-200 lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-800">
+              Impacto dos Lembretes na Assiduidade (Mês Atual)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {metrics.analyticsChartData.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-sm text-slate-400">
+                Nenhum dado consolidado no mês
+              </div>
+            ) : (
+              <ChartContainer config={attendanceAnalyticsConfig} className="h-[200px] w-full">
+                <BarChart
+                  data={metrics.analyticsChartData}
+                  layout="vertical"
+                  margin={{ left: 20, right: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                  <XAxis type="number" hide />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
+                    width={100}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
+                  <Bar
+                    dataKey="compareceu"
+                    name="Compareceu"
+                    fill="var(--color-compareceu)"
+                    stackId="a"
+                    maxBarSize={40}
+                  />
+                  <Bar
+                    dataKey="faltou_desmarcou"
+                    name="Não Compareceu"
+                    fill="var(--color-faltou_desmarcou)"
+                    radius={[0, 4, 4, 0]}
+                    stackId="a"
+                    maxBarSize={40}
+                  />
+                </BarChart>
               </ChartContainer>
             )}
           </CardContent>

@@ -2258,6 +2258,8 @@ export const Constants = {
 //   trigger_check_low_stock: CREATE TRIGGER trigger_check_low_stock AFTER INSERT OR UPDATE OF quantidade, quantidade_minima ON public.estoque FOR EACH ROW EXECUTE FUNCTION check_low_stock()
 // Table: financeiro
 //   audit_financeiro_trigger: CREATE TRIGGER audit_financeiro_trigger AFTER INSERT OR DELETE OR UPDATE ON public.financeiro FOR EACH ROW EXECUTE FUNCTION log_audit_action()
+// Table: laudos
+//   audit_laudos_trigger: CREATE TRIGGER audit_laudos_trigger AFTER INSERT OR DELETE OR UPDATE ON public.laudos FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 
 // --- INDEXES ---
 // Table: financeiro

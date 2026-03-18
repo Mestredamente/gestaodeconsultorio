@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Legend } from 'recharts'
 import {
@@ -11,6 +11,7 @@ import {
   CheckCircle,
   FileText,
   Printer,
+  AlertCircle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -43,6 +44,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { measurePerformance } from '@/lib/performance'
+import { cn } from '@/lib/utils'
 
 const monthNames = [
   'Jan',
@@ -90,6 +92,7 @@ export default function Finances() {
   const [finances, setFinances] = useState<any[]>([])
   const [despesas, setDespesas] = useState<any[]>([])
   const [reembolsos, setReembolsos] = useState<any[]>([])
+  const [overdueAlerts, setOverdueAlerts] = useState<any[]>([])
 
   const [isDespesaModalOpen, setIsDespesaModalOpen] = useState(false)
   const [newDespesa, setNewDespesa] = useState({
@@ -115,6 +118,7 @@ export default function Finances() {
           setFinances(parsed.finances)
           setDespesas(parsed.despesas)
           setReembolsos(parsed.reembolsos || [])
+          setOverdueAlerts(parsed.overdueAlerts || [])
           setLoading(false)
         }
       } catch (e) {
@@ -126,37 +130,60 @@ export default function Finances() {
       await measurePerformance(`fetchFinances_${year}`, async () => {
         const yearNum = parseInt(year)
 
-        const [patientsRes, financeRes, despesasRes, reembolsosRes] = await Promise.all([
-          supabase
-            .from('pacientes')
-            .select('id, nome, valor_sessao, frequencia_pagamento, dia_pagamento')
-            .eq('usuario_id', user.id),
-          supabase.from('financeiro').select('*').eq('usuario_id', user.id).eq('ano', yearNum),
-          supabase
-            .from('despesas')
-            .select('*')
-            .eq('usuario_id', user.id)
-            .gte('data', `${yearNum}-01-01`)
-            .lt('data', `${yearNum + 1}-01-01`),
-          supabase
-            .from('agendamentos')
-            .select(
-              'id, data_hora, valor_total, status_reembolso, codigo_autorizacao, convenio_id, pacientes(nome), convenios(nome)',
-            )
-            .eq('usuario_id', user.id)
-            .eq('tipo_pagamento', 'convenio')
-            .gte('data_hora', `${yearNum}-01-01`)
-            .lt('data_hora', `${yearNum + 1}-01-01`),
-        ])
+        const [patientsRes, financeRes, despesasRes, reembolsosRes, overdueRes] = await Promise.all(
+          [
+            supabase
+              .from('pacientes')
+              .select('id, nome, valor_sessao, frequencia_pagamento, dia_pagamento')
+              .eq('usuario_id', user.id),
+            supabase.from('financeiro').select('*').eq('usuario_id', user.id).eq('ano', yearNum),
+            supabase
+              .from('despesas')
+              .select('*')
+              .eq('usuario_id', user.id)
+              .gte('data', `${yearNum}-01-01`)
+              .lt('data', `${yearNum + 1}-01-01`),
+            supabase
+              .from('agendamentos')
+              .select(
+                'id, data_hora, valor_total, status_reembolso, codigo_autorizacao, convenio_id, pacientes(nome), convenios(nome)',
+              )
+              .eq('usuario_id', user.id)
+              .eq('tipo_pagamento', 'convenio')
+              .gte('data_hora', `${yearNum}-01-01`)
+              .lt('data_hora', `${yearNum + 1}-01-01`),
+            supabase
+              .from('financeiro')
+              .select('id, mes, ano, valor_a_receber, paciente_id, pacientes(nome, telefone)')
+              .eq('usuario_id', user.id)
+              .gt('valor_a_receber', 0),
+          ],
+        )
 
         if (patientsRes.error || financeRes.error || despesasRes.error) {
           throw new Error('Falha ao carregar dados do supabase')
+        }
+
+        let alerts: any[] = []
+        if (overdueRes.data) {
+          const today = new Date()
+          alerts = overdueRes.data
+            .map((fin: any) => {
+              const dueDate = new Date(fin.ano, fin.mes, 1) // 1st of the next month basically
+              const daysOpen = Math.floor(
+                (today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
+              )
+              return { ...fin, daysOpen }
+            })
+            .filter((fin: any) => fin.daysOpen > 30)
+            .sort((a: any, b: any) => b.daysOpen - a.daysOpen)
         }
 
         if (patientsRes.data) setPatients(patientsRes.data)
         if (financeRes.data) setFinances(financeRes.data)
         if (despesasRes.data) setDespesas(despesasRes.data)
         if (reembolsosRes.data) setReembolsos(reembolsosRes.data)
+        setOverdueAlerts(alerts)
 
         localStorage.setItem(
           cacheKey,
@@ -165,6 +192,7 @@ export default function Finances() {
             finances: financeRes.data || [],
             despesas: despesasRes.data || [],
             reembolsos: reembolsosRes.data || [],
+            overdueAlerts: alerts,
           }),
         )
       })
@@ -448,6 +476,79 @@ export default function Finances() {
           </CardContent>
         </Card>
       </div>
+
+      {overdueAlerts.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/50 shadow-sm mb-6">
+          <CardHeader className="pb-3 border-b border-amber-100/50">
+            <CardTitle className="text-sm font-bold text-amber-800 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" /> Alertas de Inadimplência (Acima de 30 dias)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-4">
+            {overdueAlerts.map((alert) => {
+              const isCritical = alert.daysOpen > 60
+              const pInfo = Array.isArray(alert.pacientes) ? alert.pacientes[0] : alert.pacientes
+              return (
+                <div
+                  key={alert.id}
+                  className={cn(
+                    'p-3 rounded-lg border flex flex-col sm:flex-row justify-between sm:items-center gap-3',
+                    isCritical ? 'bg-red-50 border-red-200' : 'bg-white border-amber-100',
+                  )}
+                >
+                  <div>
+                    <p
+                      className={cn(
+                        'font-semibold text-sm',
+                        isCritical ? 'text-red-900' : 'text-slate-800',
+                      )}
+                    >
+                      {pInfo?.nome}
+                    </p>
+                    <p
+                      className={cn(
+                        'text-xs font-medium',
+                        isCritical ? 'text-red-700' : 'text-slate-500',
+                      )}
+                    >
+                      {alert.daysOpen} dias em atraso (Ref: {String(alert.mes).padStart(2, '0')}/
+                      {alert.ano})
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 justify-between sm:justify-end">
+                    <span
+                      className={cn('font-bold', isCritical ? 'text-red-700' : 'text-amber-700')}
+                    >
+                      {formatBRL(alert.valor_a_receber)}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant={isCritical ? 'destructive' : 'outline'}
+                      className={cn(
+                        'gap-2',
+                        !isCritical && 'text-amber-700 border-amber-300 hover:bg-amber-50',
+                      )}
+                      onClick={() => {
+                        if (!pInfo?.telefone) {
+                          toast({ title: 'Paciente sem telefone', variant: 'destructive' })
+                          return
+                        }
+                        const msg = `Olá ${pInfo.nome}, notamos um saldo pendente de ${formatBRL(alert.valor_a_receber)} referente ao período de ${String(alert.mes).padStart(2, '0')}/${alert.ano}. Como podemos facilitar o acerto?`
+                        window.open(
+                          `https://wa.me/${pInfo.telefone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`,
+                          '_blank',
+                        )
+                      }}
+                    >
+                      Cobrar Agora
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="fluxo" className="w-full">
         <TabsList className="mb-4 h-auto flex-wrap">

@@ -259,7 +259,9 @@ export default function PatientRecord() {
     if (t) {
       let content = t.conteudo
       content = content.replace(/\[Nome do Paciente\]/gi, patient.nome || '')
+      content = content.replace(/\[Nome\]/gi, patient.nome || '')
       content = content.replace(/\[CPF\]/gi, patient.cpf || '')
+      content = content.replace(/\[Data\]/gi, new Date().toLocaleDateString('pt-BR'))
       content = content.replace(/\[Nome do Consultório\]/gi, clinicInfo?.nome_consultorio || '')
 
       const sessoesResumo = historico
