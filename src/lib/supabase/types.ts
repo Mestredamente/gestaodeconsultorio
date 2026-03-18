@@ -166,6 +166,38 @@ export type Database = {
           },
         ]
       }
+      bloqueios_agenda: {
+        Row: {
+          data_fim: string
+          data_inicio: string
+          descricao: string | null
+          id: string
+          usuario_id: string
+        }
+        Insert: {
+          data_fim: string
+          data_inicio: string
+          descricao?: string | null
+          id?: string
+          usuario_id: string
+        }
+        Update: {
+          data_fim?: string
+          data_inicio?: string
+          descricao?: string | null
+          id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'bloqueios_agenda_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       comunicacoes_campanhas: {
         Row: {
           conteudo: string
@@ -777,6 +809,61 @@ export type Database = {
         }
         Relationships: []
       }
+      testes_pacientes: {
+        Row: {
+          data_conclusao: string | null
+          data_envio: string
+          id: string
+          paciente_id: string
+          respostas_json: Json | null
+          status: string
+          template_id: string
+          usuario_id: string
+        }
+        Insert: {
+          data_conclusao?: string | null
+          data_envio?: string
+          id?: string
+          paciente_id: string
+          respostas_json?: Json | null
+          status?: string
+          template_id: string
+          usuario_id: string
+        }
+        Update: {
+          data_conclusao?: string | null
+          data_envio?: string
+          id?: string
+          paciente_id?: string
+          respostas_json?: Json | null
+          status?: string
+          template_id?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'testes_pacientes_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'testes_pacientes_template_id_fkey'
+            columns: ['template_id']
+            isOneToOne: false
+            referencedRelation: 'templates_documentos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'testes_pacientes_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       usuarios: {
         Row: {
           agendamento_publico_ativo: boolean | null
@@ -790,11 +877,13 @@ export type Database = {
           meta_mensal_consultas: number | null
           nome_consultorio: string | null
           politica_cancelamento: string | null
+          pre_consulta_ativa: boolean | null
           preferencias_dashboard: Json | null
           sync_calendarios: Json | null
           template_cobranca: string | null
           template_confirmacao: string | null
           template_lembrete: string | null
+          template_pre_consulta: string | null
           texto_contrato: string | null
           whatsapp_confirmacao_ativa: boolean | null
           whatsapp_tipo: string | null
@@ -811,11 +900,13 @@ export type Database = {
           meta_mensal_consultas?: number | null
           nome_consultorio?: string | null
           politica_cancelamento?: string | null
+          pre_consulta_ativa?: boolean | null
           preferencias_dashboard?: Json | null
           sync_calendarios?: Json | null
           template_cobranca?: string | null
           template_confirmacao?: string | null
           template_lembrete?: string | null
+          template_pre_consulta?: string | null
           texto_contrato?: string | null
           whatsapp_confirmacao_ativa?: boolean | null
           whatsapp_tipo?: string | null
@@ -832,11 +923,13 @@ export type Database = {
           meta_mensal_consultas?: number | null
           nome_consultorio?: string | null
           politica_cancelamento?: string | null
+          pre_consulta_ativa?: boolean | null
           preferencias_dashboard?: Json | null
           sync_calendarios?: Json | null
           template_cobranca?: string | null
           template_confirmacao?: string | null
           template_lembrete?: string | null
+          template_pre_consulta?: string | null
           texto_contrato?: string | null
           whatsapp_confirmacao_ativa?: boolean | null
           whatsapp_tipo?: string | null
@@ -882,6 +975,10 @@ export type Database = {
         Returns: boolean
       }
       request_medical_record: { Args: { p_hash: string }; Returns: boolean }
+      submit_patient_test: {
+        Args: { p_hash: string; p_respostas: Json; p_teste_id: string }
+        Returns: boolean
+      }
       update_anamnese: {
         Args: { p_anamnese: Json; p_hash: string }
         Returns: Json
@@ -1061,6 +1158,12 @@ export const Constants = {
 //   nota: integer (nullable)
 //   comentario: text (nullable)
 //   data_criacao: timestamp with time zone (not null, default: now())
+// Table: bloqueios_agenda
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   data_inicio: timestamp with time zone (not null)
+//   data_fim: timestamp with time zone (not null)
+//   descricao: text (nullable)
 // Table: comunicacoes_campanhas
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -1188,6 +1291,15 @@ export const Constants = {
 //   conteudo: text (not null)
 //   tipo: text (not null, default: 'outro'::text)
 //   data_criacao: timestamp with time zone (not null, default: now())
+// Table: testes_pacientes
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   paciente_id: uuid (not null)
+//   template_id: uuid (not null)
+//   status: text (not null, default: 'pendente'::text)
+//   respostas_json: jsonb (nullable, default: '{}'::jsonb)
+//   data_envio: timestamp with time zone (not null, default: now())
+//   data_conclusao: timestamp with time zone (nullable)
 // Table: usuarios
 //   id: uuid (not null)
 //   email: text (nullable)
@@ -1208,6 +1320,8 @@ export const Constants = {
 //   whatsapp_confirmacao_ativa: boolean (nullable, default: false)
 //   template_confirmacao: text (nullable, default: 'Olá [Nome], sua consulta foi agendada para [data] às [hora].'::text)
 //   whatsapp_tipo: text (nullable, default: 'personal'::text)
+//   pre_consulta_ativa: boolean (nullable, default: false)
+//   template_pre_consulta: text (nullable, default: 'Olá [Nome], sua consulta está confirmada para [Data] às [Hora]. O endereço é [Endereco]. Te aguardamos!'::text)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
@@ -1224,6 +1338,9 @@ export const Constants = {
 //   CHECK avaliacoes_nota_check: CHECK (((nota >= 1) AND (nota <= 5)))
 //   FOREIGN KEY avaliacoes_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY avaliacoes_pkey: PRIMARY KEY (id)
+// Table: bloqueios_agenda
+//   PRIMARY KEY bloqueios_agenda_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY bloqueios_agenda_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: comunicacoes_campanhas
 //   PRIMARY KEY comunicacoes_campanhas_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY comunicacoes_campanhas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -1276,6 +1393,11 @@ export const Constants = {
 // Table: templates_documentos
 //   PRIMARY KEY templates_documentos_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY templates_documentos_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: testes_pacientes
+//   FOREIGN KEY testes_pacientes_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY testes_pacientes_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY testes_pacientes_template_id_fkey: FOREIGN KEY (template_id) REFERENCES templates_documentos(id) ON DELETE CASCADE
+//   FOREIGN KEY testes_pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: usuarios
 //   FOREIGN KEY usuarios_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
 //   PRIMARY KEY usuarios_pkey: PRIMARY KEY (id)
@@ -1304,6 +1426,10 @@ export const Constants = {
 //     WITH CHECK: true
 //   Policy "avaliacoes_select" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
+// Table: bloqueios_agenda
+//   Policy "bloqueios_agenda_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
 // Table: comunicacoes_campanhas
 //   Policy "campanhas_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
@@ -1368,6 +1494,10 @@ export const Constants = {
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: templates_documentos
 //   Policy "templates_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: testes_pacientes
+//   Policy "testes_pacientes_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: usuarios
@@ -1534,11 +1664,18 @@ export const Constants = {
 //       v_end := (p_date || ' 23:59:59-03')::timestamptz;
 //
 //       SELECT COALESCE(jsonb_agg(to_char(data_hora AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI')), '[]'::jsonb) INTO v_occupied
-//       FROM public.agendamentos
-//       WHERE usuario_id = p_clinic_id
-//         AND data_hora >= v_start
-//         AND data_hora <= v_end
-//         AND status != 'desmarcou';
+//       FROM (
+//           SELECT data_hora FROM public.agendamentos
+//           WHERE usuario_id = p_clinic_id
+//             AND data_hora >= v_start
+//             AND data_hora <= v_end
+//             AND status != 'desmarcou'
+//           UNION ALL
+//           SELECT data_inicio as data_hora FROM public.bloqueios_agenda
+//           WHERE usuario_id = p_clinic_id
+//             AND data_inicio >= v_start
+//             AND data_inicio <= v_end
+//       ) as combined_slots;
 //
 //       RETURN jsonb_build_object('ativo', true, 'occupied', v_occupied);
 //   END;
@@ -1556,6 +1693,7 @@ export const Constants = {
 //       v_agendamentos jsonb;
 //       v_historico jsonb;
 //       v_documentos jsonb;
+//       v_testes jsonb;
 //       v_clinica record;
 //       v_past_appointments jsonb;
 //       v_all_past jsonb;
@@ -1621,6 +1759,17 @@ export const Constants = {
 //       FROM public.prescricoes pr
 //       WHERE pr.paciente_id = v_paciente.id;
 //
+//       SELECT COALESCE(jsonb_agg(jsonb_build_object(
+//           'id', tp.id,
+//           'status', tp.status,
+//           'data_envio', tp.data_envio,
+//           'titulo', td.titulo,
+//           'conteudo', td.conteudo
+//       ) ORDER BY tp.data_envio DESC), '[]'::jsonb) INTO v_testes
+//       FROM public.testes_pacientes tp
+//       JOIN public.templates_documentos td ON tp.template_id = td.id
+//       WHERE tp.paciente_id = v_paciente.id;
+//
 //       RETURN jsonb_build_object(
 //           'usuario_id', v_paciente.usuario_id,
 //           'paciente_id', v_paciente.id,
@@ -1635,7 +1784,8 @@ export const Constants = {
 //           'historico', COALESCE(v_historico, '[]'::jsonb),
 //           'documentos', v_documentos,
 //           'pending_survey', v_past_appointments,
-//           'past_sessions', v_all_past
+//           'past_sessions', v_all_past,
+//           'testes', v_testes
 //       );
 //   END;
 //   $function$
@@ -1861,6 +2011,63 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION submit_patient_test(uuid, uuid, jsonb)
+//   CREATE OR REPLACE FUNCTION public.submit_patient_test(p_hash uuid, p_teste_id uuid, p_respostas jsonb)
+//    RETURNS boolean
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//       v_paciente_id uuid;
+//   BEGIN
+//       SELECT id INTO v_paciente_id FROM public.pacientes WHERE hash_anamnese = p_hash LIMIT 1;
+//       IF v_paciente_id IS NULL THEN
+//           RETURN false;
+//       END IF;
+//
+//       UPDATE public.testes_pacientes
+//       SET status = 'concluido', respostas_json = p_respostas, data_conclusao = NOW()
+//       WHERE id = p_teste_id AND paciente_id = v_paciente_id;
+//
+//       RETURN FOUND;
+//   END;
+//   $function$
+//
+// FUNCTION trigger_agendamento_confirmado()
+//   CREATE OR REPLACE FUNCTION public.trigger_agendamento_confirmado()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   DECLARE
+//       v_usuario record;
+//       v_paciente record;
+//       v_msg text;
+//   BEGIN
+//       IF NEW.status = 'confirmado' AND OLD.status != 'confirmado' THEN
+//           SELECT * INTO v_usuario FROM public.usuarios WHERE id = NEW.usuario_id;
+//           IF v_usuario.pre_consulta_ativa = true THEN
+//               SELECT * INTO v_paciente FROM public.pacientes WHERE id = NEW.paciente_id;
+//
+//               v_msg := REPLACE(v_usuario.template_pre_consulta, '[Nome]', COALESCE(v_paciente.nome, ''));
+//               v_msg := REPLACE(v_msg, '[Data]', to_char(NEW.data_hora AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY'));
+//               v_msg := REPLACE(v_msg, '[Hora]', to_char(NEW.data_hora AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI'));
+//               v_msg := REPLACE(v_msg, '[Endereco]', COALESCE(v_paciente.endereco, 'nosso consultório'));
+//
+//               INSERT INTO public.notificacoes (usuario_id, titulo, mensagem)
+//               VALUES (NEW.usuario_id, 'Mensagem Automática', 'Pré-consulta agendada para ' || COALESCE(v_paciente.nome, ''));
+//
+//               INSERT INTO public.historico_mensagens (usuario_id, paciente_id, tipo, conteudo, status_envio)
+//               VALUES (NEW.usuario_id, NEW.paciente_id, 'pre_consulta', v_msg, 'enviado');
+//           END IF;
+//
+//           INSERT INTO public.notificacoes (usuario_id, titulo, mensagem)
+//           VALUES (NEW.usuario_id, 'Consulta Confirmada', 'O paciente ' || (SELECT nome FROM public.pacientes WHERE id = NEW.paciente_id) || ' confirmou a consulta via portal.');
+//       END IF;
+//       RETURN NEW;
+//   END;
+//   $function$
+//
 // FUNCTION update_anamnese(uuid, jsonb)
 //   CREATE OR REPLACE FUNCTION public.update_anamnese(p_hash uuid, p_anamnese jsonb)
 //    RETURNS jsonb
@@ -1881,6 +2088,7 @@ export const Constants = {
 
 // --- TRIGGERS ---
 // Table: agendamentos
+//   agendamento_confirmado_trigger: CREATE TRIGGER agendamento_confirmado_trigger AFTER UPDATE ON public.agendamentos FOR EACH ROW EXECUTE FUNCTION trigger_agendamento_confirmado()
 //   audit_agendamentos_trigger: CREATE TRIGGER audit_agendamentos_trigger AFTER INSERT OR DELETE OR UPDATE ON public.agendamentos FOR EACH ROW EXECUTE FUNCTION log_audit_action()
 // Table: estoque
 //   stock_movement_trigger: CREATE TRIGGER stock_movement_trigger AFTER INSERT OR UPDATE ON public.estoque FOR EACH ROW EXECUTE FUNCTION log_stock_movement()

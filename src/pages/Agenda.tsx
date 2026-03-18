@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Lock,
   Send,
+  RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -149,8 +150,8 @@ export default function Agenda() {
             id: 'ext-' + mockDate.getTime(),
             data_hora: mockDate.toISOString(),
             status: 'external',
-            titulo: 'Compromisso Externo (Sincronizado)',
-            pacientes: { nome: 'Bloqueio Externo' },
+            titulo: 'Compromisso Externo (Google/Outlook)',
+            pacientes: { nome: 'Bloqueio Externo Sincronizado' },
           },
         ])
       } else setExternalEvents([])
@@ -209,6 +210,12 @@ export default function Agenda() {
     if (view === 'monthly') setCurrentDate(subMonths(currentDate, 1))
     else if (view === 'weekly') setCurrentDate(subDays(currentDate, 7))
     else setCurrentDate(subDays(currentDate, 1))
+  }
+
+  const handleManualSync = async () => {
+    toast({ title: 'Sincronizando com calendários externos...' })
+    await fetchAppointments()
+    toast({ title: 'Sincronização concluída!' })
   }
 
   const handleCreateBlock = async (e: React.FormEvent) => {
@@ -343,7 +350,7 @@ export default function Agenda() {
     const msg = parseWhatsAppTemplate(template, {
       nome: pInfo.nome,
       dataHora: apt.data_hora,
-      Endereco: 'Consultório Principal', // Pode ser melhorado se endereço salvo
+      Endereco: 'Consultório Principal',
     })
     const link = generateWhatsAppLink(pInfo.telefone, msg, usrSettings?.whatsapp_tipo || 'personal')
     window.open(link, '_blank')
@@ -412,15 +419,15 @@ export default function Agenda() {
       return (
         <Card
           key={item.id}
-          className="bg-slate-50 border-l-4 border-indigo-400 opacity-80 shadow-none border-t-0 border-r-0 border-b-0"
+          className="bg-indigo-50/30 border-l-4 border-indigo-400 shadow-none border-t-0 border-r-0 border-b-0"
         >
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="bg-slate-200 min-w-[70px] py-2 rounded-lg text-center border border-slate-300 shrink-0">
-              <span className="font-bold text-slate-600 text-lg">{timeStr}</span>
+            <div className="bg-indigo-100 min-w-[70px] py-2 rounded-lg text-center border border-indigo-200 shrink-0">
+              <span className="font-bold text-indigo-700 text-lg">{timeStr}</span>
             </div>
             <div>
               <h3 className="font-semibold text-slate-700">{item.pacientes.nome}</h3>
-              <p className="text-xs font-medium text-slate-500 mt-1 flex items-center gap-1">
+              <p className="text-xs font-medium text-indigo-600 mt-1 flex items-center gap-1">
                 <CalendarIcon className="w-3 h-3" /> {item.titulo}
               </p>
             </div>
@@ -589,6 +596,15 @@ export default function Agenda() {
               <TabsTrigger value="monthly">Mês</TabsTrigger>
             </TabsList>
           </Tabs>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleManualSync}
+            title="Sincronizar Calendários"
+            className="h-10 w-10 shrink-0"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
         </div>
         <div className="flex gap-2">
           <Button

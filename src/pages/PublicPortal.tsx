@@ -22,6 +22,7 @@ import {
   CreditCard,
   BrainCircuit,
   Save,
+  QrCode,
 } from 'lucide-react'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
@@ -722,6 +723,12 @@ export default function PublicPortal() {
                     currency: 'BRL',
                   })}
               </p>
+            </div>
+
+            <div className="flex justify-center mb-4 mt-2">
+              <div className="p-4 bg-white border-2 border-slate-200 rounded-xl shadow-sm">
+                <QrCode className="w-32 h-32 text-slate-800" />
+              </div>
             </div>
 
             <div className="space-y-2">

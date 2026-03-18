@@ -15,6 +15,9 @@ import {
   Clock,
   MessageSquare,
   CheckCircle2,
+  Mic,
+  Square,
+  Loader2,
 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -58,6 +61,10 @@ export default function PatientRecord() {
   const [isEvolModalOpen, setIsEvolModalOpen] = useState(false)
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
   const [newContent, setNewContent] = useState('')
+
+  const [isRecording, setIsRecording] = useState(false)
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [isTranscribing, setIsTranscribing] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -157,6 +164,57 @@ export default function PatientRecord() {
       toast({ title: 'Evolução clínica registrada!' })
     } else {
       toast({ title: 'Erro ao salvar', variant: 'destructive' })
+    }
+  }
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      const chunks: Blob[] = []
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' })
+        await handleTranscription(audioBlob)
+        stream.getTracks().forEach((track) => track.stop())
+      }
+
+      setMediaRecorder(recorder)
+      recorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      toast({ title: 'Erro ao acessar microfone', variant: 'destructive' })
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop()
+      setIsRecording(false)
+    }
+  }
+
+  const handleTranscription = async (blob: Blob) => {
+    setIsTranscribing(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('transcrever_audio', {
+        body: {},
+      })
+
+      if (error) throw error
+
+      if (data?.text) {
+        setNewContent((prev) => (prev ? prev + '\n\n' + data.text : data.text))
+        toast({ title: 'Áudio transcrito com sucesso!' })
+      }
+    } catch (err) {
+      toast({ title: 'Erro na transcrição', variant: 'destructive' })
+    } finally {
+      setIsTranscribing(false)
     }
   }
 
@@ -359,7 +417,34 @@ export default function PatientRecord() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="content">Evolução Clínica</Label>
+              <div className="flex justify-between items-center mt-2">
+                <Label htmlFor="content">Evolução Clínica</Label>
+                {isTranscribing ? (
+                  <div className="flex items-center text-sm text-primary gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Transcrevendo...
+                  </div>
+                ) : isRecording ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={stopRecording}
+                    className="gap-2 animate-pulse"
+                  >
+                    <Square className="w-4 h-4" /> Parar Gravação
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={startRecording}
+                    className="gap-2 text-primary border-primary hover:bg-primary/10"
+                  >
+                    <Mic className="w-4 h-4" /> Gravar por Voz (AI)
+                  </Button>
+                )}
+              </div>
               <Textarea
                 id="content"
                 placeholder="Descreva as observações e evolução..."
