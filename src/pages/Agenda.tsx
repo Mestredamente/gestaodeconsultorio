@@ -19,6 +19,8 @@ import {
   Send,
   RefreshCw,
   Trash2,
+  Filter,
+  Search,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -77,6 +79,8 @@ export default function Agenda() {
 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [view, setView] = useState<'daily' | 'weekly' | 'monthly' | 'waitlist'>('daily')
+  const [convenioFilter, setConvenioFilter] = useState<string>('all')
+  const [searchTerm, setSearchTerm] = useState('')
 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false)
@@ -129,7 +133,7 @@ export default function Agenda() {
     const { data, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, is_online, status_whatsapp_lembrete, pacientes (id, nome, valor_sessao, telefone)`,
+        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, is_online, status_whatsapp_lembrete, convenio_id, pacientes (id, nome, valor_sessao, telefone)`,
       )
       .eq('usuario_id', user.id)
       .gte('data_hora', s.toISOString())
@@ -538,7 +542,14 @@ export default function Agenda() {
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-slate-500 font-medium">Valor: {valueStr}</p>
+              <p className="text-sm text-slate-500 font-medium flex items-center gap-2">
+                Valor: {valueStr}
+                {apt.tipo_pagamento === 'convenio' && (
+                  <Badge variant="outline" className="text-[10px] ml-2">
+                    Convênio
+                  </Badge>
+                )}
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
@@ -602,6 +613,25 @@ export default function Agenda() {
     )
   }
 
+  const filteredAppointments = appointments.filter((a) => {
+    // Convênio Filter
+    const matchConvenio =
+      convenioFilter === 'all' ||
+      (convenioFilter === 'particular' && a.tipo_pagamento !== 'convenio') ||
+      a.convenio_id === convenioFilter
+
+    // Global Search Filter
+    const pInfo = Array.isArray(a.pacientes) ? a.pacientes[0] : a.pacientes
+    const s = searchTerm.toLowerCase()
+    const matchSearch =
+      !s ||
+      pInfo?.nome?.toLowerCase().includes(s) ||
+      pInfo?.telefone?.toLowerCase().includes(s) ||
+      a.especialidade?.toLowerCase().includes(s)
+
+    return matchConvenio && matchSearch
+  })
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -643,15 +673,41 @@ export default function Agenda() {
               <TabsTrigger value="waitlist">Espera</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleManualSync}
-            title="Sincronizar Calendários"
-            className="h-10 w-10 shrink-0"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Buscar paciente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-[160px] pl-8 bg-white h-10"
+              />
+            </div>
+            <Select value={convenioFilter} onValueChange={setConvenioFilter}>
+              <SelectTrigger className="w-[160px] bg-white h-10">
+                <Filter className="w-4 h-4 mr-2 text-slate-400" />
+                <SelectValue placeholder="Convênio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="particular">Particular</SelectItem>
+                {convenios.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleManualSync}
+              title="Sincronizar Calendários"
+              className="h-10 w-10 shrink-0"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button
@@ -751,11 +807,13 @@ export default function Agenda() {
                 <div key={`empty-${i}`} />
               ))}
               {getDaysForView().map((d) => {
-                const dayAppts = [...appointments, ...externalEvents, ...blocks].filter((a) => {
-                  if (a.data_hora) return isSameDay(new Date(a.data_hora), d)
-                  if (a.data_inicio) return isSameDay(new Date(a.data_inicio), d)
-                  return false
-                })
+                const dayAppts = [...filteredAppointments, ...externalEvents, ...blocks].filter(
+                  (a) => {
+                    if (a.data_hora) return isSameDay(new Date(a.data_hora), d)
+                    if (a.data_inicio) return isSameDay(new Date(a.data_inicio), d)
+                    return false
+                  },
+                )
                 return (
                   <div
                     key={d.toISOString()}
@@ -803,7 +861,9 @@ export default function Agenda() {
           ) : (
             <div className="space-y-8">
               {getDaysForView().map((d) => {
-                const dayAppts = appointments.filter((a) => isSameDay(new Date(a.data_hora), d))
+                const dayAppts = filteredAppointments.filter((a) =>
+                  isSameDay(new Date(a.data_hora), d),
+                )
                 const dayExts = externalEvents.filter((a) => isSameDay(new Date(a.data_hora), d))
                 const dayBlocks = blocks.filter((b) => isSameDay(new Date(b.data_inicio), d))
 

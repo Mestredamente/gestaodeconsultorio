@@ -18,6 +18,8 @@ import {
   Mic,
   Square,
   Loader2,
+  Eye,
+  FileCheck2,
 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -30,6 +32,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { PrescriptionsList } from '@/components/PrescriptionsList'
 import { QuickMessageDialog } from '@/components/QuickMessageDialog'
@@ -57,14 +66,20 @@ export default function PatientRecord() {
   const [isEditingQueixa, setIsEditingQueixa] = useState(false)
   const [historico, setHistorico] = useState<HistoricoEntry[]>([])
   const [mensagens, setMensagens] = useState<MensagemEntry[]>([])
+  const [laudos, setLaudos] = useState<any[]>([])
+  const [laudoTemplates, setLaudoTemplates] = useState<any[]>([])
 
   const [isEvolModalOpen, setIsEvolModalOpen] = useState(false)
+  const [isLaudoModalOpen, setIsLaudoModalOpen] = useState(false)
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
   const [newContent, setNewContent] = useState('')
 
   const [isRecording, setIsRecording] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [isTranscribing, setIsTranscribing] = useState(false)
+
+  const [laudoContent, setLaudoContent] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState('')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,6 +115,22 @@ export default function PatientRecord() {
         .order('data_envio', { ascending: false })
 
       if (msgData) setMensagens(msgData)
+
+      const { data: laudosData } = await supabase
+        .from('laudos' as any)
+        .select('*')
+        .eq('paciente_id', id)
+        .order('data_emissao', { ascending: false })
+
+      if (laudosData) setLaudos(laudosData)
+
+      const { data: tData } = await supabase
+        .from('templates_documentos')
+        .select('*')
+        .eq('usuario_id', user.id)
+        .eq('tipo', 'laudo')
+
+      if (tData) setLaudoTemplates(tData)
 
       setLoading(false)
     }
@@ -218,6 +249,83 @@ export default function PatientRecord() {
     }
   }
 
+  const handleGenerateLaudo = () => {
+    if (!selectedTemplate) {
+      toast({ title: 'Selecione um template', variant: 'destructive' })
+      return
+    }
+    const t = laudoTemplates.find((x) => x.id === selectedTemplate)
+    if (t) {
+      let content = t.conteudo
+      content = content.replace(/\[Nome do Paciente\]/gi, patient.nome || '')
+      content = content.replace(/\[CPF\]/gi, patient.cpf || '')
+      content = content.replace(/\[Nome do Consultório\]/gi, clinicInfo?.nome_consultorio || '')
+
+      const sessoesResumo = historico
+        .slice(0, 5)
+        .map((h) => `- ${new Date(h.date).toLocaleDateString('pt-BR')}: ${h.content}`)
+        .join('\n')
+      content = content.replace(/\[Resumo Histórico\]/gi, sessoesResumo)
+
+      setLaudoContent(content)
+    }
+  }
+
+  const handleSaveLaudo = async () => {
+    if (!laudoContent.trim()) return
+    const { data, error } = await supabase
+      .from('laudos' as any)
+      .insert({
+        paciente_id: id,
+        usuario_id: user?.id,
+        conteudo: laudoContent,
+        tipo: 'psicologico',
+      })
+      .select()
+      .single()
+
+    if (!error && data) {
+      toast({ title: 'Laudo gerado e salvo com sucesso!' })
+      setLaudos([data, ...laudos])
+      setIsLaudoModalOpen(false)
+      setLaudoContent('')
+      setSelectedTemplate('')
+    } else {
+      toast({ title: 'Erro ao salvar', variant: 'destructive' })
+    }
+  }
+
+  const printLaudo = (laudo: any) => {
+    const printWindow = window.open('', '_blank')
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Laudo Psicológico - ${patient.nome}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 40px; line-height: 1.6; }
+              .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 40px; }
+              .footer { text-align: center; margin-top: 60px; font-size: 12px; color: #666; }
+              .content { white-space: pre-wrap; text-align: justify; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>${clinicInfo?.nome_consultorio || 'Consultório Psicológico'}</h1>
+              <h3>LAUDO PSICOLÓGICO</h3>
+            </div>
+            <div class="content">${laudo.conteudo}</div>
+            <div class="footer">
+              <p>Emitido em ${new Date(laudo.data_emissao).toLocaleDateString('pt-BR')}</p>
+            </div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.print()
+    }
+  }
+
   if (loading)
     return (
       <div className="flex justify-center py-20">
@@ -310,6 +418,9 @@ export default function PatientRecord() {
             <TabsTrigger value="prescricoes" className="gap-2 py-2.5 px-4">
               <FileText className="w-4 h-4" /> Documentos
             </TabsTrigger>
+            <TabsTrigger value="laudos" className="gap-2 py-2.5 px-4">
+              <FileCheck2 className="w-4 h-4" /> Laudos Psicológicos
+            </TabsTrigger>
             <TabsTrigger value="mensagens" className="gap-2 py-2.5 px-4">
               <MessageSquare className="w-4 h-4" /> Mensagens
             </TabsTrigger>
@@ -361,6 +472,53 @@ export default function PatientRecord() {
 
           <TabsContent value="prescricoes">
             <PrescriptionsList pacienteId={id} clinicInfo={clinicInfo} patientName={patient.nome} />
+          </TabsContent>
+
+          <TabsContent value="laudos" className="space-y-4">
+            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+              <div>
+                <h3 className="font-semibold text-slate-800">Laudos Psicológicos</h3>
+                <p className="text-sm text-slate-500">
+                  Gere documentos formais com base no histórico do paciente.
+                </p>
+              </div>
+              <Button onClick={() => setIsLaudoModalOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4" /> Gerar Laudo
+              </Button>
+            </div>
+
+            {laudos.length === 0 ? (
+              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                Nenhum laudo gerado para este paciente.
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {laudos.map((l) => (
+                  <Card key={l.id} className="shadow-sm">
+                    <CardContent className="p-4 flex justify-between items-start">
+                      <div>
+                        <h4 className="font-semibold text-slate-800 flex items-center gap-2">
+                          <FileCheck2 className="w-4 h-4 text-primary" /> Laudo Psicológico
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Emitido em {new Date(l.data_emissao).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => printLaudo(l)}
+                          className="gap-2"
+                        >
+                          <Printer className="w-4 h-4" /> Imprimir
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="mensagens" className="space-y-4">
@@ -460,6 +618,59 @@ export default function PatientRecord() {
             </Button>
             <Button onClick={saveEvolucao} className="gap-2">
               <Save className="w-4 h-4" /> Salvar Evolução
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isLaudoModalOpen} onOpenChange={setIsLaudoModalOpen}>
+        <DialogContent className="sm:max-w-3xl p-0">
+          <DialogHeader className="p-6 pb-4 bg-slate-50 border-b border-slate-100">
+            <DialogTitle>Gerar Laudo Psicológico</DialogTitle>
+          </DialogHeader>
+          <div className="p-6 space-y-4">
+            <div className="flex gap-4 items-end">
+              <div className="space-y-2 flex-1">
+                <Label>Template de Laudo</Label>
+                <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um modelo base..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {laudoTemplates.length === 0 && (
+                      <SelectItem value="empty" disabled>
+                        Nenhum template encontrado (Crie em Configurações)
+                      </SelectItem>
+                    )}
+                    {laudoTemplates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.titulo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleGenerateLaudo} variant="secondary" className="gap-2">
+                <RefreshCw className="w-4 h-4" /> Preencher Dados
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Conteúdo do Laudo (Editável)</Label>
+              <Textarea
+                className="min-h-[300px] font-mono text-sm"
+                value={laudoContent}
+                onChange={(e) => setLaudoContent(e.target.value)}
+                placeholder="Selecione o template e clique em preencher para carregar as informações do paciente e histórico..."
+              />
+            </div>
+          </div>
+          <DialogFooter className="p-6 pt-4 bg-slate-50 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setIsLaudoModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveLaudo} disabled={!laudoContent.trim()}>
+              Salvar Documento Oficial
             </Button>
           </DialogFooter>
         </DialogContent>

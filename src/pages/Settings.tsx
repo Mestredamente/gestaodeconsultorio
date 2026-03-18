@@ -27,11 +27,21 @@ import {
   MessageCircle,
   Building2,
   MapPin,
+  Check,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { TemplatesManager } from '@/components/TemplatesManager'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 
 const predefinedApproaches = [
   'Terapia Cognitivo-Comportamental (TCC)',
@@ -44,6 +54,9 @@ const predefinedApproaches = [
   'Psicologia Junguiana',
   'Terapia Sistêmica',
   'Neuropsicologia',
+  'Terapia de Casal',
+  'Terapia Infantil',
+  'Orientação Profissional',
 ]
 
 export default function Settings() {
@@ -72,10 +85,12 @@ export default function Settings() {
   const [questions, setQuestions] = useState<any[]>([])
   const [lembreteAtivo, setLembreteAtivo] = useState(false)
   const [templateLembrete, setTemplateLembrete] = useState(
-    'Olá [Nome], você tem uma consulta marcada conosco para [data] às [hora]. Confirme presena clicando aqui: [link_confirmacao]',
+    'Olá [Nome], você tem uma consulta marcada conosco para [data] às [hora]. Confirme presença clicando aqui: [link_confirmacao]',
   )
   const [especialidades, setEspecialidades] = useState<string[]>([])
   const [novaEspecialidade, setNovaEspecialidade] = useState('')
+  const [popoverOpen, setPopoverOpen] = useState(false)
+
   const [metaConsultas, setMetaConsultas] = useState(50)
   const [syncCals, setSyncCals] = useState({ google: false, outlook: false })
   const [userTemplates, setUserTemplates] = useState<any[]>([])
@@ -161,10 +176,18 @@ export default function Settings() {
     else toast({ title: 'Configurações salvas!' })
   }
 
-  const addEspecialidade = () => {
+  const addCustomEspecialidade = () => {
     if (novaEspecialidade.trim() && !especialidades.includes(novaEspecialidade.trim())) {
       setEspecialidades([...especialidades, novaEspecialidade.trim()])
       setNovaEspecialidade('')
+    }
+  }
+
+  const toggleEspecialidade = (esp: string) => {
+    if (especialidades.includes(esp)) {
+      setEspecialidades(especialidades.filter((e) => e !== esp))
+    } else {
+      setEspecialidades([...especialidades, esp])
     }
   }
 
@@ -570,58 +593,93 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="especialidades" className="p-6 m-0 space-y-5">
-            <div>
-              <h3 className="font-semibold text-slate-900">Especialidades e Abordagens</h3>
-              <p className="text-sm text-slate-500">
-                Cadastre as abordagens psicológicas e serviços que ficarão disponíveis para
-                agendamento.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={novaEspecialidade}
-                onChange={(e) => setNovaEspecialidade(e.target.value)}
-                placeholder="Ex: Terapia de Casal..."
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addEspecialidade())}
-              />
-              <Button type="button" onClick={addEspecialidade} variant="secondary">
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-2">
-              {predefinedApproaches.map((a) => (
-                <Button
-                  key={a}
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  className="text-xs"
-                  onClick={() => {
-                    if (!especialidades.includes(a)) setEspecialidades([...especialidades, a])
-                  }}
-                >
-                  + {a}
-                </Button>
-              ))}
-            </div>
-            <div className="space-y-2 pt-4">
-              {especialidades.map((esp, idx) => (
-                <div
-                  key={idx}
-                  className="flex justify-between items-center bg-slate-50 px-3 py-2 rounded-md border border-slate-100"
-                >
-                  <span className="text-sm font-medium">{esp}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => setEspecialidades(especialidades.filter((_, i) => i !== idx))}
-                  >
-                    <Trash2 className="w-4 h-4" />
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-slate-900">Especialidades e Abordagens</h3>
+                <p className="text-sm text-slate-500">
+                  Cadastre as abordagens psicológicas e serviços que ficarão disponíveis para
+                  agendamento.
+                </p>
+              </div>
+
+              <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button className="gap-2 rounded-full px-4">
+                    <Plus className="w-4 h-4" /> Adicionar Especialidade
                   </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="end">
+                  <Command>
+                    <CommandInput placeholder="Buscar especialidade..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhuma especialidade encontrada.</CommandEmpty>
+                      <CommandGroup heading="Abordagens Comuns">
+                        {predefinedApproaches.map((a) => (
+                          <CommandItem
+                            key={a}
+                            onSelect={() => toggleEspecialidade(a)}
+                            className="cursor-pointer"
+                          >
+                            <div
+                              className={`mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary ${especialidades.includes(a) ? 'bg-primary text-primary-foreground' : 'opacity-50'}`}
+                            >
+                              {especialidades.includes(a) && <Check className="h-3 w-3" />}
+                            </div>
+                            {a}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                    <div className="p-2 border-t border-slate-100 flex gap-2">
+                      <Input
+                        placeholder="Outra..."
+                        value={novaEspecialidade}
+                        onChange={(e) => setNovaEspecialidade(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addCustomEspecialidade()
+                          }
+                        }}
+                        className="h-8 text-xs"
+                      />
+                      <Button size="sm" className="h-8" onClick={addCustomEspecialidade}>
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2 pt-4">
+              {especialidades.length === 0 ? (
+                <div className="text-center py-6 text-slate-500 border border-dashed rounded-lg">
+                  Nenhuma especialidade selecionada.
                 </div>
-              ))}
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {especialidades.map((esp, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-md border border-slate-100 shadow-sm"
+                    >
+                      <span className="text-sm font-medium text-slate-700">{esp}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() =>
+                          setEspecialidades(especialidades.filter((_, i) => i !== idx))
+                        }
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </TabsContent>
 

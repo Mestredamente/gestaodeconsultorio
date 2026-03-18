@@ -11,6 +11,9 @@ import {
   Users,
   MessageCircle,
   ChevronRight,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -31,6 +34,13 @@ import { PerformanceDashboard } from '@/components/PerformanceDashboard'
 import { MentalHealthIndicators } from '@/components/MentalHealthIndicators'
 import { measurePerformance } from '@/lib/performance'
 
+const DEFAULT_WIDGETS = [
+  { id: 'agenda', label: 'Agenda de Hoje', visible: true, order: 0 },
+  { id: 'dashboard', label: 'Dashboard de Performance', visible: true, order: 1 },
+  { id: 'indicators', label: 'Indicadores de Bem-estar', visible: true, order: 2 },
+  { id: 'goals', label: 'Metas e Supervisão', visible: true, order: 3 },
+]
+
 export default function Index() {
   const { user, signOut } = useAuth()
   const { toast } = useToast()
@@ -40,11 +50,9 @@ export default function Index() {
   const [waitlist, setWaitlist] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [prefs, setPrefs] = useState({
-    show_agenda: true,
-    show_dashboard: true,
-    show_stock_alert: true,
-  })
+
+  const [widgets, setWidgets] = useState(DEFAULT_WIDGETS)
+  const [isConfigOpen, setIsConfigOpen] = useState(false)
 
   const todayStr = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -117,7 +125,20 @@ export default function Index() {
           .select('preferencias_dashboard')
           .eq('id', user.id)
           .maybeSingle()
-        if (u?.preferencias_dashboard) setPrefs(u.preferencias_dashboard)
+
+        if (u?.preferencias_dashboard?.widgets) {
+          setWidgets(u.preferencias_dashboard.widgets)
+        } else if (u?.preferencias_dashboard) {
+          // Backward compatibility mapping
+          const mapped = DEFAULT_WIDGETS.map((w) => {
+            if (w.id === 'agenda' && u.preferencias_dashboard.show_agenda === false)
+              return { ...w, visible: false }
+            if (w.id === 'dashboard' && u.preferencias_dashboard.show_dashboard === false)
+              return { ...w, visible: false }
+            return w
+          })
+          setWidgets(mapped)
+        }
 
         const startOfDay = new Date()
         startOfDay.setHours(0, 0, 0, 0)
@@ -163,186 +184,43 @@ export default function Index() {
     else fetchIndexData()
   }
 
-  const savePrefs = async (newPref: any) => {
-    const updated = { ...prefs, ...newPref }
-    setPrefs(updated)
-    await supabase.from('usuarios').update({ preferencias_dashboard: updated }).eq('id', user?.id)
+  const savePrefs = async (newWidgets: typeof widgets) => {
+    setWidgets(newWidgets)
+    await supabase
+      .from('usuarios')
+      .update({ preferencias_dashboard: { widgets: newWidgets } })
+      .eq('id', user?.id)
   }
 
-  return (
-    <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a)!</h1>
-          <p className="text-slate-500 capitalize">{todayStr}</p>
-        </div>
-        <div className="flex gap-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Settings2 className="w-5 h-5" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Configurar Dashboard</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="flex items-center justify-between">
-                  <Label>Mostrar Dashboard</Label>
-                  <Switch
-                    checked={prefs.show_dashboard !== false}
-                    onCheckedChange={(v) => savePrefs({ show_dashboard: v })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Mostrar Agenda de Hoje</Label>
-                  <Switch
-                    checked={prefs.show_agenda !== false}
-                    onCheckedChange={(v) => savePrefs({ show_agenda: v })}
-                  />
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Button variant="outline" className="text-slate-600 gap-2" onClick={() => signOut()}>
-            <LogOut className="w-4 h-4" /> Sair da Conta
-          </Button>
-        </div>
-      </div>
+  const toggleWidget = (id: string, visible: boolean) => {
+    const updated = widgets.map((w) => (w.id === id ? { ...w, visible } : w))
+    savePrefs(updated)
+  }
 
-      {prefs.show_dashboard !== false && (
-        <div className="space-y-6">
-          <PerformanceDashboard />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  const moveWidget = (index: number, direction: -1 | 1) => {
+    if (index + direction < 0 || index + direction >= widgets.length) return
+    const updated = [...widgets]
+    const temp = updated[index]
+    updated[index] = updated[index + direction]
+    updated[index + direction] = temp
+
+    const reordered = updated.map((w, i) => ({ ...w, order: i }))
+    savePrefs(reordered)
+  }
+
+  const renderWidget = (id: string) => {
+    switch (id) {
+      case 'dashboard':
+        return <PerformanceDashboard key="dashboard" />
+      case 'indicators':
+        return (
+          <div key="indicators" className="w-full lg:w-1/2">
             <MentalHealthIndicators />
           </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="space-y-6">
-          <ServiceGoalTracker />
-
-          <Card
-            className="shadow-sm border-slate-200 cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => navigate('/supervisao')}
-          >
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-slate-800 text-sm">Supervisão Clínica</h3>
-                  <p className="text-xs text-slate-500">Casos e orientações</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
-                <Users className="w-4 h-4 text-primary" /> Fila de Espera
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-xs px-2"
-                onClick={() => navigate('/agenda')}
-              >
-                Gerenciar
-              </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-slate-100 max-h-[250px] overflow-y-auto">
-                {waitlist.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-slate-500">
-                    Nenhum paciente aguardando.
-                  </div>
-                ) : (
-                  waitlist.map((wl) => (
-                    <div
-                      key={wl.id}
-                      className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center gap-2"
-                    >
-                      <div>
-                        <p className="font-semibold text-sm text-slate-800 leading-tight">
-                          {wl.pacientes?.nome}
-                        </p>
-                        <div className="flex gap-1 mt-1.5 flex-wrap">
-                          {wl.dias_semana.slice(0, 2).map((d: string) => (
-                            <span
-                              key={d}
-                              className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded capitalize"
-                            >
-                              {d}
-                            </span>
-                          ))}
-                          {wl.periodos.slice(0, 1).map((p: string) => (
-                            <span
-                              key={p}
-                              className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded capitalize"
-                            >
-                              {p}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      {wl.pacientes?.telefone && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 shrink-0 text-emerald-600 hover:bg-emerald-50"
-                          onClick={() =>
-                            window.open(
-                              `https://wa.me/${wl.pacientes.telefone.replace(/\D/g, '')}`,
-                              '_blank',
-                            )
-                          }
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-              <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
-                <Bell className="w-4 h-4 text-primary" /> Notificações
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto">
-                {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-slate-500">Nenhuma notificação.</div>
-                ) : (
-                  notifications.map((n) => (
-                    <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors">
-                      <p className="font-semibold text-sm text-slate-800 leading-tight">
-                        {n.titulo}
-                      </p>
-                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">{n.mensagem}</p>
-                      <p className="text-[10px] text-slate-400 mt-1.5">
-                        {new Date(n.data_criacao).toLocaleString('pt-BR')}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {prefs.show_agenda !== false && (
-          <Card className="lg:col-span-2 shadow-sm border-slate-200 h-fit">
+        )
+      case 'agenda':
+        return (
+          <Card key="agenda" className="shadow-sm border-slate-200 w-full lg:w-2/3 h-fit">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" /> Sessões de Hoje
@@ -419,7 +297,202 @@ export default function Index() {
               )}
             </CardContent>
           </Card>
-        )}
+        )
+      case 'goals':
+        return (
+          <div key="goals" className="space-y-6 w-full lg:w-1/3">
+            <ServiceGoalTracker />
+            <Card
+              className="shadow-sm border-slate-200 cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => navigate('/supervisao')}
+            >
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-800 text-sm">Supervisão Clínica</h3>
+                    <p className="text-xs text-slate-500">Casos e orientações</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm border-slate-200">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                  <Users className="w-4 h-4 text-primary" /> Fila de Espera
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs px-2"
+                  onClick={() => navigate('/agenda')}
+                >
+                  Gerenciar
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-slate-100 max-h-[250px] overflow-y-auto">
+                  {waitlist.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-slate-500">
+                      Nenhum paciente aguardando.
+                    </div>
+                  ) : (
+                    waitlist.map((wl) => (
+                      <div
+                        key={wl.id}
+                        className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center gap-2"
+                      >
+                        <div>
+                          <p className="font-semibold text-sm text-slate-800 leading-tight">
+                            {wl.pacientes?.nome}
+                          </p>
+                          <div className="flex gap-1 mt-1.5 flex-wrap">
+                            {wl.dias_semana.slice(0, 2).map((d: string) => (
+                              <span
+                                key={d}
+                                className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded capitalize"
+                              >
+                                {d}
+                              </span>
+                            ))}
+                            {wl.periodos.slice(0, 1).map((p: string) => (
+                              <span
+                                key={p}
+                                className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded capitalize"
+                              >
+                                {p}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        {wl.pacientes?.telefone && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 shrink-0 text-emerald-600 hover:bg-emerald-50"
+                            onClick={() =>
+                              window.open(
+                                `https://wa.me/${wl.pacientes.telefone.replace(/\D/g, '')}`,
+                                '_blank',
+                              )
+                            }
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm border-slate-200">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+                <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                  <Bell className="w-4 h-4 text-primary" /> Notificações
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-slate-500">
+                      Nenhuma notificação.
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors">
+                        <p className="font-semibold text-sm text-slate-800 leading-tight">
+                          {n.titulo}
+                        </p>
+                        <p className="text-xs text-slate-600 mt-1 line-clamp-2">{n.mensagem}</p>
+                        <p className="text-[10px] text-slate-400 mt-1.5">
+                          {new Date(n.data_criacao).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+
+  const visibleWidgets = [...widgets].sort((a, b) => a.order - b.order).filter((w) => w.visible)
+
+  return (
+    <div className="space-y-8 animate-fade-in pb-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a)!</h1>
+          <p className="text-slate-500 capitalize">{todayStr}</p>
+        </div>
+        <div className="flex gap-2">
+          <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Settings2 className="w-5 h-5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Configurar Dashboard</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 py-4">
+                {widgets
+                  .sort((a, b) => a.order - b.order)
+                  .map((w, index) => (
+                    <div
+                      key={w.id}
+                      className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100"
+                    >
+                      <div className="flex items-center gap-3">
+                        <GripVertical className="w-4 h-4 text-slate-400 cursor-grab" />
+                        <Label className="cursor-pointer">{w.label}</Label>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={w.visible}
+                          onCheckedChange={(v) => toggleWidget(w.id, v)}
+                        />
+                        <div className="flex flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => moveWidget(index, -1)}
+                            disabled={index === 0}
+                            className="text-slate-400 hover:text-primary disabled:opacity-30"
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveWidget(index, 1)}
+                            disabled={index === widgets.length - 1}
+                            className="text-slate-400 hover:text-primary disabled:opacity-30"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" className="text-slate-600 gap-2" onClick={() => signOut()}>
+            <LogOut className="w-4 h-4" /> Sair da Conta
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-6 items-start">
+        {visibleWidgets.map((w) => renderWidget(w.id))}
       </div>
     </div>
   )

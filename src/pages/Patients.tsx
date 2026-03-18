@@ -30,7 +30,15 @@ export default function Patients() {
     fetchPatients()
   }, [user])
 
-  const filtered = patients.filter((p) => p.nome.toLowerCase().includes(search.toLowerCase()))
+  const filtered = patients.filter((p) => {
+    const s = search.toLowerCase()
+    return (
+      p.nome?.toLowerCase().includes(s) ||
+      p.cpf?.toLowerCase().includes(s) ||
+      p.telefone?.toLowerCase().includes(s) ||
+      p.email?.toLowerCase().includes(s)
+    )
+  })
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-10">
@@ -53,7 +61,7 @@ export default function Patients() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
               className="pl-9 bg-white"
-              placeholder="Buscar por nome ou CPF..."
+              placeholder="Buscar por nome, email, CPF ou telefone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

@@ -14,7 +14,7 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
-import { Send } from 'lucide-react'
+import { Send, Target } from 'lucide-react'
 
 export function SelfCareNewsletter() {
   const { user } = useAuth()
@@ -23,6 +23,7 @@ export function SelfCareNewsletter() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [titulo, setTitulo] = useState('')
   const [conteudo, setConteudo] = useState('')
+  const [therapeuticGoal, setTherapeuticGoal] = useState('all')
   const [sending, setSending] = useState(false)
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export function SelfCareNewsletter() {
 
     try {
       const res = await supabase.functions.invoke('enviar_comunicado_massa', {
-        body: { titulo, conteudo, tipo: 'newsletter' },
+        body: { titulo, conteudo, tipo: 'newsletter', objetivo_terapeutico: therapeuticGoal },
       })
 
       if (res.error) throw res.error
@@ -61,7 +62,7 @@ export function SelfCareNewsletter() {
       await supabase.from('notificacoes').insert({
         usuario_id: user.id,
         titulo: 'Newsletter Enviada',
-        mensagem: `A newsletter "${titulo}" foi enviada para ${res.data?.count || 0} pacientes ativos.`,
+        mensagem: `A newsletter "${titulo}" foi enviada para ${res.data?.count || 0} pacientes.`,
       })
 
       toast({ title: 'Newsletter disparada com sucesso!' })
@@ -82,27 +83,44 @@ export function SelfCareNewsletter() {
   return (
     <Card className="shadow-sm border-slate-200">
       <CardHeader className="bg-slate-50/50 border-b border-slate-100">
-        <CardTitle className="text-lg">Newsletter de Autocuidado</CardTitle>
+        <CardTitle className="text-lg">Newsletter Dinâmica de Autocuidado</CardTitle>
         <CardDescription>
-          Envie conteúdos terapêuticos e mensagens para seus pacientes ativos (consultas nos últimos
-          90 dias).
+          Envie conteúdos terapêuticos direcionados com base nas necessidades dos pacientes.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-6 space-y-4">
-        <div className="space-y-2">
-          <Label>Selecionar Template</Label>
-          <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Escolha um modelo..." />
-            </SelectTrigger>
-            <SelectContent>
-              {templates.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.titulo}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Público Alvo (Objetivo Terapêutico)</Label>
+            <Select value={therapeuticGoal} onValueChange={setTherapeuticGoal}>
+              <SelectTrigger className="bg-white">
+                <Target className="w-4 h-4 mr-2 text-slate-400" />
+                <SelectValue placeholder="Todos os pacientes ativos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os pacientes ativos</SelectItem>
+                <SelectItem value="ansiedade">Foco: Ansiedade / Estresse</SelectItem>
+                <SelectItem value="depressao">Foco: Depressão / Humor</SelectItem>
+                <SelectItem value="relacionamento">Foco: Relacionamentos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Selecionar Template</Label>
+            <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="Escolha um modelo..." />
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.titulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -130,7 +148,7 @@ export function SelfCareNewsletter() {
           className="w-full gap-2"
         >
           <Send className="w-4 h-4" />
-          {sending ? 'Enviando...' : 'Disparar para Pacientes Ativos'}
+          {sending ? 'Enviando...' : 'Disparar Newsletter Dinâmica'}
         </Button>
       </CardContent>
     </Card>

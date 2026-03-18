@@ -15,7 +15,7 @@ Deno.serve(async (req: Request) => {
     } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 
-    const { titulo, conteudo, tipo } = await req.json()
+    const { titulo, conteudo, tipo, objetivo_terapeutico } = await req.json()
 
     // Registra a campanha no banco
     const { data: campanha, error: campError } = await supabase
@@ -42,13 +42,27 @@ Deno.serve(async (req: Request) => {
       .eq('usuario_id', user.id)
       .gte('data_hora', ninetyDaysAgo.toISOString())
 
-    const activePatientIds = new Set(agendamentos?.map((a) => a.paciente_id) || [])
+    let activePatientIds = new Set(agendamentos?.map((a) => a.paciente_id) || [])
+
+    // Lógica para filtrar por objetivo (Dynamic Newsletter). Em um cenário real,
+    // os prontuários ou a tabela de pacientes teriam uma flag `objetivo_terapeutico`.
+    // Aqui usamos uma simulação que checaria o histórico ou simplesmente pegaria todos se for 'all'.
+    if (objetivo_terapeutico && objetivo_terapeutico !== 'all') {
+      const { data: prontuarios } = await supabase
+        .from('prontuarios')
+        .select('paciente_id, queixa_principal')
+        .eq('usuario_id', user.id)
+        .ilike('queixa_principal', `%${objetivo_terapeutico}%`)
+
+      const filteredSet = new Set(prontuarios?.map((p) => p.paciente_id) || [])
+      // Intersection
+      activePatientIds = new Set([...activePatientIds].filter((x) => filteredSet.has(x)))
+    }
 
     const validPatients = (pacientes || []).filter(
       (p) => p.email && p.email.trim() !== '' && activePatientIds.has(p.id),
     )
 
-    // TODO: Integração real com provedor de email (SendGrid, Resend, etc.) para envio em massa.
     // Simulando o delay do envio
     await new Promise((resolve) => setTimeout(resolve, 500))
 
@@ -58,7 +72,12 @@ Deno.serve(async (req: Request) => {
       acao: 'SEND_MASS_EMAIL',
       tabela_afetada: 'comunicacoes_campanhas',
       registro_id: campanha.id,
-      detalhes: { recipients_count: validPatients.length, titulo, action: 'Mock Send' },
+      detalhes: {
+        recipients_count: validPatients.length,
+        titulo,
+        action: 'Mock Send',
+        filter: objetivo_terapeutico,
+      },
     })
 
     return new Response(JSON.stringify({ success: true, count: validPatients.length, campanha }), {
