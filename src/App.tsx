@@ -15,6 +15,7 @@ import Settings from './pages/Settings'
 import Stock from './pages/Stock'
 import Logs from './pages/Logs'
 import Marketing from './pages/Marketing'
+import Supervision from './pages/Supervision'
 import TelehealthSession from './pages/TelehealthSession'
 import PublicTelehealth from './pages/PublicTelehealth'
 import PublicBooking from './pages/PublicBooking'
@@ -85,6 +86,7 @@ const AppRoutes = () => (
       <Route path="/carteira" element={<Finances />} />
       <Route path="/financeiro" element={<Navigate to="/carteira" replace />} />
       <Route path="/marketing" element={<Marketing />} />
+      <Route path="/supervisao" element={<Supervision />} />
       <Route path="/relatorios" element={<Reports />} />
       <Route path="/estoque" element={<Stock />} />
       <Route path="/logs" element={<Logs />} />

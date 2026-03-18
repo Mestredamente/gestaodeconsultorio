@@ -1,7 +1,17 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Check, X, LogOut, Settings2, Bell, Users, MessageCircle } from 'lucide-react'
+import {
+  Calendar,
+  Check,
+  X,
+  LogOut,
+  Settings2,
+  Bell,
+  Users,
+  MessageCircle,
+  ChevronRight,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -18,6 +28,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { ServiceGoalTracker } from '@/components/ServiceGoalTracker'
 import { PerformanceDashboard } from '@/components/PerformanceDashboard'
+import { MentalHealthIndicators } from '@/components/MentalHealthIndicators'
 import { measurePerformance } from '@/lib/performance'
 
 export default function Index() {
@@ -200,11 +211,36 @@ export default function Index() {
         </div>
       </div>
 
-      {prefs.show_dashboard !== false && <PerformanceDashboard />}
+      {prefs.show_dashboard !== false && (
+        <div className="space-y-6">
+          <PerformanceDashboard />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <MentalHealthIndicators />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-6">
           <ServiceGoalTracker />
+
+          <Card
+            className="shadow-sm border-slate-200 cursor-pointer hover:border-primary/50 transition-colors"
+            onClick={() => navigate('/supervisao')}
+          >
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-800 text-sm">Supervisão Clínica</h3>
+                  <p className="text-xs text-slate-500">Casos e orientações</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </CardContent>
+          </Card>
 
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">

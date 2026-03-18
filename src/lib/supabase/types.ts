@@ -479,6 +479,48 @@ export type Database = {
           },
         ]
       }
+      lista_espera: {
+        Row: {
+          created_at: string
+          dias_semana: string[]
+          id: string
+          paciente_id: string
+          periodos: string[]
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          dias_semana: string[]
+          id?: string
+          paciente_id: string
+          periodos: string[]
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          dias_semana?: string[]
+          id?: string
+          paciente_id?: string
+          periodos?: string[]
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'lista_espera_paciente_id_fkey'
+            columns: ['paciente_id']
+            isOneToOne: false
+            referencedRelation: 'pacientes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'lista_espera_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       logs_auditoria: {
         Row: {
           acao: string
@@ -1218,6 +1260,13 @@ export const Constants = {
 //   conteudo: text (not null)
 //   status_envio: text (not null, default: 'enviado'::text)
 //   data_envio: timestamp with time zone (not null, default: now())
+// Table: lista_espera
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   paciente_id: uuid (not null)
+//   dias_semana: _text (not null)
+//   periodos: _text (not null)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: logs_auditoria
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -1366,6 +1415,10 @@ export const Constants = {
 //   FOREIGN KEY historico_mensagens_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY historico_mensagens_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY historico_mensagens_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: lista_espera
+//   FOREIGN KEY lista_espera_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
+//   PRIMARY KEY lista_espera_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY lista_espera_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 // Table: logs_auditoria
 //   PRIMARY KEY logs_auditoria_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY logs_auditoria_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
@@ -1456,6 +1509,10 @@ export const Constants = {
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: historico_mensagens
 //   Policy "historico_mensagens_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (usuario_id = auth.uid())
+//     WITH CHECK: (usuario_id = auth.uid())
+// Table: lista_espera
+//   Policy "lista_espera_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
 // Table: logs_auditoria
