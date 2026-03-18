@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Calendar, Check, X, LogOut, Settings2, Bell } from 'lucide-react'
+import { Calendar, Check, X, LogOut, Settings2, Bell, Users, MessageCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -26,6 +26,7 @@ export default function Index() {
   const navigate = useNavigate()
   const [appointments, setAppointments] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
+  const [waitlist, setWaitlist] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [prefs, setPrefs] = useState({
@@ -123,6 +124,15 @@ export default function Index() {
           .order('data_hora', { ascending: true })
 
         if (apptsRes.data) setAppointments(apptsRes.data)
+
+        const { data: wlData } = await supabase
+          .from('lista_espera' as any)
+          .select('id, dias_semana, periodos, pacientes(nome, telefone)')
+          .eq('usuario_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5)
+
+        if (wlData) setWaitlist(wlData)
       })
     } catch (err) {
       setError(true)
@@ -197,9 +207,80 @@ export default function Index() {
           <ServiceGoalTracker />
 
           <Card className="shadow-sm border-slate-200">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                <Users className="w-4 h-4 text-primary" /> Fila de Espera
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={() => navigate('/agenda')}
+              >
+                Gerenciar
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-100 max-h-[250px] overflow-y-auto">
+                {waitlist.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-slate-500">
+                    Nenhum paciente aguardando.
+                  </div>
+                ) : (
+                  waitlist.map((wl) => (
+                    <div
+                      key={wl.id}
+                      className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center gap-2"
+                    >
+                      <div>
+                        <p className="font-semibold text-sm text-slate-800 leading-tight">
+                          {wl.pacientes?.nome}
+                        </p>
+                        <div className="flex gap-1 mt-1.5 flex-wrap">
+                          {wl.dias_semana.slice(0, 2).map((d: string) => (
+                            <span
+                              key={d}
+                              className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded capitalize"
+                            >
+                              {d}
+                            </span>
+                          ))}
+                          {wl.periodos.slice(0, 1).map((p: string) => (
+                            <span
+                              key={p}
+                              className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded capitalize"
+                            >
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {wl.pacientes?.telefone && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 shrink-0 text-emerald-600 hover:bg-emerald-50"
+                          onClick={() =>
+                            window.open(
+                              `https://wa.me/${wl.pacientes.telefone.replace(/\D/g, '')}`,
+                              '_blank',
+                            )
+                          }
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-slate-200">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
               <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
-                <Bell className="w-4 h-4 text-primary" /> Notificações Recentes
+                <Bell className="w-4 h-4 text-primary" /> Notificações
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -239,7 +320,7 @@ export default function Index() {
               ) : appointments.length === 0 ? (
                 <div className="p-8 text-center text-slate-500">Nenhuma sessão para hoje.</div>
               ) : (
-                <div className="divide-y divide-slate-100 max-h-[400px] overflow-y-auto">
+                <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
                   {appointments.map((apt) => {
                     const pInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
                     const time = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
@@ -266,7 +347,11 @@ export default function Index() {
                                   ? 'bg-emerald-100 text-emerald-700'
                                   : apt.status === 'confirmado'
                                     ? 'bg-indigo-100 text-indigo-700'
-                                    : 'bg-slate-100 text-slate-700',
+                                    : apt.status === 'desmarcou'
+                                      ? 'bg-amber-100 text-amber-700'
+                                      : apt.status === 'faltou'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-slate-100 text-slate-700',
                               )}
                             >
                               {apt.status}
