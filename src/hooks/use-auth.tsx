@@ -35,15 +35,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+      if (event === 'SIGNED_OUT') {
+        setSession(null)
+        setUser(null)
+      } else {
+        setSession(session)
+        setUser(session?.user ?? null)
+      }
       setLoading(false)
     })
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+
+    // Handle session restoration carefully to catch invalid refresh tokens
+    supabase.auth
+      .getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('Auth session error:', error.message)
+          // If the refresh token is invalid or missing, clear the stale session
+          if (
+            error.message.toLowerCase().includes('refresh token') ||
+            error.name.includes('AuthSessionMissingError')
+          ) {
+            supabase.auth.signOut().catch(() => {})
+          }
+          setSession(null)
+          setUser(null)
+        } else {
+          setSession(session)
+          setUser(session?.user ?? null)
+        }
+      })
+      .catch((err) => {
+        console.error('Unexpected auth error during getSession:', err)
+        // Fallback cleanup
+        supabase.auth.signOut().catch(() => {})
+        setSession(null)
+        setUser(null)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+
     return () => subscription.unsubscribe()
   }, [])
 
