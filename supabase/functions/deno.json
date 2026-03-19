@@ -1,5 +1,5 @@
-{}
- "_versions": {
+{
+  "_versions": {
     "enviar_cobranca_whatsapp": 8,
     "enviar_lembrete_consulta": 11,
     "emitir_nota_fiscal": 2,
