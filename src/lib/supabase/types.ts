@@ -985,7 +985,9 @@ export type Database = {
           anamnese_template: Json | null
           chave_pix: string | null
           email: string | null
+          endereco_consultorio: string | null
           especialidades_disponiveis: string[] | null
+          horario_funcionamento: Json | null
           id: string
           lembrete_whatsapp_ativo: boolean | null
           logo_url: string | null
@@ -995,6 +997,7 @@ export type Database = {
           pre_consulta_ativa: boolean | null
           preferencias_dashboard: Json | null
           sync_calendarios: Json | null
+          telefone_consultorio: string | null
           template_cobranca: string | null
           template_confirmacao: string | null
           template_lembrete: string | null
@@ -1008,7 +1011,9 @@ export type Database = {
           anamnese_template?: Json | null
           chave_pix?: string | null
           email?: string | null
+          endereco_consultorio?: string | null
           especialidades_disponiveis?: string[] | null
+          horario_funcionamento?: Json | null
           id: string
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
@@ -1018,6 +1023,7 @@ export type Database = {
           pre_consulta_ativa?: boolean | null
           preferencias_dashboard?: Json | null
           sync_calendarios?: Json | null
+          telefone_consultorio?: string | null
           template_cobranca?: string | null
           template_confirmacao?: string | null
           template_lembrete?: string | null
@@ -1031,7 +1037,9 @@ export type Database = {
           anamnese_template?: Json | null
           chave_pix?: string | null
           email?: string | null
+          endereco_consultorio?: string | null
           especialidades_disponiveis?: string[] | null
+          horario_funcionamento?: Json | null
           id?: string
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
@@ -1041,6 +1049,7 @@ export type Database = {
           pre_consulta_ativa?: boolean | null
           preferencias_dashboard?: Json | null
           sync_calendarios?: Json | null
+          telefone_consultorio?: string | null
           template_cobranca?: string | null
           template_confirmacao?: string | null
           template_lembrete?: string | null
@@ -1459,6 +1468,9 @@ export const Constants = {
 //   whatsapp_tipo: text (nullable, default: 'personal'::text)
 //   pre_consulta_ativa: boolean (nullable, default: false)
 //   template_pre_consulta: text (nullable, default: 'Olá [Nome], sua consulta está confirmada para [Data] às [Hora]. O endereço é [Endereco]. Te aguardamos!'::text)
+//   endereco_consultorio: text (nullable)
+//   telefone_consultorio: text (nullable)
+//   horario_funcionamento: jsonb (nullable, default: '[]'::jsonb)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
