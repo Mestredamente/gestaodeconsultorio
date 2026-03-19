@@ -33,7 +33,7 @@ export default function Sidebar() {
     <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen shrink-0 sticky top-0 hidden lg:flex">
       <div className="h-16 flex items-center px-6 bg-slate-950 font-bold text-white text-lg gap-2 tracking-tight">
         <Brain className="w-6 h-6 text-indigo-400" />
-        Gestão<span className="text-indigo-400">Clínica</span>
+        Gestão<span className="text-indigo-400">Consultório</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
