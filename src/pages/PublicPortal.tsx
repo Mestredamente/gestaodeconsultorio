@@ -187,42 +187,23 @@ export default function PublicPortal() {
     )
 
   const showLegalTab = data.texto_contrato || data.politica_cancelamento
-  const hasDocuments = data.documentos && data.documentos.length > 0
+
+  const portalSettings = data.portal_settings || {
+    show_appointments: true,
+    show_medical_records: true,
+    show_prescriptions: true,
+    show_tests: true,
+  }
+
   const pendingPayments = data.agendamentos
     ? data.agendamentos.filter((a: any) => Number(a.valor_total) > 0 && !a.sinal_pago)
     : []
-  const hasTests = data.testes && data.testes.length > 0
-  const pendingTests = hasTests ? data.testes.filter((t: any) => t.status === 'pendente') : []
+  const pendingTests = (data.testes || []).filter((t: any) => t.status === 'pendente')
   const hasAchievements = data.conquistas && data.conquistas.length > 0
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 animate-fade-in">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-center sm:flex-1 sm:text-left">
-            <h3 className="font-bold">Baixe nosso Aplicativo!</h3>
-            <p className="text-indigo-100 text-sm">
-              Acompanhe seus dados e agendamentos diretamente do celular.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="bg-white text-indigo-700 hover:bg-indigo-50"
-            >
-              iOS App Store
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="bg-white text-indigo-700 hover:bg-indigo-50"
-            >
-              Google Play
-            </Button>
-          </div>
-        </div>
-
         <Card className="shadow-sm border-slate-200 bg-white">
           <CardHeader className="pb-6 border-b border-slate-100 bg-slate-50/50 rounded-t-lg flex flex-row items-start justify-between">
             <div>
@@ -275,34 +256,42 @@ export default function PublicPortal() {
           </Card>
         )}
 
-        <Tabs defaultValue="agenda" className="w-full">
+        <Tabs
+          defaultValue={portalSettings.show_appointments !== false ? 'agenda' : 'financeiro'}
+          className="w-full"
+        >
           <TabsList className="mb-4 flex-wrap h-auto">
-            <TabsTrigger value="agenda" className="gap-2 py-2">
-              <Calendar className="w-4 h-4" /> Meus Agendamentos
-            </TabsTrigger>
+            {portalSettings.show_appointments !== false && (
+              <TabsTrigger value="agenda" className="gap-2 py-2">
+                <Calendar className="w-4 h-4" /> Meus Agendamentos
+              </TabsTrigger>
+            )}
             <TabsTrigger value="financeiro" className="gap-2 py-2 relative">
               <DollarSign className="w-4 h-4" /> Financeiro
               {pendingPayments.length > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="historico" className="gap-2 py-2">
-              <Activity className="w-4 h-4" /> Meu Histórico
-            </TabsTrigger>
+            {portalSettings.show_medical_records !== false && (
+              <TabsTrigger value="historico" className="gap-2 py-2">
+                <Activity className="w-4 h-4" /> Meu Histórico
+              </TabsTrigger>
+            )}
             {hasAchievements && (
               <TabsTrigger value="desafios" className="gap-2 py-2">
                 <Trophy className="w-4 h-4 text-amber-500" /> Meus Desafios
               </TabsTrigger>
             )}
-            {hasTests && (
-              <TabsTrigger value="testes" className="gap-2 py-2 relative">
-                <BrainCircuit className="w-4 h-4" /> Testes / Avaliações
-                {pendingTests.length > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                )}
-              </TabsTrigger>
-            )}
-            {hasDocuments && (
+            {portalSettings.show_tests !== false &&
+              (data.testes?.length > 0 || pendingTests.length > 0) && (
+                <TabsTrigger value="testes" className="gap-2 py-2 relative">
+                  <BrainCircuit className="w-4 h-4" /> Testes / Avaliações
+                  {pendingTests.length > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                  )}
+                </TabsTrigger>
+              )}
+            {portalSettings.show_prescriptions !== false && data.documentos?.length > 0 && (
               <TabsTrigger value="documentos" className="gap-2 py-2">
                 <FileText className="w-4 h-4" /> Laudos / Prescrições
               </TabsTrigger>
@@ -317,108 +306,110 @@ export default function PublicPortal() {
             )}
           </TabsList>
 
-          <TabsContent value="agenda" className="space-y-4">
-            {!data.agendamentos || data.agendamentos.length === 0 ? (
-              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
-                Nenhuma consulta futura agendada.
-              </Card>
-            ) : (
-              data.agendamentos.map((apt: any) => {
-                const dateObj = new Date(apt.data_hora)
-                const title = `Consulta: ${data.paciente_nome} - ${apt.especialidade || 'Geral'}`
-                const today = isToday(dateObj)
-                return (
-                  <Card
-                    key={apt.id}
-                    className={cn(
-                      'shadow-sm border-slate-200',
-                      today && 'border-indigo-300 bg-indigo-50/10',
-                    )}
-                  >
-                    <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              'capitalize',
-                              today
-                                ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                                : 'bg-primary/5 text-primary border-primary/20',
-                            )}
-                          >
-                            {today
-                              ? 'Hoje'
-                              : dateObj.toLocaleDateString('pt-BR', {
-                                  weekday: 'long',
-                                  day: 'numeric',
-                                  month: 'long',
-                                })}
-                          </Badge>
-                          <Badge variant="secondary" className="gap-1">
-                            <Clock className="w-3 h-3" />{' '}
-                            {dateObj.toLocaleTimeString('pt-BR', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </Badge>
-                          {apt.is_online && (
+          {portalSettings.show_appointments !== false && (
+            <TabsContent value="agenda" className="space-y-4">
+              {!data.agendamentos || data.agendamentos.length === 0 ? (
+                <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                  Nenhuma consulta futura agendada.
+                </Card>
+              ) : (
+                data.agendamentos.map((apt: any) => {
+                  const dateObj = new Date(apt.data_hora)
+                  const title = `Consulta: ${data.paciente_nome} - ${apt.especialidade || 'Geral'}`
+                  const today = isToday(dateObj)
+                  return (
+                    <Card
+                      key={apt.id}
+                      className={cn(
+                        'shadow-sm border-slate-200',
+                        today && 'border-indigo-300 bg-indigo-50/10',
+                      )}
+                    >
+                      <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
                             <Badge
                               variant="outline"
-                              className="gap-1 bg-indigo-50 text-indigo-700 border-indigo-200"
+                              className={cn(
+                                'capitalize',
+                                today
+                                  ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                  : 'bg-primary/5 text-primary border-primary/20',
+                              )}
                             >
-                              <Video className="w-3 h-3" /> Online
+                              {today
+                                ? 'Hoje'
+                                : dateObj.toLocaleDateString('pt-BR', {
+                                    weekday: 'long',
+                                    day: 'numeric',
+                                    month: 'long',
+                                  })}
                             </Badge>
-                          )}
+                            <Badge variant="secondary" className="gap-1">
+                              <Clock className="w-3 h-3" />{' '}
+                              {dateObj.toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </Badge>
+                            {apt.is_online && (
+                              <Badge
+                                variant="outline"
+                                className="gap-1 bg-indigo-50 text-indigo-700 border-indigo-200"
+                              >
+                                <Video className="w-3 h-3" /> Online
+                              </Badge>
+                            )}
+                          </div>
+                          <h3 className="font-semibold text-lg text-slate-900">
+                            {apt.especialidade || 'Consulta Geral'}
+                          </h3>
                         </div>
-                        <h3 className="font-semibold text-lg text-slate-900">
-                          {apt.especialidade || 'Consulta Geral'}
-                        </h3>
-                      </div>
-                      <div className="flex flex-col gap-2 min-w-[180px]">
-                        {today && apt.is_online && (
+                        <div className="flex flex-col gap-2 min-w-[180px]">
+                          {today && apt.is_online && (
+                            <Button
+                              className="gap-2 justify-start bg-indigo-600 hover:bg-indigo-700 text-white shadow-md animate-pulse"
+                              onClick={() => navigate(`/sessao/${hash}`)}
+                            >
+                              <Video className="w-4 h-4 shrink-0" /> Entrar na Sessão
+                            </Button>
+                          )}
                           <Button
-                            className="gap-2 justify-start bg-indigo-600 hover:bg-indigo-700 text-white shadow-md animate-pulse"
-                            onClick={() => navigate(`/sessao/${hash}`)}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 justify-start"
+                            onClick={() =>
+                              window.open(
+                                formatGoogleCalendarLink(
+                                  title,
+                                  `Clínica: ${data.consultorio}`,
+                                  apt.data_hora,
+                                ),
+                                '_blank',
+                              )
+                            }
                           >
-                            <Video className="w-4 h-4 shrink-0" /> Entrar na Sessão
+                            <ExternalLink className="w-4 h-4 shrink-0" /> Salvar na Agenda
                           </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2 justify-start"
-                          onClick={() =>
-                            window.open(
-                              formatGoogleCalendarLink(
-                                title,
-                                `Clínica: ${data.consultorio}`,
-                                apt.data_hora,
-                              ),
-                              '_blank',
-                            )
-                          }
-                        >
-                          <ExternalLink className="w-4 h-4 shrink-0" /> Salvar na Agenda
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 justify-start"
-                          onClick={() => {
-                            setCancelAptId(apt.id)
-                            setIsCancelDialogOpen(true)
-                          }}
-                        >
-                          <Ban className="w-4 h-4 shrink-0" /> Solicitar Cancelamento
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })
-            )}
-          </TabsContent>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 justify-start"
+                            onClick={() => {
+                              setCancelAptId(apt.id)
+                              setIsCancelDialogOpen(true)
+                            }}
+                          >
+                            <Ban className="w-4 h-4 shrink-0" /> Solicitar Cancelamento
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })
+              )}
+            </TabsContent>
+          )}
 
           <TabsContent value="financeiro" className="space-y-4">
             {pendingPayments.length === 0 ? (
@@ -462,76 +453,84 @@ export default function PublicPortal() {
             )}
           </TabsContent>
 
-          <TabsContent value="historico" className="space-y-6">
-            <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-              <div>
-                <h3 className="font-semibold text-slate-800">Prontuário Médico</h3>
-                <p className="text-sm text-slate-500">Solicite acesso ao seu registro detalhado.</p>
+          {portalSettings.show_medical_records !== false && (
+            <TabsContent value="historico" className="space-y-6">
+              <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                <div>
+                  <h3 className="font-semibold text-slate-800">Prontuário Médico</h3>
+                  <p className="text-sm text-slate-500">
+                    Solicite acesso ao seu registro detalhado.
+                  </p>
+                </div>
+                <Button onClick={handleRequestRecord} variant="outline" className="gap-2">
+                  <FileText className="w-4 h-4" /> Solicitar
+                </Button>
               </div>
-              <Button onClick={handleRequestRecord} variant="outline" className="gap-2">
-                <FileText className="w-4 h-4" /> Solicitar
-              </Button>
-            </div>
 
-            <h3 className="font-semibold text-slate-800 mt-6 mb-3">Sessões Realizadas</h3>
-            {!data.past_sessions || data.past_sessions.length === 0 ? (
-              <Card className="p-8 text-center text-slate-500 border-dashed shadow-none bg-transparent">
-                Nenhuma sessão realizada ainda.
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {data.past_sessions.map((apt: any) => (
-                  <Card key={apt.id} className="shadow-sm border-slate-200">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-full">
-                          <CheckCircle className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-slate-900">
-                            {new Date(apt.data_hora).toLocaleDateString('pt-BR')}
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            {new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}{' '}
-                            - {apt.especialidade || 'Consulta Geral'}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-
-            <h3 className="font-semibold text-slate-800 mt-8 mb-3">Histórico Clínico</h3>
-            {!data.historico || data.historico.length === 0 ? (
-              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
-                Nenhum histórico registrado ainda.
-              </Card>
-            ) : (
-              <div className="relative border-l-2 border-slate-200 ml-4 space-y-6 pb-4">
-                {data.historico.map((entry: any) => (
-                  <div key={entry.id} className="relative pl-6">
-                    <div className="absolute w-4 h-4 bg-primary/20 rounded-full -left-[9px] top-1 ring-4 ring-slate-50" />
-                    <div className="mb-2">
-                      <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md text-sm font-semibold inline-flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-primary" />{' '}
-                        {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                    <Card className="shadow-sm border-slate-200">
-                      <CardContent className="p-4 text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
-                        {entry.content}
-                      </CardContent>
+              {portalSettings.show_appointments !== false && (
+                <>
+                  <h3 className="font-semibold text-slate-800 mt-6 mb-3">Sessões Realizadas</h3>
+                  {!data.past_sessions || data.past_sessions.length === 0 ? (
+                    <Card className="p-8 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                      Nenhuma sessão realizada ainda.
                     </Card>
-                  </div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
+                  ) : (
+                    <div className="space-y-3">
+                      {data.past_sessions.map((apt: any) => (
+                        <Card key={apt.id} className="shadow-sm border-slate-200">
+                          <CardContent className="p-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-full">
+                                <CheckCircle className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {new Date(apt.data_hora).toLocaleDateString('pt-BR')}
+                                </p>
+                                <p className="text-sm text-slate-500">
+                                  {new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}{' '}
+                                  - {apt.especialidade || 'Consulta Geral'}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <h3 className="font-semibold text-slate-800 mt-8 mb-3">Histórico Clínico</h3>
+              {!data.historico || data.historico.length === 0 ? (
+                <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                  Nenhum histórico registrado ainda.
+                </Card>
+              ) : (
+                <div className="relative border-l-2 border-slate-200 ml-4 space-y-6 pb-4">
+                  {data.historico.map((entry: any) => (
+                    <div key={entry.id} className="relative pl-6">
+                      <div className="absolute w-4 h-4 bg-primary/20 rounded-full -left-[9px] top-1 ring-4 ring-slate-50" />
+                      <div className="mb-2">
+                        <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md text-sm font-semibold inline-flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-primary" />{' '}
+                          {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                      <Card className="shadow-sm border-slate-200">
+                        <CardContent className="p-4 text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
+                          {entry.content}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          )}
 
           {hasAchievements && (
             <TabsContent value="desafios" className="space-y-4">
@@ -589,7 +588,7 @@ export default function PublicPortal() {
             </TabsContent>
           )}
 
-          {hasTests && (
+          {portalSettings.show_tests !== false && data.testes && (
             <TabsContent value="testes" className="space-y-4">
               {data.testes.map((t: any) => (
                 <Card key={t.id} className="shadow-sm border-slate-200">
@@ -626,7 +625,7 @@ export default function PublicPortal() {
             </TabsContent>
           )}
 
-          {hasDocuments && (
+          {portalSettings.show_prescriptions !== false && data.documentos && (
             <TabsContent value="documentos" className="space-y-4">
               {data.documentos.map((doc: any) => (
                 <Card key={doc.id} className="shadow-sm border-slate-200">

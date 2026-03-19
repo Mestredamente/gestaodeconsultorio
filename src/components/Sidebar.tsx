@@ -75,7 +75,9 @@ export default function Sidebar() {
             className="w-8 h-8 rounded object-cover bg-white shadow-sm"
           />
         ) : (
-          <Brain className="w-6 h-6 text-primary shrink-0" />
+          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
+            {clinic.name ? clinic.name.substring(0, 2).toUpperCase() : 'C'}
+          </div>
         )}
         <span className="truncate flex-1">
           {clinic.name || (

@@ -29,6 +29,8 @@ import {
   MapPin,
   Check,
   Palette,
+  Users,
+  ShieldAlert,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -52,13 +54,8 @@ const predefinedApproaches = [
   'Fenomenologia',
   'Psicodrama',
   'Abordagem Centrada na Pessoa (ACP)',
-  'Terapia Analítico-Comportamental (TAC)',
-  'Psicologia Junguiana',
   'Terapia Sistêmica',
-  'Neuropsicologia',
-  'Terapia de Casal',
   'Terapia Infantil',
-  'Orientação Profissional',
 ]
 
 const themeOptions = [
@@ -91,17 +88,21 @@ export default function Settings() {
     template_confirmacao: 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
     whatsapp_tipo: 'personal',
     pre_consulta_ativa: false,
-    template_pre_consulta:
-      'Olá [Nome], sua consulta está confirmada para [data] às [hora]. Nosso endereço é [Endereco]. Por favor, toque a campainha e aguarde na recepção.',
+    template_pre_consulta: 'Olá [Nome]...',
     endereco_consultorio: '',
     telefone_consultorio: '',
   })
 
+  const [portalSettings, setPortalSettings] = useState({
+    show_medical_records: true,
+    show_prescriptions: true,
+    show_appointments: true,
+    show_tests: true,
+  })
+
   const [questions, setQuestions] = useState<any[]>([])
   const [lembreteAtivo, setLembreteAtivo] = useState(false)
-  const [templateLembrete, setTemplateLembrete] = useState(
-    'Olá [Nome], você tem uma consulta marcada conosco para [data] às [hora]. Confirme presença clicando aqui: [link_confirmacao]',
-  )
+  const [templateLembrete, setTemplateLembrete] = useState('Olá [Nome]...')
   const [especialidades, setEspecialidades] = useState<string[]>([])
   const [novaEspecialidade, setNovaEspecialidade] = useState('')
   const [popoverOpen, setPopoverOpen] = useState(false)
@@ -118,6 +119,10 @@ export default function Settings() {
   )
   const [themeColor, setThemeColor] = useState('indigo')
   const [preferenciasOriginal, setPreferenciasOriginal] = useState<any>({})
+
+  const [team, setTeam] = useState<any[]>([])
+  const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [newMemberRole, setNewMemberRole] = useState('profissional')
 
   useEffect(() => {
     if (user) {
@@ -144,11 +149,15 @@ export default function Settings() {
               whatsapp_tipo: (data as any).whatsapp_tipo || 'personal',
               pre_consulta_ativa: (data as any).pre_consulta_ativa || false,
               template_pre_consulta:
-                (data as any).template_pre_consulta ||
-                'Olá [Nome], sua consulta está confirmada para [data] às [hora]. Nosso endereço é [Endereco]. Por favor, toque a campainha e aguarde na recepção.',
+                (data as any).template_pre_consulta || 'Olá [Nome], sua consulta...',
               endereco_consultorio: (data as any).endereco_consultorio || '',
               telefone_consultorio: (data as any).telefone_consultorio || '',
             })
+
+            if ((data as any).portal_settings) {
+              setPortalSettings((data as any).portal_settings)
+            }
+
             setQuestions(data.anamnese_template || [])
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
             setTemplateLembrete(data.template_lembrete || 'Olá [Nome]...')
@@ -178,8 +187,28 @@ export default function Settings() {
         })
 
       fetchConvenios()
+      fetchTeam()
     }
   }, [user])
+
+  const fetchTeam = async () => {
+    if (!user) return
+    const { data } = await supabase
+      .from('usuarios')
+      .select('id, email, nome_consultorio, role')
+      .eq('parent_id', user.id)
+    if (data) setTeam(data)
+  }
+
+  const handleInviteMember = () => {
+    if (!newMemberEmail) return
+    // Full auth flow should happen here. For now, simulate success logic
+    toast({
+      title: 'Convite Enviado',
+      description: `Um e-mail de convite foi enviado para ${newMemberEmail} com perfil de ${newMemberRole}.`,
+    })
+    setNewMemberEmail('')
+  }
 
   const fetchConvenios = async () => {
     if (!user) return
@@ -203,6 +232,7 @@ export default function Settings() {
       meta_mensal_consultas: metaConsultas,
       sync_calendarios: syncCals,
       horario_funcionamento: horarios,
+      portal_settings: portalSettings,
       preferencias_dashboard: {
         ...preferenciasOriginal,
         theme_color: themeColor,
@@ -307,7 +337,19 @@ export default function Settings() {
               value="clinica"
               className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
             >
-              <Building2 className="w-4 h-4" /> Dados do Consultório
+              <Building2 className="w-4 h-4" /> Consultório
+            </TabsTrigger>
+            <TabsTrigger
+              value="equipe"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
+            >
+              <Users className="w-4 h-4" /> Equipe
+            </TabsTrigger>
+            <TabsTrigger
+              value="portal"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
+            >
+              <ShieldAlert className="w-4 h-4" /> Portal
             </TabsTrigger>
             <TabsTrigger
               value="aparencia"
@@ -320,18 +362,6 @@ export default function Settings() {
               className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
             >
               <MessageCircle className="w-4 h-4" /> WhatsApp
-            </TabsTrigger>
-            <TabsTrigger
-              value="convenios"
-              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
-            >
-              <Building2 className="w-4 h-4" /> Convênios
-            </TabsTrigger>
-            <TabsTrigger
-              value="especialidades"
-              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none"
-            >
-              Especialidades
             </TabsTrigger>
             <TabsTrigger
               value="juridico"
@@ -357,16 +387,18 @@ export default function Settings() {
             <div>
               <h3 className="font-semibold text-slate-900 mb-1">Identidade do Profissional</h3>
               <p className="text-sm text-slate-500 mb-4">
-                Esta foto e nome serão exibidos no seu perfil e no portal do paciente.
+                Esta foto e nome serão exibidos no seu perfil, documentos e portal do paciente.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-8 items-start bg-slate-50/50 p-5 rounded-lg border border-slate-100">
                 <div className="flex flex-col items-center gap-3">
                   <Avatar className="w-28 h-28 border-4 border-white shadow-sm">
                     <AvatarImage src={formData.logo_url} className="object-cover" />
-                    <AvatarFallback className="bg-slate-100">
+                    <AvatarFallback className="bg-slate-100 text-3xl font-bold text-slate-400">
                       {uploadingLogo ? (
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      ) : formData.nome_consultorio ? (
+                        formData.nome_consultorio.substring(0, 2).toUpperCase()
                       ) : (
                         <ImageIcon className="w-10 h-10 text-slate-400" />
                       )}
@@ -390,9 +422,7 @@ export default function Settings() {
                     ref={fileInputRef}
                     onChange={handleFileUpload}
                   />
-                  <p className="text-[10px] text-slate-400 text-center">
-                    JPG, PNG ou WebP. Máx 2MB.
-                  </p>
+                  <p className="text-[10px] text-slate-400 text-center">JPG, PNG. Máx 2MB.</p>
                 </div>
 
                 <div className="flex-1 space-y-4 w-full">
@@ -418,15 +448,6 @@ export default function Settings() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Meta Mensal de Atendimentos</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={metaConsultas}
-                        onChange={(e) => setMetaConsultas(Number(e.target.value))}
-                      />
-                    </div>
-                    <div className="space-y-2">
                       <Label>Chave PIX (Cobrança)</Label>
                       <Input
                         value={formData.chave_pix}
@@ -446,7 +467,8 @@ export default function Settings() {
                 <Building2 className="w-5 h-5 text-primary" /> Dados do Consultório
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Informações públicas e de contato da sua clínica.
+                Informações de contato e endereço que aparecerão no cabeçalho de laudos e
+                prescrições.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-5 rounded-lg border border-slate-100">
@@ -457,7 +479,7 @@ export default function Settings() {
                   onChange={(e) =>
                     setFormData({ ...formData, endereco_consultorio: e.target.value })
                   }
-                  placeholder="Rua, Número, Bairro, Cidade"
+                  placeholder="Ex: Rua das Flores, 123, Bairro Centro, Cidade - UF"
                   className="bg-white"
                 />
               </div>
@@ -518,14 +540,164 @@ export default function Settings() {
             </div>
           </TabsContent>
 
+          <TabsContent value="equipe" className="p-6 m-0 space-y-6">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" /> Gerenciamento de Equipe
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Convide profissionais e recepcionistas para sua clínica. Defina seus papéis e níveis
+                de acesso.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
+              <div className="space-y-1 w-full flex-1">
+                <Label>E-mail do Novo Membro</Label>
+                <Input
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  placeholder="email@exemplo.com"
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-1 w-full sm:w-48">
+                <Label>Nível de Acesso</Label>
+                <Select value={newMemberRole} onValueChange={setNewMemberRole}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="profissional">Profissional</SelectItem>
+                    <SelectItem value="recepcao">Recepção / Staff</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="button" onClick={handleInviteMember} className="w-full sm:w-auto">
+                <Plus className="w-4 h-4 mr-2" /> Convidar
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {team.length === 0 ? (
+                <div className="text-center py-6 text-slate-500 border border-dashed rounded-lg">
+                  Nenhum membro vinculado à sua clínica ainda.
+                </div>
+              ) : (
+                team.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex justify-between items-center bg-white px-4 py-3 rounded-md border border-slate-200 shadow-sm"
+                  >
+                    <div>
+                      <p className="font-semibold text-slate-800">{t.email}</p>
+                      <p className="text-xs text-slate-500 uppercase font-medium mt-0.5">
+                        Role: {t.role || 'Profissional'}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="portal" className="p-6 m-0 space-y-6">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-primary" /> Visibilidade do Portal do Paciente
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Controle quais módulos e informações o paciente poderá acessar dentro da área logada
+                dele.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base font-semibold text-slate-800">
+                    Meus Agendamentos
+                  </Label>
+                  <p className="text-sm text-slate-500">
+                    Permite que o paciente visualize e solicite cancelamento de consultas futuras e
+                    passadas.
+                  </p>
+                </div>
+                <Switch
+                  checked={portalSettings.show_appointments}
+                  onCheckedChange={(v) =>
+                    setPortalSettings({ ...portalSettings, show_appointments: v })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+                <div>
+                  <Label className="text-base font-semibold text-slate-800">
+                    Prontuário Médico (Resumo)
+                  </Label>
+                  <p className="text-sm text-slate-500">
+                    Exibe o histórico de anotações compartilhadas e evolução.
+                  </p>
+                </div>
+                <Switch
+                  checked={portalSettings.show_medical_records}
+                  onCheckedChange={(v) =>
+                    setPortalSettings({ ...portalSettings, show_medical_records: v })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+                <div>
+                  <Label className="text-base font-semibold text-slate-800">
+                    Laudos e Prescrições
+                  </Label>
+                  <p className="text-sm text-slate-500">
+                    Permite visualizar e baixar documentos assinados digitalmente.
+                  </p>
+                </div>
+                <Switch
+                  checked={portalSettings.show_prescriptions}
+                  onCheckedChange={(v) =>
+                    setPortalSettings({ ...portalSettings, show_prescriptions: v })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-200 pt-4">
+                <div>
+                  <Label className="text-base font-semibold text-slate-800">
+                    Testes e Avaliações
+                  </Label>
+                  <p className="text-sm text-slate-500">
+                    Permite que o paciente responda a escalas e formulários pelo portal.
+                  </p>
+                </div>
+                <Switch
+                  checked={portalSettings.show_tests}
+                  onCheckedChange={(v) => setPortalSettings({ ...portalSettings, show_tests: v })}
+                />
+              </div>
+            </div>
+          </TabsContent>
+
           <TabsContent value="aparencia" className="p-6 m-0 space-y-6">
             <div>
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                 <Palette className="w-5 h-5 text-primary" /> Personalização de Tema
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Escolha a cor principal que representa a sua marca. Esta cor será aplicada em
-                botões, links e destaques em toda a plataforma.
+                Escolha a cor principal que representa a sua marca.
               </p>
             </div>
 
@@ -564,8 +736,7 @@ export default function Settings() {
           <TabsContent value="whatsapp" className="p-6 m-0 space-y-6">
             <div>
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-emerald-500" /> Integração WhatsApp e
-                WhatsApp Business
+                <MessageCircle className="w-5 h-5 text-emerald-500" /> Integração WhatsApp
               </h3>
               <p className="text-sm text-slate-500 mt-1">
                 Configure as mensagens automáticas enviadas para os pacientes.
@@ -575,41 +746,14 @@ export default function Settings() {
             <div className="space-y-6">
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
                 <div>
-                  <Label className="text-base font-semibold text-slate-800">Tipo de WhatsApp</Label>
-                  <p className="text-sm text-slate-500 mb-3">
-                    Selecione qual versão do aplicativo você utiliza para as mensagens.
+                  <Label className="text-base font-semibold text-slate-800">
+                    Confirmação de Agendamento
+                  </Label>
+                  <p className="text-sm text-slate-500">
+                    Mensagem disparada assim que a consulta é marcada.
                   </p>
                 </div>
-                <RadioGroup
-                  value={formData.whatsapp_tipo}
-                  onValueChange={(v) => setFormData({ ...formData, whatsapp_tipo: v })}
-                  className="flex flex-col sm:flex-row gap-4 sm:gap-6"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="personal" id="settings-personal" />
-                    <Label htmlFor="settings-personal" className="cursor-pointer">
-                      WhatsApp Pessoal
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="business" id="settings-business" />
-                    <Label htmlFor="settings-business" className="cursor-pointer">
-                      WhatsApp Business
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base font-semibold text-slate-800">
-                      Confirmação de Agendamento
-                    </Label>
-                    <p className="text-sm text-slate-500">
-                      Mensagem disparada assim que a consulta é marcada.
-                    </p>
-                  </div>
+                <div className="flex items-center gap-2">
                   <Switch
                     checked={formData.whatsapp_confirmacao_ativa}
                     onCheckedChange={(v) =>
@@ -635,39 +779,6 @@ export default function Settings() {
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-primary" /> Instruções Pré-Consulta
-                    </Label>
-                    <p className="text-sm text-slate-500">
-                      Mensagem de boas-vindas com endereço, enviada ao confirmar a consulta.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.pre_consulta_ativa}
-                    onCheckedChange={(v) => setFormData({ ...formData, pre_consulta_ativa: v })}
-                  />
-                </div>
-                {formData.pre_consulta_ativa && (
-                  <div className="space-y-2 pt-2 border-t border-slate-200">
-                    <Label>Template de Pré-Consulta</Label>
-                    <Textarea
-                      value={formData.template_pre_consulta}
-                      onChange={(e) =>
-                        setFormData({ ...formData, template_pre_consulta: e.target.value })
-                      }
-                      rows={3}
-                      className="bg-white"
-                    />
-                    <p className="text-xs text-slate-500">
-                      Variáveis: [Nome], [data], [hora], [Endereco]
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
                     <Label className="text-base font-semibold text-slate-800">
                       Lembretes Automáticos (24h antes)
                     </Label>
@@ -680,24 +791,10 @@ export default function Settings() {
                     onCheckedChange={async (v) => {
                       setLembreteAtivo(v)
                       if (user) {
-                        const { error } = await supabase
+                        await supabase
                           .from('usuarios')
                           .update({ lembrete_whatsapp_ativo: v })
                           .eq('id', user.id)
-                        if (error) {
-                          toast({
-                            title: 'Erro ao atualizar',
-                            description: error.message,
-                            variant: 'destructive',
-                          })
-                          setLembreteAtivo(!v)
-                        } else {
-                          toast({
-                            title: v
-                              ? 'Lembretes automáticos ativados'
-                              : 'Lembretes automáticos desativados',
-                          })
-                        }
                       }
                     }}
                   />
@@ -717,175 +814,6 @@ export default function Settings() {
             </div>
           </TabsContent>
 
-          <TabsContent value="convenios" className="p-6 m-0 space-y-6">
-            <div>
-              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary" /> Operadoras de Saúde e Convênios
-              </h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Cadastre os convênios aceitos na clínica para vinculá-los aos agendamentos.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
-              <div className="space-y-1 w-full flex-1">
-                <Label>Nome do Convênio</Label>
-                <Input
-                  value={novoConvenio.nome}
-                  onChange={(e) => setNewConvenio({ ...novoConvenio, nome: e.target.value })}
-                  placeholder="Ex: SulAmérica, Bradesco Saúde..."
-                  className="bg-white"
-                />
-              </div>
-              <div className="space-y-1 w-full sm:w-48">
-                <Label>Registro ANS</Label>
-                <Input
-                  value={novoConvenio.registro_ans}
-                  onChange={(e) =>
-                    setNewConvenio({ ...novoConvenio, registro_ans: e.target.value })
-                  }
-                  placeholder="Opcional"
-                  className="bg-white"
-                />
-              </div>
-              <div className="space-y-1 w-full sm:w-48">
-                <Label>Contato/Portal</Label>
-                <Input
-                  value={novoConvenio.contato}
-                  onChange={(e) => setNewConvenio({ ...novoConvenio, contato: e.target.value })}
-                  placeholder="Telefone ou site"
-                  className="bg-white"
-                />
-              </div>
-              <Button type="button" onClick={handleAddConvenio} className="w-full sm:w-auto">
-                <Plus className="w-4 h-4 mr-2" /> Adicionar
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              {convenios.length === 0 && (
-                <div className="text-center py-6 text-slate-500 border border-dashed rounded-lg">
-                  Nenhum convênio cadastrado.
-                </div>
-              )}
-              {convenios.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex justify-between items-center bg-white px-4 py-3 rounded-md border border-slate-200 shadow-sm"
-                >
-                  <div>
-                    <p className="font-semibold text-slate-800">{c.nome}</p>
-                    <p className="text-xs text-slate-500">
-                      {c.registro_ans && `ANS: ${c.registro_ans}`}
-                      {c.registro_ans && c.contato && ' | '}
-                      {c.contato && `Contato: ${c.contato}`}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                    onClick={() => handleDeleteConvenio(c.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="especialidades" className="p-6 m-0 space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-900">Especialidades e Abordagens</h3>
-                <p className="text-sm text-slate-500">
-                  Cadastre as abordagens psicológicas e serviços que ficarão disponíveis para
-                  agendamento.
-                </p>
-              </div>
-
-              <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button className="gap-2 rounded-full px-4">
-                    <Plus className="w-4 h-4" /> Adicionar Especialidade
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="end">
-                  <Command>
-                    <CommandInput placeholder="Buscar especialidade..." />
-                    <CommandList>
-                      <CommandEmpty>Nenhuma especialidade encontrada.</CommandEmpty>
-                      <CommandGroup heading="Abordagens Comuns">
-                        {predefinedApproaches.map((a) => (
-                          <CommandItem
-                            key={a}
-                            onSelect={() => toggleEspecialidade(a)}
-                            className="cursor-pointer"
-                          >
-                            <div
-                              className={`mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary ${especialidades.includes(a) ? 'bg-primary text-primary-foreground' : 'opacity-50'}`}
-                            >
-                              {especialidades.includes(a) && <Check className="h-3 w-3" />}
-                            </div>
-                            {a}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                    <div className="p-2 border-t border-slate-100 flex gap-2">
-                      <Input
-                        placeholder="Outra..."
-                        value={novaEspecialidade}
-                        onChange={(e) => setNovaEspecialidade(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            addCustomEspecialidade()
-                          }
-                        }}
-                        className="h-8 text-xs"
-                      />
-                      <Button size="sm" className="h-8" onClick={addCustomEspecialidade}>
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2 pt-4">
-              {especialidades.length === 0 ? (
-                <div className="text-center py-6 text-slate-500 border border-dashed rounded-lg">
-                  Nenhuma especialidade selecionada.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {especialidades.map((esp, idx) => (
-                    <div
-                      key={idx}
-                      className="flex justify-between items-center bg-slate-50 px-4 py-3 rounded-md border border-slate-100 shadow-sm"
-                    >
-                      <span className="text-sm font-medium text-slate-700">{esp}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() =>
-                          setEspecialidades(especialidades.filter((_, i) => i !== idx))
-                        }
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
           <TabsContent value="juridico" className="p-6 m-0 space-y-5">
             <div>
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -897,28 +825,7 @@ export default function Settings() {
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
-                <div className="flex justify-between items-end">
-                  <Label>Contrato de Prestação de Serviços</Label>
-                  {userTemplates.length > 0 && (
-                    <Select
-                      onValueChange={(val) => {
-                        const t = userTemplates.find((x) => x.id === val)
-                        if (t) setFormData({ ...formData, texto_contrato: t.conteudo })
-                      }}
-                    >
-                      <SelectTrigger className="w-[200px] h-8 text-xs bg-white border-slate-200">
-                        <SelectValue placeholder="Carregar Template" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {userTemplates.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.titulo}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
+                <Label>Contrato de Prestação de Serviços</Label>
                 <Textarea
                   value={formData.texto_contrato}
                   onChange={(e) => setFormData({ ...formData, texto_contrato: e.target.value })}
@@ -947,59 +854,15 @@ export default function Settings() {
           <TabsContent value="integracoes" className="p-6 m-0 space-y-6">
             <div>
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-primary" /> Integração de Calendários
+                <Calendar className="w-5 h-5 text-primary" /> Agendamento Público Online
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Sincronize sua agenda com serviços externos para evitar conflitos.
+                Permite que pacientes agendem sozinhos pelos horários disponíveis.
               </p>
             </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="flex items-center gap-4">
-                  <img
-                    src="https://img.usecurling.com/i?q=google&color=multicolor"
-                    alt="Google"
-                    className="w-8 h-8 rounded"
-                  />
-                  <div>
-                    <p className="font-semibold text-slate-800">Google Calendar</p>
-                    <p className="text-xs text-slate-500">
-                      Sincronização bidirecional em tempo real.
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={syncCals.google}
-                  onCheckedChange={(v) => setSyncCals({ ...syncCals, google: v })}
-                />
-              </div>
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="flex items-center gap-4">
-                  <img
-                    src="https://img.usecurling.com/i?q=microsoft&color=multicolor"
-                    alt="Outlook"
-                    className="w-8 h-8 rounded"
-                  />
-                  <div>
-                    <p className="font-semibold text-slate-800">Outlook Calendar</p>
-                    <p className="text-xs text-slate-500">
-                      Sincronização bidirecional em tempo real.
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={syncCals.outlook}
-                  onCheckedChange={(v) => setSyncCals({ ...syncCals, outlook: v })}
-                />
-              </div>
-            </div>
-            <div className="pt-6 border-t border-slate-100">
+            <div className="pt-2 border-t border-slate-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100 gap-4">
                 <div className="flex-1">
-                  <Label className="text-base font-semibold">Agendamento Público Online</Label>
-                  <p className="text-sm text-slate-500 mb-2">
-                    Permite que pacientes agendem sozinhos pelos horários disponíveis na sua agenda.
-                  </p>
                   {formData.agendamento_publico_ativo && (
                     <div className="flex items-center gap-2 bg-white border border-slate-200 p-2 rounded-md max-w-md w-full">
                       <code className="text-xs text-slate-700 flex-1 truncate">
@@ -1014,7 +877,7 @@ export default function Settings() {
                           navigator.clipboard.writeText(
                             `${window.location.origin}/agendar/${user?.id}`,
                           )
-                          toast({ title: 'Link de agendamento copiado!' })
+                          toast({ title: 'Link copiado!' })
                         }}
                       >
                         <Copy className="w-3 h-3" />

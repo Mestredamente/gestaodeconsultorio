@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { navItems } from '@/lib/nav'
-import { Activity } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
 
 export function Sidebar() {
   const location = useLocation()
   const { user } = useAuth()
-  const [clinic, setClinic] = useState({ name: 'Clínica.io', logo: '' })
+  const [clinic, setClinic] = useState({ name: 'Clínica', logo: '' })
 
   useEffect(() => {
     if (!user) return
@@ -20,20 +19,19 @@ export function Sidebar() {
         .select('nome_consultorio, logo_url')
         .eq('id', user.id)
         .single()
-      if (data)
-        setClinic({ name: data.nome_consultorio || 'Clínica.io', logo: data.logo_url || '' })
+      if (data) setClinic({ name: data.nome_consultorio || 'Clínica', logo: data.logo_url || '' })
     }
 
     fetchClinic()
 
     const sub = supabase
-      .channel('sidebar_updates')
+      .channel('sidebar_updates_layout')
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'usuarios', filter: `id=eq.${user.id}` },
         (payload) => {
           setClinic({
-            name: payload.new.nome_consultorio || 'Clínica.io',
+            name: payload.new.nome_consultorio || 'Clínica',
             logo: payload.new.logo_url || '',
           })
         },
@@ -55,8 +53,8 @@ export function Sidebar() {
             className="w-8 h-8 rounded-md object-contain bg-white shadow-sm border border-slate-100"
           />
         ) : (
-          <div className="p-2 bg-primary text-primary-foreground rounded-lg shadow-sm">
-            <Activity className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
+            {clinic.name ? clinic.name.substring(0, 2).toUpperCase() : 'C'}
           </div>
         )}
         <span
