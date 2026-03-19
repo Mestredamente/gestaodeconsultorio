@@ -25,6 +25,37 @@
     --ring: 242 84% 58%;
     --radius: 0.5rem;
   }
+
+  /* Themes */
+  .theme-indigo {
+    --primary: 242 84% 58%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 242 84% 58%;
+  }
+
+  .theme-blue {
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 221.2 83.2% 53.3%;
+  }
+
+  .theme-emerald {
+    --primary: 142.1 76.2% 36.3%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --ring: 142.1 76.2% 36.3%;
+  }
+
+  .theme-rose {
+    --primary: 346.8 77.2% 49.8%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --ring: 346.8 77.2% 49.8%;
+  }
+
+  .theme-slate {
+    --primary: 215.4 16.3% 46.9%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 215.4 16.3% 46.9%;
+  }
 }
 
 @layer base {

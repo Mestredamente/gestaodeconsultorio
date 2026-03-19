@@ -28,6 +28,7 @@ import {
   Building2,
   MapPin,
   Check,
+  Palette,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -59,12 +60,23 @@ const predefinedApproaches = [
   'Orientação Profissional',
 ]
 
+const themeOptions = [
+  { id: 'indigo', name: 'Índigo', color: 'bg-indigo-600' },
+  { id: 'blue', name: 'Azul', color: 'bg-blue-600' },
+  { id: 'emerald', name: 'Esmeralda', color: 'bg-emerald-600' },
+  { id: 'rose', name: 'Rosa', color: 'bg-rose-600' },
+  { id: 'slate', name: 'Ardósia', color: 'bg-slate-600' },
+]
+
+const DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+
 export default function Settings() {
   const { user } = useAuth()
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+
   const [formData, setFormData] = useState({
     nome_consultorio: '',
     email: '',
@@ -80,6 +92,8 @@ export default function Settings() {
     pre_consulta_ativa: false,
     template_pre_consulta:
       'Olá [Nome], sua consulta está confirmada para [data] às [hora]. Nosso endereço é [Endereco]. Por favor, toque a campainha e aguarde na recepção.',
+    endereco_consultorio: '',
+    telefone_consultorio: '',
   })
 
   const [questions, setQuestions] = useState<any[]>([])
@@ -97,6 +111,12 @@ export default function Settings() {
 
   const [convenios, setConvenios] = useState<any[]>([])
   const [novoConvenio, setNewConvenio] = useState({ nome: '', registro_ans: '', contato: '' })
+
+  const [horarios, setHorarios] = useState(
+    DIAS.map((dia) => ({ dia, ativo: true, inicio: '08:00', fim: '18:00' })),
+  )
+  const [themeColor, setThemeColor] = useState('indigo')
+  const [preferenciasOriginal, setPreferenciasOriginal] = useState<any>({})
 
   useEffect(() => {
     if (user) {
@@ -125,6 +145,8 @@ export default function Settings() {
               template_pre_consulta:
                 (data as any).template_pre_consulta ||
                 'Olá [Nome], sua consulta está confirmada para [data] às [hora]. Nosso endereço é [Endereco]. Por favor, toque a campainha e aguarde na recepção.',
+              endereco_consultorio: (data as any).endereco_consultorio || '',
+              telefone_consultorio: (data as any).telefone_consultorio || '',
             })
             setQuestions(data.anamnese_template || [])
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
@@ -132,6 +154,17 @@ export default function Settings() {
             setEspecialidades(data.especialidades_disponiveis || [])
             setMetaConsultas(data.meta_mensal_consultas || 50)
             if (data.sync_calendarios) setSyncCals(data.sync_calendarios as any)
+
+            const prefs = data.preferencias_dashboard || {}
+            setPreferenciasOriginal(prefs)
+            setThemeColor(prefs.theme_color || 'indigo')
+
+            if (
+              (data as any).horario_funcionamento &&
+              (data as any).horario_funcionamento.length > 0
+            ) {
+              setHorarios((data as any).horario_funcionamento)
+            }
           }
         })
 
@@ -168,12 +201,23 @@ export default function Settings() {
       especialidades_disponiveis: especialidades,
       meta_mensal_consultas: metaConsultas,
       sync_calendarios: syncCals,
+      horario_funcionamento: horarios,
+      preferencias_dashboard: {
+        ...preferenciasOriginal,
+        theme_color: themeColor,
+      },
     }
     const { error } = await supabase.from('usuarios').upsert(payload as any)
     setLoading(false)
     if (error)
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     else toast({ title: 'Configurações salvas!' })
+  }
+
+  const updateHorario = (index: number, field: string, value: any) => {
+    const newHorarios = [...horarios]
+    newHorarios[index] = { ...newHorarios[index], [field]: value }
+    setHorarios(newHorarios)
   }
 
   const addCustomEspecialidade = () => {
@@ -256,7 +300,19 @@ export default function Settings() {
               value="perfil"
               className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
             >
-              <UserRound className="w-4 h-4" /> Perfil
+              <UserRound className="w-4 h-4" /> Perfil & Identidade
+            </TabsTrigger>
+            <TabsTrigger
+              value="clinica"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
+            >
+              <Building2 className="w-4 h-4" /> Dados do Consultório
+            </TabsTrigger>
+            <TabsTrigger
+              value="aparencia"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
+            >
+              <Palette className="w-4 h-4" /> Aparência
             </TabsTrigger>
             <TabsTrigger
               value="whatsapp"
@@ -298,9 +354,9 @@ export default function Settings() {
 
           <TabsContent value="perfil" className="p-6 m-0 space-y-6">
             <div>
-              <h3 className="font-semibold text-slate-900 mb-1">Informações do Profissional</h3>
+              <h3 className="font-semibold text-slate-900 mb-1">Identidade do Profissional</h3>
               <p className="text-sm text-slate-500 mb-4">
-                Esta foto e nome serão exibidos no seu perfil e portal do paciente.
+                Esta foto e nome serão exibidos no seu perfil e no portal do paciente.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-8 items-start bg-slate-50/50 p-5 rounded-lg border border-slate-100">
@@ -324,7 +380,7 @@ export default function Settings() {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    {uploadingLogo ? 'Enviando...' : 'Alterar Foto'}
+                    {uploadingLogo ? 'Enviando...' : 'Alterar Logo'}
                   </Button>
                   <input
                     type="file"
@@ -380,6 +436,127 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="clinica" className="p-6 m-0 space-y-6">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" /> Dados do Consultório
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Informações públicas e de contato da sua clínica.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-5 rounded-lg border border-slate-100">
+              <div className="space-y-2 md:col-span-2">
+                <Label>Endereço Completo</Label>
+                <Input
+                  value={formData.endereco_consultorio}
+                  onChange={(e) =>
+                    setFormData({ ...formData, endereco_consultorio: e.target.value })
+                  }
+                  placeholder="Rua, Número, Bairro, Cidade"
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone / WhatsApp da Clínica</Label>
+                <Input
+                  value={formData.telefone_consultorio}
+                  onChange={(e) =>
+                    setFormData({ ...formData, telefone_consultorio: e.target.value })
+                  }
+                  placeholder="(00) 00000-0000"
+                  className="bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <h4 className="font-semibold text-slate-800 mb-3">Horário de Funcionamento</h4>
+              <div className="space-y-3">
+                {horarios.map((h, i) => (
+                  <div
+                    key={h.dia}
+                    className="flex flex-col sm:flex-row sm:items-center gap-4 p-3 bg-slate-50 border border-slate-100 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3 w-40">
+                      <Switch
+                        checked={h.ativo}
+                        onCheckedChange={(v) => updateHorario(i, 'ativo', v)}
+                      />
+                      <span
+                        className={`font-medium ${h.ativo ? 'text-slate-800' : 'text-slate-400'}`}
+                      >
+                        {h.dia}
+                      </span>
+                    </div>
+                    {h.ativo ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="time"
+                          value={h.inicio}
+                          onChange={(e) => updateHorario(i, 'inicio', e.target.value)}
+                          className="w-32 bg-white"
+                        />
+                        <span className="text-slate-500 text-sm">até</span>
+                        <Input
+                          type="time"
+                          value={h.fim}
+                          onChange={(e) => updateHorario(i, 'fim', e.target.value)}
+                          className="w-32 bg-white"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-sm text-slate-400 italic">Fechado</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="aparencia" className="p-6 m-0 space-y-6">
+            <div>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <Palette className="w-5 h-5 text-primary" /> Personalização de Tema
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Escolha a cor principal que representa a sua marca. Esta cor será aplicada em
+                botões, links e destaques em toda a plataforma.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-6 bg-slate-50/50 p-6 rounded-lg border border-slate-100">
+              {themeOptions.map((t) => (
+                <div key={t.id} className="flex flex-col items-center gap-3">
+                  <button
+                    type="button"
+                    className={`w-14 h-14 rounded-full ${t.color} shadow-sm transition-all hover:scale-105 ${themeColor === t.id ? 'ring-4 ring-offset-2 ring-primary scale-110' : ''}`}
+                    onClick={() => {
+                      setThemeColor(t.id)
+                      document.documentElement.classList.remove(
+                        'theme-indigo',
+                        'theme-blue',
+                        'theme-emerald',
+                        'theme-rose',
+                        'theme-slate',
+                      )
+                      document.documentElement.classList.add(`theme-${t.id}`)
+                    }}
+                    title={t.name}
+                  />
+                  <span
+                    className={cn(
+                      'text-sm font-medium',
+                      themeColor === t.id ? 'text-primary font-bold' : 'text-slate-500',
+                    )}
+                  >
+                    {t.name}
+                  </span>
+                </div>
+              ))}
             </div>
           </TabsContent>
 
@@ -458,7 +635,7 @@ export default function Settings() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-indigo-500" /> Instruções Pré-Consulta
+                      <MapPin className="w-4 h-4 text-primary" /> Instruções Pré-Consulta
                     </Label>
                     <p className="text-sm text-slate-500">
                       Mensagem de boas-vindas com endereço, enviada ao confirmar a consulta.
