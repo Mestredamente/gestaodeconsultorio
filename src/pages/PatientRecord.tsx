@@ -18,9 +18,9 @@ import {
   Mic,
   Square,
   Loader2,
-  Eye,
   FileCheck2,
   RefreshCw,
+  BrainCircuit,
 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -82,6 +82,12 @@ export default function PatientRecord() {
   const [laudoContent, setLaudoContent] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('')
 
+  // Anamnese Smart Form
+  const [anamneseTemplates, setAnamneseTemplates] = useState<any[]>([])
+  const [activeAnamneseTemplateId, setActiveAnamneseTemplateId] = useState<string>('')
+  const [anamneseAnswers, setAnamneseAnswers] = useState<Record<string, string>>({})
+  const [savingAnamnese, setSavingAnamnese] = useState(false)
+
   useEffect(() => {
     const fetchData = async () => {
       if (!user || !id) return
@@ -92,12 +98,29 @@ export default function PatientRecord() {
       setLoading(true)
       const { data: pData } = await supabase.from('pacientes').select('*').eq('id', id).single()
       setPatient(pData)
+
+      if (pData?.anamnese && Object.keys(pData.anamnese).length > 0) {
+        setAnamneseAnswers(pData.anamnese)
+      }
+
       const { data: cData } = await supabase
         .from('usuarios')
-        .select('nome_consultorio')
+        .select('nome_consultorio, anamnese_template')
         .eq('id', user.id)
         .single()
+
       setClinicInfo(cData)
+
+      if (cData?.anamnese_template && Array.isArray(cData.anamnese_template)) {
+        setAnamneseTemplates(cData.anamnese_template)
+        if (
+          cData.anamnese_template.length > 0 &&
+          (!pData?.anamnese || Object.keys(pData.anamnese).length === 0)
+        ) {
+          setActiveAnamneseTemplateId(cData.anamnese_template[0].id)
+        }
+      }
+
       const { data: prData } = await supabase
         .from('prontuarios')
         .select('*')
@@ -200,6 +223,22 @@ export default function PatientRecord() {
       toast({ title: 'Evolução clínica registrada!' })
     } else {
       toast({ title: 'Erro ao salvar', variant: 'destructive' })
+    }
+  }
+
+  const handleSaveAnamnese = async () => {
+    if (!id || id === 'novo') return
+    setSavingAnamnese(true)
+    const { error } = await supabase
+      .from('pacientes')
+      .update({ anamnese: anamneseAnswers as any })
+      .eq('id', id)
+
+    setSavingAnamnese(false)
+    if (!error) {
+      toast({ title: 'Anamnese salva com sucesso!' })
+    } else {
+      toast({ title: 'Erro ao salvar anamnese', variant: 'destructive' })
     }
   }
 
@@ -361,6 +400,9 @@ export default function PatientRecord() {
 
   if (!patient) return <div className="text-center py-20">Paciente não encontrado.</div>
 
+  const activeTemplateData =
+    anamneseTemplates.find((t) => t.id === activeAnamneseTemplateId) || anamneseTemplates[0]
+
   return (
     <>
       <style media="print">{`body * { visibility: hidden; } #print-area, #print-area * { visibility: visible; } #print-area { display: block !important; position: absolute; left: 0; top: 0; width: 100%; } html, body { background-color: white !important; min-height: 100%; } @page { size: auto; margin: 20mm; }`}</style>
@@ -440,13 +482,16 @@ export default function PatientRecord() {
         <Tabs defaultValue="historico" className="w-full">
           <TabsList className="mb-6 h-auto p-1 flex-wrap bg-slate-100/50 border border-slate-200">
             <TabsTrigger value="historico" className="gap-2 py-2.5 px-4">
-              <Clock className="w-4 h-4" /> Histórico Clínico
+              <Clock className="w-4 h-4" /> Evolução Clínica
+            </TabsTrigger>
+            <TabsTrigger value="anamnese" className="gap-2 py-2.5 px-4">
+              <BrainCircuit className="w-4 h-4" /> Anamnese
             </TabsTrigger>
             <TabsTrigger value="prescricoes" className="gap-2 py-2.5 px-4">
               <FileText className="w-4 h-4" /> Documentos
             </TabsTrigger>
             <TabsTrigger value="laudos" className="gap-2 py-2.5 px-4">
-              <FileCheck2 className="w-4 h-4" /> Laudos Psicológicos
+              <FileCheck2 className="w-4 h-4" /> Laudos
             </TabsTrigger>
             <TabsTrigger value="mensagens" className="gap-2 py-2.5 px-4">
               <MessageSquare className="w-4 h-4" /> Mensagens
@@ -495,6 +540,70 @@ export default function PatientRecord() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="anamnese" className="space-y-6">
+            <Card className="shadow-sm border-slate-200">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg">Anamnese Inteligente</CardTitle>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Formulário clínico adaptado à especialidade.
+                  </p>
+                </div>
+                {anamneseTemplates.length > 0 && (
+                  <Select
+                    value={activeAnamneseTemplateId || anamneseTemplates[0]?.id}
+                    onValueChange={setActiveAnamneseTemplateId}
+                  >
+                    <SelectTrigger className="w-full sm:w-[250px] bg-white">
+                      <SelectValue placeholder="Selecione o modelo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {anamneseTemplates.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.titulo} ({t.especialidade})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </CardHeader>
+              <CardContent className="p-6">
+                {anamneseTemplates.length === 0 ? (
+                  <div className="text-center py-10 text-slate-500">
+                    Nenhum modelo de anamnese configurado. Crie em Configurações.
+                  </div>
+                ) : activeTemplateData ? (
+                  <div className="space-y-6 animate-fade-in">
+                    {activeTemplateData.perguntas.map((q: string, i: number) => (
+                      <div key={i} className="space-y-2">
+                        <Label className="text-base text-slate-800">{q}</Label>
+                        <Textarea
+                          className="bg-white min-h-[100px]"
+                          placeholder="Sua anotação aqui..."
+                          value={anamneseAnswers[q] || ''}
+                          onChange={(e) =>
+                            setAnamneseAnswers({ ...anamneseAnswers, [q]: e.target.value })
+                          }
+                        />
+                      </div>
+                    ))}
+
+                    <div className="flex justify-end pt-4 border-t border-slate-100">
+                      <Button
+                        onClick={handleSaveAnamnese}
+                        disabled={savingAnamnese}
+                        className="gap-2"
+                      >
+                        <Save className="w-4 h-4" />{' '}
+                        {savingAnamnese ? 'Salvando...' : 'Salvar Anamnese'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="prescricoes">

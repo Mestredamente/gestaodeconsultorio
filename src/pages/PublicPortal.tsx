@@ -9,7 +9,6 @@ import {
   Calendar,
   Clock,
   ExternalLink,
-  Activity,
   FileText,
   Star,
   Scale,
@@ -117,17 +116,6 @@ export default function PublicPortal() {
     } else toast({ title: 'Erro ao desmarcar consulta.', variant: 'destructive' })
   }
 
-  const handleRequestRecord = async () => {
-    if (!hash) return
-    const { data: success, error } = await supabase.rpc('request_medical_record', { p_hash: hash })
-    if (success && !error)
-      toast({
-        title: 'Prontuário solicitado',
-        description: 'O profissional foi notificado do seu pedido.',
-      })
-    else toast({ title: 'Erro ao solicitar', variant: 'destructive' })
-  }
-
   const handleSimulatePayment = async () => {
     if (!hash || !payApt) return
     setPaying(true)
@@ -190,7 +178,6 @@ export default function PublicPortal() {
 
   const portalSettings = data.portal_settings || {
     show_appointments: true,
-    show_medical_records: true,
     show_prescriptions: true,
     show_tests: true,
   }
@@ -272,11 +259,6 @@ export default function PublicPortal() {
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               )}
             </TabsTrigger>
-            {portalSettings.show_medical_records !== false && (
-              <TabsTrigger value="historico" className="gap-2 py-2">
-                <Activity className="w-4 h-4" /> Meu Histórico
-              </TabsTrigger>
-            )}
             {hasAchievements && (
               <TabsTrigger value="desafios" className="gap-2 py-2">
                 <Trophy className="w-4 h-4 text-amber-500" /> Meus Desafios
@@ -452,85 +434,6 @@ export default function PublicPortal() {
               ))
             )}
           </TabsContent>
-
-          {portalSettings.show_medical_records !== false && (
-            <TabsContent value="historico" className="space-y-6">
-              <div className="flex justify-between items-center bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-                <div>
-                  <h3 className="font-semibold text-slate-800">Prontuário Médico</h3>
-                  <p className="text-sm text-slate-500">
-                    Solicite acesso ao seu registro detalhado.
-                  </p>
-                </div>
-                <Button onClick={handleRequestRecord} variant="outline" className="gap-2">
-                  <FileText className="w-4 h-4" /> Solicitar
-                </Button>
-              </div>
-
-              {portalSettings.show_appointments !== false && (
-                <>
-                  <h3 className="font-semibold text-slate-800 mt-6 mb-3">Sessões Realizadas</h3>
-                  {!data.past_sessions || data.past_sessions.length === 0 ? (
-                    <Card className="p-8 text-center text-slate-500 border-dashed shadow-none bg-transparent">
-                      Nenhuma sessão realizada ainda.
-                    </Card>
-                  ) : (
-                    <div className="space-y-3">
-                      {data.past_sessions.map((apt: any) => (
-                        <Card key={apt.id} className="shadow-sm border-slate-200">
-                          <CardContent className="p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-full">
-                                <CheckCircle className="w-5 h-5" />
-                              </div>
-                              <div>
-                                <p className="font-semibold text-slate-900">
-                                  {new Date(apt.data_hora).toLocaleDateString('pt-BR')}
-                                </p>
-                                <p className="text-sm text-slate-500">
-                                  {new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}{' '}
-                                  - {apt.especialidade || 'Consulta Geral'}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-
-              <h3 className="font-semibold text-slate-800 mt-8 mb-3">Histórico Clínico</h3>
-              {!data.historico || data.historico.length === 0 ? (
-                <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
-                  Nenhum histórico registrado ainda.
-                </Card>
-              ) : (
-                <div className="relative border-l-2 border-slate-200 ml-4 space-y-6 pb-4">
-                  {data.historico.map((entry: any) => (
-                    <div key={entry.id} className="relative pl-6">
-                      <div className="absolute w-4 h-4 bg-primary/20 rounded-full -left-[9px] top-1 ring-4 ring-slate-50" />
-                      <div className="mb-2">
-                        <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-md text-sm font-semibold inline-flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-primary" />{' '}
-                          {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                      <Card className="shadow-sm border-slate-200">
-                        <CardContent className="p-4 text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">
-                          {entry.content}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-          )}
 
           {hasAchievements && (
             <TabsContent value="desafios" className="space-y-4">

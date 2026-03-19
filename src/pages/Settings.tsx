@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useToast } from '@/hooks/use-toast'
 import {
   Save,
@@ -26,25 +25,15 @@ import {
   UserRound,
   MessageCircle,
   Building2,
-  MapPin,
-  Check,
   Palette,
   Users,
   ShieldAlert,
+  BrainCircuit,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { TemplatesManager } from '@/components/TemplatesManager'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
 import { cn } from '@/lib/utils'
 
 const predefinedApproaches = [
@@ -94,22 +83,19 @@ export default function Settings() {
   })
 
   const [portalSettings, setPortalSettings] = useState({
-    show_medical_records: true,
     show_prescriptions: true,
     show_appointments: true,
     show_tests: true,
   })
 
-  const [questions, setQuestions] = useState<any[]>([])
+  const [anamneseTemplates, setAnamneseTemplates] = useState<any[]>([])
   const [lembreteAtivo, setLembreteAtivo] = useState(false)
   const [templateLembrete, setTemplateLembrete] = useState('Olá [Nome]...')
   const [especialidades, setEspecialidades] = useState<string[]>([])
   const [novaEspecialidade, setNovaEspecialidade] = useState('')
-  const [popoverOpen, setPopoverOpen] = useState(false)
 
   const [metaConsultas, setMetaConsultas] = useState(50)
   const [syncCals, setSyncCals] = useState({ google: false, outlook: false })
-  const [userTemplates, setUserTemplates] = useState<any[]>([])
 
   const [convenios, setConvenios] = useState<any[]>([])
   const [novoConvenio, setNewConvenio] = useState({ nome: '', registro_ans: '', contato: '' })
@@ -158,7 +144,9 @@ export default function Settings() {
               setPortalSettings((data as any).portal_settings)
             }
 
-            setQuestions(data.anamnese_template || [])
+            setAnamneseTemplates(
+              Array.isArray(data.anamnese_template) ? data.anamnese_template : [],
+            )
             setLembreteAtivo(data.lembrete_whatsapp_ativo || false)
             setTemplateLembrete(data.template_lembrete || 'Olá [Nome]...')
             setEspecialidades(data.especialidades_disponiveis || [])
@@ -178,14 +166,6 @@ export default function Settings() {
           }
         })
 
-      supabase
-        .from('templates_documentos')
-        .select('id, titulo, conteudo')
-        .eq('usuario_id', user.id)
-        .then(({ data }) => {
-          if (data) setUserTemplates(data)
-        })
-
       fetchConvenios()
       fetchTeam()
     }
@@ -202,7 +182,6 @@ export default function Settings() {
 
   const handleInviteMember = () => {
     if (!newMemberEmail) return
-    // Full auth flow should happen here. For now, simulate success logic
     toast({
       title: 'Convite Enviado',
       description: `Um e-mail de convite foi enviado para ${newMemberEmail} com perfil de ${newMemberRole}.`,
@@ -225,7 +204,7 @@ export default function Settings() {
     const payload = {
       ...formData,
       id: user?.id,
-      anamnese_template: questions,
+      anamnese_template: anamneseTemplates,
       lembrete_whatsapp_ativo: lembreteAtivo,
       template_lembrete: templateLembrete,
       especialidades_disponiveis: especialidades,
@@ -249,21 +228,6 @@ export default function Settings() {
     const newHorarios = [...horarios]
     newHorarios[index] = { ...newHorarios[index], [field]: value }
     setHorarios(newHorarios)
-  }
-
-  const addCustomEspecialidade = () => {
-    if (novaEspecialidade.trim() && !especialidades.includes(novaEspecialidade.trim())) {
-      setEspecialidades([...especialidades, novaEspecialidade.trim()])
-      setNovaEspecialidade('')
-    }
-  }
-
-  const toggleEspecialidade = (esp: string) => {
-    if (especialidades.includes(esp)) {
-      setEspecialidades(especialidades.filter((e) => e !== esp))
-    } else {
-      setEspecialidades([...especialidades, esp])
-    }
   }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -292,30 +256,40 @@ export default function Settings() {
     }
   }
 
-  const handleAddConvenio = async () => {
-    if (!novoConvenio.nome.trim()) return
-    const { error } = await supabase.from('convenios' as any).insert({
-      usuario_id: user?.id,
-      nome: novoConvenio.nome,
-      registro_ans: novoConvenio.registro_ans,
-      contato: novoConvenio.contato,
-    })
-    if (!error) {
-      setNewConvenio({ nome: '', registro_ans: '', contato: '' })
-      fetchConvenios()
-      toast({ title: 'Convênio adicionado!' })
-    } else {
-      toast({ title: 'Erro ao adicionar convênio', variant: 'destructive' })
-    }
+  const addAnamneseTemplate = () => {
+    setAnamneseTemplates([
+      ...anamneseTemplates,
+      {
+        id: crypto.randomUUID(),
+        titulo: 'Novo Modelo',
+        especialidade: '',
+        perguntas: ['Nova pergunta'],
+      },
+    ])
   }
 
-  const handleDeleteConvenio = async (id: string) => {
-    await supabase
-      .from('convenios' as any)
-      .delete()
-      .eq('id', id)
-    fetchConvenios()
-    toast({ title: 'Convênio removido!' })
+  const updateAnamneseTemplate = (index: number, field: string, value: any) => {
+    const newTpls = [...anamneseTemplates]
+    newTpls[index] = { ...newTpls[index], [field]: value }
+    setAnamneseTemplates(newTpls)
+  }
+
+  const updateAnamneseQuestion = (tplIndex: number, qIndex: number, value: string) => {
+    const newTpls = [...anamneseTemplates]
+    newTpls[tplIndex].perguntas[qIndex] = value
+    setAnamneseTemplates(newTpls)
+  }
+
+  const addAnamneseQuestion = (tplIndex: number) => {
+    const newTpls = [...anamneseTemplates]
+    newTpls[tplIndex].perguntas.push('Nova pergunta')
+    setAnamneseTemplates(newTpls)
+  }
+
+  const removeAnamneseQuestion = (tplIndex: number, qIndex: number) => {
+    const newTpls = [...anamneseTemplates]
+    newTpls[tplIndex].perguntas.splice(qIndex, 1)
+    setAnamneseTemplates(newTpls)
   }
 
   return (
@@ -362,6 +336,12 @@ export default function Settings() {
               className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
             >
               <MessageCircle className="w-4 h-4" /> WhatsApp
+            </TabsTrigger>
+            <TabsTrigger
+              value="anamnese"
+              className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
+            >
+              <BrainCircuit className="w-4 h-4" /> Anamnese
             </TabsTrigger>
             <TabsTrigger
               value="juridico"
@@ -643,23 +623,6 @@ export default function Settings() {
               <div className="flex items-center justify-between border-t border-slate-200 pt-4">
                 <div>
                   <Label className="text-base font-semibold text-slate-800">
-                    Prontuário Médico (Resumo)
-                  </Label>
-                  <p className="text-sm text-slate-500">
-                    Exibe o histórico de anotações compartilhadas e evolução.
-                  </p>
-                </div>
-                <Switch
-                  checked={portalSettings.show_medical_records}
-                  onCheckedChange={(v) =>
-                    setPortalSettings({ ...portalSettings, show_medical_records: v })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between border-t border-slate-200 pt-4">
-                <div>
-                  <Label className="text-base font-semibold text-slate-800">
                     Laudos e Prescrições
                   </Label>
                   <p className="text-sm text-slate-500">
@@ -736,21 +699,49 @@ export default function Settings() {
           <TabsContent value="whatsapp" className="p-6 m-0 space-y-6">
             <div>
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-emerald-500" /> Integração WhatsApp
+                <MessageCircle className="w-5 h-5 text-emerald-500" /> Integração WhatsApp &
+                Notificações
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Configure as mensagens automáticas enviadas para os pacientes.
+                Configure os lembretes automáticos para evitar faltas e esquecimentos.
               </p>
             </div>
 
             <div className="space-y-6">
+              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold text-slate-800">
+                      Lembretes Automáticos de Consulta
+                    </Label>
+                    <p className="text-sm text-slate-500">
+                      Envia um lembrete no dia anterior à sessão (requer Edge Functions ativas).
+                    </p>
+                  </div>
+                  <Switch checked={lembreteAtivo} onCheckedChange={setLembreteAtivo} />
+                </div>
+                {lembreteAtivo && (
+                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                    <Label>Template do Lembrete</Label>
+                    <Textarea
+                      value={templateLembrete}
+                      onChange={(e) => setTemplateLembrete(e.target.value)}
+                      rows={3}
+                      className="bg-white"
+                      placeholder="Olá [Nome], lembramos que sua consulta está marcada para [data] às [hora]."
+                    />
+                    <p className="text-xs text-slate-500">Variáveis: [Nome], [data], [hora]</p>
+                  </div>
+                )}
+              </div>
+
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
                 <div>
                   <Label className="text-base font-semibold text-slate-800">
                     Confirmação de Agendamento
                   </Label>
                   <p className="text-sm text-slate-500">
-                    Mensagem disparada assim que a consulta é marcada.
+                    Mensagem de texto para usar manualmente na hora de confirmar uma nova marcação.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -775,42 +766,103 @@ export default function Settings() {
                   </div>
                 )}
               </div>
+            </div>
+          </TabsContent>
 
-              <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base font-semibold text-slate-800">
-                      Lembretes Automáticos (24h antes)
-                    </Label>
-                    <p className="text-sm text-slate-500">
-                      Envia um lembrete 1 dia antes via servidor.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={lembreteAtivo}
-                    onCheckedChange={async (v) => {
-                      setLembreteAtivo(v)
-                      if (user) {
-                        await supabase
-                          .from('usuarios')
-                          .update({ lembrete_whatsapp_ativo: v })
-                          .eq('id', user.id)
-                      }
-                    }}
-                  />
-                </div>
-                {lembreteAtivo && (
-                  <div className="space-y-2 pt-2 border-t border-slate-200">
-                    <Label>Template de Lembrete</Label>
-                    <Textarea
-                      value={templateLembrete}
-                      onChange={(e) => setTemplateLembrete(e.target.value)}
-                      rows={3}
-                      className="bg-white"
-                    />
-                  </div>
-                )}
+          <TabsContent value="anamnese" className="p-6 m-0 space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <BrainCircuit className="w-5 h-5 text-primary" /> Anamnese Inteligente
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Crie questionários personalizados baseados na especialidade do atendimento.
+                </p>
               </div>
+              <Button type="button" onClick={addAnamneseTemplate} className="gap-2">
+                <Plus className="w-4 h-4" /> Novo Modelo
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              {anamneseTemplates.map((tpl, tplIndex) => (
+                <div
+                  key={tpl.id}
+                  className="bg-slate-50 p-5 rounded-lg border border-slate-200 shadow-sm relative"
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-4 right-4 text-red-500 hover:bg-red-50"
+                    onClick={() =>
+                      setAnamneseTemplates(anamneseTemplates.filter((_, i) => i !== tplIndex))
+                    }
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pr-10">
+                    <div className="space-y-1">
+                      <Label>Título do Modelo</Label>
+                      <Input
+                        value={tpl.titulo}
+                        onChange={(e) => updateAnamneseTemplate(tplIndex, 'titulo', e.target.value)}
+                        className="bg-white"
+                        placeholder="Ex: Anamnese TCC Adulto"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Especialidade Vinculada</Label>
+                      <Input
+                        value={tpl.especialidade}
+                        onChange={(e) =>
+                          updateAnamneseTemplate(tplIndex, 'especialidade', e.target.value)
+                        }
+                        className="bg-white"
+                        placeholder="Ex: TCC, Psicanálise, etc."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-slate-200">
+                    <Label className="text-slate-700">Perguntas</Label>
+                    {tpl.perguntas.map((q: string, qIndex: number) => (
+                      <div key={qIndex} className="flex items-center gap-2">
+                        <Input
+                          value={q}
+                          onChange={(e) => updateAnamneseQuestion(tplIndex, qIndex, e.target.value)}
+                          className="bg-white flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeAnamneseQuestion(tplIndex, qIndex)}
+                          className="text-slate-400 hover:text-red-500"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addAnamneseQuestion(tplIndex)}
+                      className="mt-2 text-primary border-primary border-dashed"
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Adicionar Pergunta
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {anamneseTemplates.length === 0 && (
+                <div className="text-center py-10 border border-dashed border-slate-300 rounded-lg text-slate-500">
+                  Nenhum modelo de anamnese criado. Clique em "Novo Modelo" para começar.
+                </div>
+              )}
             </div>
           </TabsContent>
 
