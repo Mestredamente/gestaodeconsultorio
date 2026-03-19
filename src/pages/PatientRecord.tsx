@@ -85,6 +85,10 @@ export default function PatientRecord() {
   useEffect(() => {
     const fetchData = async () => {
       if (!user || !id) return
+      if (id === 'novo') {
+        setLoading(false)
+        return
+      }
       setLoading(true)
       const { data: pData } = await supabase.from('pacientes').select('*').eq('id', id).single()
       setPatient(pData)
@@ -140,7 +144,7 @@ export default function PatientRecord() {
 
   const ensureProntuario = async () => {
     if (prontuarioId) return prontuarioId
-    if (!user || !id) return null
+    if (!user || !id || id === 'novo') return null
     const { data, error } = await supabase
       .from('prontuarios')
       .insert({
@@ -275,7 +279,7 @@ export default function PatientRecord() {
   }
 
   const handleSaveLaudo = async () => {
-    if (!laudoContent.trim()) return
+    if (!laudoContent.trim() || id === 'novo') return
     const { data, error } = await supabase
       .from('laudos' as any)
       .insert({
@@ -335,6 +339,26 @@ export default function PatientRecord() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
+
+  if (id === 'novo') {
+    return (
+      <div className="space-y-6 animate-fade-in-up pb-10 max-w-5xl mx-auto">
+        <Button
+          variant="ghost"
+          onClick={() => navigate('/pacientes')}
+          className="gap-2 -ml-4 text-slate-500 mb-2"
+        >
+          <ArrowLeft className="w-4 h-4" /> Voltar
+        </Button>
+        <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-slate-200">
+          <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-slate-700">Paciente não salvo</h2>
+          <p className="text-slate-500">Salve o paciente primeiro para acessar seu prontuário.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (!patient) return <div className="text-center py-20">Paciente não encontrado.</div>
 
   return (

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import PatientEditForm from '@/components/PatientEditForm'
 import PatientHeader from '@/components/PatientHeader'
+import NewPatientForm from '@/components/NewPatientForm'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { LineChart, Line, XAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { useAuth } from '@/hooks/use-auth'
@@ -57,7 +58,7 @@ export default function PatientDetail() {
   const [visibleSessionsCount, setVisibleSessionsCount] = useState(5)
 
   const fetchPatient = async () => {
-    if (!id || !user) return
+    if (!id || !user || id === 'novo') return
     const { data } = await supabase
       .from('pacientes')
       .select('*')
@@ -126,6 +127,10 @@ export default function PatientDetail() {
   }
 
   useEffect(() => {
+    if (id === 'novo') {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     fetchPatient().then(() => setLoading(false))
   }, [id, user])
@@ -139,7 +144,7 @@ export default function PatientDetail() {
   }
 
   const sendTest = async (templateId: string) => {
-    if (!user || !id) return
+    if (!user || !id || id === 'novo') return
     const { error } = await supabase.from('testes_pacientes').insert({
       usuario_id: user.id,
       paciente_id: id,
@@ -194,6 +199,30 @@ export default function PatientDetail() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
+
+  if (id === 'novo') {
+    return (
+      <div className="space-y-6 animate-fade-in-up pb-10">
+        <div className="flex justify-between items-center">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/pacientes')}
+            className="gap-2 -ml-4 text-slate-500"
+          >
+            <ArrowLeft className="w-4 h-4" /> Voltar
+          </Button>
+        </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Novo Paciente</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Preencha os dados abaixo para cadastrar um novo paciente.
+          </p>
+        </div>
+        <NewPatientForm />
+      </div>
+    )
+  }
+
   if (!patient) return <div className="text-center py-20">Paciente não encontrado.</div>
 
   const formatBRL = (val: number) =>
