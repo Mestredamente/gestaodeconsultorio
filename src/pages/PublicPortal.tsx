@@ -108,7 +108,10 @@ export default function PublicPortal() {
       p_justificativa: cancelJustification,
     })
     if (!error) {
-      toast({ title: 'Consulta desmarcada com sucesso.' })
+      toast({
+        title: 'Consulta desmarcada com sucesso.',
+        description: 'O horário foi liberado na agenda da clínica.',
+      })
       setIsCancelDialogOpen(false)
       setCancelAptId(null)
       setCancelJustification('')
@@ -116,7 +119,8 @@ export default function PublicPortal() {
     } else {
       toast({
         title: 'Erro ao desmarcar',
-        description: 'Ocorreu um erro, verifique se está dentro do prazo de 24h.',
+        description:
+          'Ocorreu um erro, verifique se está dentro do prazo de 24h ou tente novamente.',
         variant: 'destructive',
       })
     }
@@ -661,13 +665,13 @@ export default function PublicPortal() {
           <DialogHeader>
             <DialogTitle>Solicitar Cancelamento</DialogTitle>
             <DialogDescription>
-              Informe o motivo do cancelamento. Esta ação deve ser realizada com pelo menos 24 horas
-              de antecedência.
+              Informe a justificativa do cancelamento. Como o aviso está sendo feito com pelo menos
+              24 horas de antecedência, o horário será liberado na agenda do profissional.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Textarea
-              placeholder="Justificativa (obrigatório)"
+              placeholder="Descreva o motivo do cancelamento (obrigatório)"
               value={cancelJustification}
               onChange={(e) => setCancelJustification(e.target.value)}
               className="min-h-[100px]"

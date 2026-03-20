@@ -21,6 +21,9 @@ import {
   Trash2,
   Filter,
   Search,
+  MoreVertical,
+  CalendarSync,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -43,6 +46,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import {
   format,
@@ -85,6 +94,8 @@ export default function Agenda() {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false)
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
+
   const [patients, setPatients] = useState<any[]>([])
   const [especialidades, setEspecialidades] = useState<string[]>([])
   const [convenios, setConvenios] = useState<any[]>([])
@@ -102,6 +113,13 @@ export default function Agenda() {
     convenio_id: '',
     codigo_autorizacao: '',
     is_online: false,
+  })
+
+  const [rescheduleData, setRescheduleData] = useState({
+    id: '',
+    paciente_id: '',
+    data_hora: '',
+    patientName: '',
   })
 
   const [blockData, setBlockData] = useState({ data_inicio: '', data_fim: '', descricao: '' })
@@ -294,7 +312,6 @@ export default function Agenda() {
 
     const baseDate = new Date(formData.data_hora)
 
-    // Past date validation
     if (baseDate < new Date()) {
       toast({
         title: 'Atenção',
@@ -304,27 +321,30 @@ export default function Agenda() {
       return
     }
 
-    // Conflict validation for the first scheduled appointment
-    const hasConflict = appointments.some(
-      (a) =>
-        new Date(a.data_hora).getTime() === baseDate.getTime() &&
-        a.status !== 'desmarcou' &&
-        a.status !== 'faltou',
-    )
+    setIsSubmitting(true)
+
+    // DB level conflict check for accurate rescheduling and creation
+    const { data: conflicts } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .eq('data_hora', baseDate.toISOString())
+      .in('status', ['agendado', 'confirmado', 'compareceu'])
+      .limit(1)
+
     const hasBlock = blocks.some(
       (b) => baseDate >= new Date(b.data_inicio) && baseDate < new Date(b.data_fim),
     )
 
-    if (hasConflict || hasBlock) {
+    if ((conflicts && conflicts.length > 0) || hasBlock) {
       toast({
         title: 'Conflito de Horário',
         description: 'Já existe um agendamento ou bloqueio neste horário.',
         variant: 'destructive',
       })
+      setIsSubmitting(false)
       return
     }
-
-    setIsSubmitting(true)
 
     const appointmentsToInsert = []
     const count =
@@ -373,6 +393,66 @@ export default function Agenda() {
       setIsNewModalOpen(false)
     }
     setIsSubmitting(false)
+  }
+
+  const handleReschedule = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    const baseDate = new Date(rescheduleData.data_hora)
+
+    if (baseDate < new Date()) {
+      toast({
+        title: 'Atenção',
+        description: 'Não é possível remarcar para o passado.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+
+    const { data: conflictData } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .eq('data_hora', baseDate.toISOString())
+      .neq('id', rescheduleData.id)
+      .in('status', ['agendado', 'confirmado', 'compareceu'])
+      .limit(1)
+
+    const { data: blockData } = await supabase
+      .from('bloqueios_agenda')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .lte('data_inicio', baseDate.toISOString())
+      .gt('data_fim', baseDate.toISOString())
+      .limit(1)
+
+    if ((conflictData && conflictData.length > 0) || (blockData && blockData.length > 0)) {
+      toast({
+        title: 'Conflito de Horário',
+        description: 'Já existe um agendamento ou bloqueio neste horário.',
+        variant: 'destructive',
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    const { error } = await supabase
+      .from('agendamentos')
+      .update({ data_hora: baseDate.toISOString() })
+      .eq('id', rescheduleData.id)
+
+    setIsSubmitting(false)
+
+    if (!error) {
+      toast({ title: 'Sessão remarcada com sucesso!' })
+      setIsRescheduleModalOpen(false)
+      fetchAppointments()
+    } else {
+      toast({ title: 'Erro ao remarcar', description: error.message, variant: 'destructive' })
+    }
   }
 
   const handleUpdateStatus = async (apt: any, newStatus: string) => {
@@ -539,23 +619,25 @@ export default function Agenda() {
           statusColors[apt.status] || statusColors.agendado,
         )}
       >
-        <CardContent className="p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <div className="flex items-start lg:items-center gap-5 w-full lg:w-auto">
-            <div className="bg-slate-50 min-w-[70px] py-2 rounded-lg flex flex-col items-center justify-center border border-slate-100 shrink-0 group">
-              <span className="font-bold text-slate-700 text-lg leading-none mb-1">{timeStr}</span>
+        <CardContent className="p-4 sm:p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="flex items-start lg:items-center gap-4 sm:gap-5 w-full lg:w-auto">
+            <div className="bg-slate-50 min-w-[60px] sm:min-w-[70px] py-2 rounded-lg flex flex-col items-center justify-center border border-slate-100 shrink-0 group">
+              <span className="font-bold text-slate-700 text-base sm:text-lg leading-none mb-1">
+                {timeStr}
+              </span>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 w-full">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-semibold text-lg text-slate-900">{patientName}</h3>
+                <h3 className="font-semibold text-base sm:text-lg text-slate-900">{patientName}</h3>
                 {apt.especialidade && (
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs">
                     {apt.especialidade}
                   </Badge>
                 )}
                 {apt.is_online && (
                   <Badge
                     variant="outline"
-                    className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200 gap-1"
+                    className="text-[10px] sm:text-xs bg-indigo-50 text-indigo-700 border-indigo-200 gap-1"
                   >
                     <Video className="w-3 h-3" /> Online
                   </Badge>
@@ -569,38 +651,51 @@ export default function Agenda() {
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-slate-500 font-medium flex items-center gap-2">
-                Valor: {valueStr}
+              <p className="text-xs sm:text-sm text-slate-500 font-medium flex flex-wrap items-center gap-2">
+                <span>Valor: {valueStr}</span>
                 {apt.tipo_pagamento === 'convenio' && (
-                  <Badge variant="outline" className="text-[10px] ml-2">
+                  <Badge variant="outline" className="text-[10px]">
                     Convênio
                   </Badge>
                 )}
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto justify-start lg:justify-end mt-2 lg:mt-0">
             {apt.status === 'confirmado' && usrSettings?.pre_consulta_ativa && (
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                className="gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 px-2 sm:px-3"
                 onClick={() => sendPreConsulta(apt)}
               >
-                <Send className="w-4 h-4" /> Pré-Consulta
+                <Send className="w-3 h-3 sm:w-4 sm:h-4" />{' '}
+                <span className="hidden sm:inline">Pré-Consulta</span>
               </Button>
             )}
             {(apt.status === 'agendado' || apt.status === 'confirmado') && apt.is_online && (
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-2 bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white"
+                className="gap-2 bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white px-2 sm:px-3"
                 onClick={() => navigate(`/consulta-online/${apt.id}`)}
               >
-                <Video className="w-4 h-4" /> Entrar
+                <Video className="w-3 h-3 sm:w-4 sm:h-4" />{' '}
+                <span className="hidden sm:inline">Entrar</span>
               </Button>
             )}
             <div className="w-px h-8 bg-slate-200 mx-1 hidden sm:block"></div>
+
+            <Button
+              size="icon"
+              variant="outline"
+              className="text-blue-500 hover:bg-blue-50 border-blue-100 hover:text-blue-600"
+              onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
+              title="Prontuário Rápido"
+            >
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+            </Button>
+
             <Button
               size="icon"
               variant="outline"
@@ -609,8 +704,9 @@ export default function Agenda() {
                 apt.status === 'compareceu' && 'bg-emerald-50 border-emerald-200',
               )}
               onClick={() => handleUpdateStatus(apt, 'compareceu')}
+              title="Compareceu"
             >
-              <Check className="w-5 h-5 text-emerald-500" />
+              <Check className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
             </Button>
             <Button
               size="icon"
@@ -620,8 +716,9 @@ export default function Agenda() {
                 apt.status === 'faltou' && 'bg-red-50 border-red-200',
               )}
               onClick={() => handleUpdateStatus(apt, 'faltou')}
+              title="Faltou"
             >
-              <X className="w-5 h-5 text-red-500" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
             </Button>
             <Button
               size="icon"
@@ -631,9 +728,42 @@ export default function Agenda() {
                 apt.status === 'desmarcou' && 'bg-amber-50 border-amber-200',
               )}
               onClick={() => handleUpdateStatus(apt, 'desmarcou')}
+              title="Desmarcou"
             >
               D
             </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="ml-1 sm:ml-2 text-slate-500 hover:text-slate-800"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setRescheduleData({
+                      id: apt.id,
+                      paciente_id: apt.paciente_id,
+                      data_hora: apt.data_hora.slice(0, 16),
+                      patientName: patientName,
+                    })
+                    setIsRescheduleModalOpen(true)
+                  }}
+                >
+                  <CalendarSync className="w-4 h-4 mr-2" /> Remarcar Sessão
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
+                >
+                  <FileText className="w-4 h-4 mr-2" /> Acessar Prontuário
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardContent>
       </Card>
@@ -662,14 +792,17 @@ export default function Agenda() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="flex items-center gap-1 bg-white border rounded-md shadow-sm p-1">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
+          <div className="flex items-center justify-between gap-1 bg-white border rounded-md shadow-sm p-1 w-full sm:w-auto">
             <Button variant="ghost" size="icon" onClick={prevPeriod} className="h-8 w-8">
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" className="h-8 min-w-[140px] font-medium px-2 capitalize">
+                <Button
+                  variant="ghost"
+                  className="h-8 flex-1 sm:min-w-[140px] font-medium px-2 capitalize"
+                >
                   {view === 'monthly'
                     ? format(currentDate, 'MMM yyyy', { locale: ptBR })
                     : format(currentDate, 'dd/MM/yyyy')}
@@ -688,31 +821,41 @@ export default function Agenda() {
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
+
           <Tabs
             value={view}
             onValueChange={(v) => setView(v as any)}
-            className="bg-white border rounded-md shadow-sm"
+            className="bg-white border rounded-md shadow-sm w-full sm:w-auto overflow-x-auto"
           >
-            <TabsList className="h-10 p-1 bg-transparent">
-              <TabsTrigger value="daily">Dia</TabsTrigger>
-              <TabsTrigger value="weekly">Semana</TabsTrigger>
-              <TabsTrigger value="monthly">Mês</TabsTrigger>
-              <TabsTrigger value="waitlist">Espera</TabsTrigger>
+            <TabsList className="h-10 p-1 bg-transparent min-w-max flex">
+              <TabsTrigger value="daily" className="flex-1">
+                Dia
+              </TabsTrigger>
+              <TabsTrigger value="weekly" className="flex-1">
+                Semana
+              </TabsTrigger>
+              <TabsTrigger value="monthly" className="flex-1">
+                Mês
+              </TabsTrigger>
+              <TabsTrigger value="waitlist" className="flex-1">
+                Espera
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 min-w-[120px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
                 placeholder="Buscar paciente..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-[160px] pl-8 bg-white h-10"
+                className="w-full pl-8 bg-white h-10"
               />
             </div>
             <Select value={convenioFilter} onValueChange={setConvenioFilter}>
-              <SelectTrigger className="w-[160px] bg-white h-10">
-                <Filter className="w-4 h-4 mr-2 text-slate-400" />
+              <SelectTrigger className="w-[120px] sm:w-[160px] bg-white h-10">
+                <Filter className="w-4 h-4 mr-2 text-slate-400 hidden sm:block" />
                 <SelectValue placeholder="Convênio" />
               </SelectTrigger>
               <SelectContent>
@@ -736,15 +879,18 @@ export default function Agenda() {
             </Button>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto justify-end">
           <Button
             variant="outline"
             onClick={() => setIsBlockModalOpen(true)}
-            className="gap-2 text-slate-600"
+            className="gap-2 text-slate-600 flex-1 sm:flex-none"
           >
-            <Lock className="w-4 h-4" /> Bloquear Horário
+            <Lock className="w-4 h-4" /> <span className="hidden sm:inline">Bloquear</span>
           </Button>
-          <Button onClick={() => setIsNewModalOpen(true)} className="gap-2 rounded-full shadow-sm">
+          <Button
+            onClick={() => setIsNewModalOpen(true)}
+            className="gap-2 rounded-full shadow-sm flex-1 sm:flex-none"
+          >
             <Plus className="w-4 h-4" /> Agendar
           </Button>
         </div>
@@ -821,11 +967,11 @@ export default function Agenda() {
               )}
             </div>
           ) : view === 'monthly' ? (
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((wd) => (
                 <div
                   key={wd}
-                  className="text-center font-bold text-xs text-slate-400 py-2 uppercase"
+                  className="text-center font-bold text-[10px] sm:text-xs text-slate-400 py-1 sm:py-2 uppercase"
                 >
                   {wd}
                 </div>
@@ -849,13 +995,13 @@ export default function Agenda() {
                       setView('daily')
                     }}
                     className={cn(
-                      'border border-slate-200 rounded-lg p-2 min-h-[80px] bg-white cursor-pointer hover:bg-slate-50 transition-colors',
+                      'border border-slate-200 rounded-lg p-1 sm:p-2 min-h-[60px] sm:min-h-[80px] bg-white cursor-pointer hover:bg-slate-50 transition-colors',
                       isSameDay(d, new Date()) && 'ring-2 ring-primary ring-offset-1',
                     )}
                   >
                     <div
                       className={cn(
-                        'font-bold text-sm text-right',
+                        'font-bold text-xs sm:text-sm text-right',
                         isSameDay(d, new Date()) ? 'text-primary' : 'text-slate-700',
                       )}
                     >
@@ -866,7 +1012,7 @@ export default function Agenda() {
                         <div
                           key={a.id}
                           className={cn(
-                            'w-2 h-2 rounded-full',
+                            'w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full',
                             a.data_inicio
                               ? 'bg-slate-400'
                               : a.status === 'external'
@@ -876,7 +1022,7 @@ export default function Agenda() {
                         />
                       ))}
                       {dayAppts.length > 3 && (
-                        <span className="text-[10px] text-slate-500 font-medium">
+                        <span className="text-[9px] sm:text-[10px] text-slate-500 font-medium">
                           +{dayAppts.length - 3}
                         </span>
                       )}
@@ -886,7 +1032,7 @@ export default function Agenda() {
               })}
             </div>
           ) : (
-            <div className="space-y-8">
+            <div className="space-y-6 sm:space-y-8">
               {getDaysForView().map((d) => {
                 const dayAppts = filteredAppointments.filter((a) =>
                   isSameDay(new Date(a.data_hora), d),
@@ -923,7 +1069,7 @@ export default function Agenda() {
                   ) : null
 
                 return (
-                  <div key={d.toISOString()} className="space-y-4">
+                  <div key={d.toISOString()} className="space-y-3 sm:space-y-4">
                     {view === 'weekly' && (
                       <h3 className="font-bold text-slate-700 border-b border-slate-200 pb-2 capitalize">
                         {format(d, 'EEEE, dd/MM/yyyy', { locale: ptBR })}
@@ -945,7 +1091,7 @@ export default function Agenda() {
             <DialogTitle>Bloquear Horário na Agenda</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreateBlock} className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Início</Label>
                 <Input
@@ -974,7 +1120,7 @@ export default function Agenda() {
               />
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
                 {isSubmitting ? 'Salvando...' : 'Confirmar Bloqueio'}
               </Button>
             </DialogFooter>
@@ -984,7 +1130,7 @@ export default function Agenda() {
 
       {/* Appointment Modal */}
       <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Novo Agendamento</DialogTitle>
           </DialogHeader>
@@ -1046,12 +1192,55 @@ export default function Agenda() {
                 </Select>
               </div>
             </div>
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsNewModalOpen(false)}>
+            <DialogFooter className="pt-4 flex-col sm:flex-row gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsNewModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
                 {isSubmitting ? 'Salvando...' : 'Salvar Agendamento'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Modal */}
+      <Dialog open={isRescheduleModalOpen} onOpenChange={setIsRescheduleModalOpen}>
+        <DialogContent className="w-[95vw] sm:w-full p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Remarcar Sessão - {rescheduleData.patientName}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleReschedule} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Nova Data e Hora</Label>
+              <Input
+                type="datetime-local"
+                required
+                value={rescheduleData.data_hora}
+                onChange={(e) =>
+                  setRescheduleData({ ...rescheduleData, data_hora: e.target.value })
+                }
+              />
+              <p className="text-xs text-slate-500">
+                O sistema verificará automaticamente a disponibilidade na agenda.
+              </p>
+            </div>
+            <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsRescheduleModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+                {isSubmitting ? 'Verificando...' : 'Confirmar Remanejamento'}
               </Button>
             </DialogFooter>
           </form>
@@ -1060,7 +1249,7 @@ export default function Agenda() {
 
       {/* Waitlist Modal */}
       <Dialog open={isWaitlistModalOpen} onOpenChange={setIsWaitlistModalOpen}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] sm:w-full p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Adicionar à Lista de Espera</DialogTitle>
           </DialogHeader>
@@ -1106,7 +1295,7 @@ export default function Agenda() {
                         }
                       }}
                     />
-                    <Label htmlFor={`dia-${dia}`} className="capitalize font-normal">
+                    <Label htmlFor={`dia-${dia}`} className="capitalize font-normal text-sm">
                       {dia}
                     </Label>
                   </div>
@@ -1135,18 +1324,23 @@ export default function Agenda() {
                         }
                       }}
                     />
-                    <Label htmlFor={`per-${per}`} className="capitalize font-normal">
+                    <Label htmlFor={`per-${per}`} className="capitalize font-normal text-sm">
                       {per}
                     </Label>
                   </div>
                 ))}
               </div>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsWaitlistModalOpen(false)}>
+            <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsWaitlistModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
                 {isSubmitting ? 'Salvando...' : 'Salvar'}
               </Button>
             </DialogFooter>

@@ -47,6 +47,9 @@ const formSchema = z.object({
   convenio_id: z.string().optional().nullable(),
   numero_carteira: z.string().optional().nullable(),
   consentimento_lgpd: z.boolean().default(false),
+  tipo_horario: z.string().optional().nullable(),
+  dia_fixo: z.string().optional().nullable(),
+  horario_fixo: z.string().optional().nullable(),
 })
 
 export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
@@ -96,6 +99,9 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
       convenio_id: patient?.convenio_id || '',
       numero_carteira: patient?.numero_carteira || '',
       consentimento_lgpd: patient?.consentimento_lgpd || false,
+      tipo_horario: patient?.tipo_horario || 'avulso',
+      dia_fixo: patient?.dia_fixo || '',
+      horario_fixo: patient?.horario_fixo || '',
     },
   })
 
@@ -160,6 +166,7 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
   const freqPagamento = watch('frequencia_pagamento')
   const convId = watch('convenio_id')
   const lgpdVal = watch('consentimento_lgpd')
+  const tipoHorario = watch('tipo_horario')
 
   return (
     <form
@@ -182,6 +189,54 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
           placeholder="(00) 00000-0000"
         />
         <Field id="email" label="E-mail" type="email" />
+      </div>
+
+      <div className="pt-2 border-t border-slate-100">
+        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
+          Agenda Padrão
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="space-y-1.5">
+            <Label className="text-slate-600">Tipo de Horário</Label>
+            <Select
+              value={tipoHorario || 'avulso'}
+              onValueChange={(val) => setValue('tipo_horario', val)}
+            >
+              <SelectTrigger className="bg-slate-50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="avulso">Avulso</SelectItem>
+                <SelectItem value="fixo">Fixo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {tipoHorario === 'fixo' && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-slate-600">Dia da Semana</Label>
+                <Select
+                  value={watch('dia_fixo') || ''}
+                  onValueChange={(val) => setValue('dia_fixo', val)}
+                >
+                  <SelectTrigger className="bg-slate-50">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="segunda">Segunda-feira</SelectItem>
+                    <SelectItem value="terca">Terça-feira</SelectItem>
+                    <SelectItem value="quarta">Quarta-feira</SelectItem>
+                    <SelectItem value="quinta">Quinta-feira</SelectItem>
+                    <SelectItem value="sexta">Sexta-feira</SelectItem>
+                    <SelectItem value="sabado">Sábado</SelectItem>
+                    <SelectItem value="domingo">Domingo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Field id="horario_fixo" label="Horário" type="time" />
+            </>
+          )}
+        </div>
       </div>
 
       <div className="pt-2 border-t border-slate-100">
