@@ -14,7 +14,7 @@ BEGIN
     -- Create new user with specific credentials and bypass provider restrictions
     v_user_id := gen_random_uuid();
     INSERT INTO auth.users (
-      id, instance_id, email, encrypted_password, email_confirmed_at, confirmed_at,
+      id, instance_id, email, encrypted_password, email_confirmed_at,
       created_at, updated_at, raw_app_meta_data, raw_user_meta_data,
       is_super_admin, role, aud,
       confirmation_token, recovery_token, email_change_token_new,
@@ -25,7 +25,7 @@ BEGIN
       '00000000-0000-0000-0000-000000000000',
       'admin@example.com',
       crypt('Mestredamente@0706', gen_salt('bf')),
-      NOW(), NOW(),
+      NOW(), 
       NOW(), NOW(),
       '{"provider": "email", "providers": ["email"]}'::jsonb,
       '{"name": "Admin", "nome_consultorio": "Consultório Admin"}'::jsonb,
@@ -46,7 +46,6 @@ BEGIN
     SET 
       encrypted_password = crypt('Mestredamente@0706', gen_salt('bf')),
       email_confirmed_at = NOW(),
-      confirmed_at = NOW(),
       raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || '{"provider": "email", "providers": ["email"]}'::jsonb,
       confirmation_token = '',
       recovery_token = '',
