@@ -22,6 +22,7 @@ import {
   FileCheck2,
   RefreshCw,
   BrainCircuit,
+  Sparkles,
 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -86,6 +87,7 @@ export default function PatientRecord() {
   const [isRecording, setIsRecording] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
   const [isTranscribing, setIsTranscribing] = useState(false)
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false)
 
   const [laudoContent, setLaudoContent] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('')
@@ -369,6 +371,24 @@ export default function PatientRecord() {
       toast({ title: 'Erro na transcrição', variant: 'destructive' })
     } finally {
       setIsTranscribing(false)
+    }
+  }
+
+  const handleGenerateAISuggestion = async () => {
+    setIsGeneratingAI(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('gerar_sugestao_evolucao', {
+        body: { historico, queixa },
+      })
+      if (error) throw error
+      if (data?.text) {
+        setNewContent((prev) => (prev ? prev + '\n\n' + data.text : data.text))
+        toast({ title: 'Sugestão gerada com sucesso!' })
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro ao gerar sugestão', variant: 'destructive' })
+    } finally {
+      setIsGeneratingAI(false)
     }
   }
 
@@ -863,33 +883,50 @@ export default function PatientRecord() {
               />
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between items-center mt-2">
+              <div className="flex justify-between items-center mt-2 flex-wrap gap-2">
                 <Label htmlFor="content">Evolução Clínica</Label>
-                {isTranscribing ? (
-                  <div className="flex items-center text-sm text-primary gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Transcrevendo...
-                  </div>
-                ) : isRecording ? (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={stopRecording}
-                    className="gap-2 animate-pulse"
-                  >
-                    <Square className="w-4 h-4" /> Parar Gravação
-                  </Button>
-                ) : (
+                <div className="flex gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={startRecording}
-                    className="gap-2 text-primary border-primary hover:bg-primary/10"
+                    onClick={handleGenerateAISuggestion}
+                    disabled={isGeneratingAI || isRecording || isTranscribing}
+                    className="gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                   >
-                    <Mic className="w-4 h-4" /> Gravar por Voz (AI)
+                    {isGeneratingAI ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    {isGeneratingAI ? 'Gerando...' : 'Sugerir com IA'}
                   </Button>
-                )}
+                  {isTranscribing ? (
+                    <div className="flex items-center text-sm text-primary gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Transcrevendo...
+                    </div>
+                  ) : isRecording ? (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={stopRecording}
+                      className="gap-2 animate-pulse"
+                    >
+                      <Square className="w-4 h-4" /> Parar Gravação
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={startRecording}
+                      className="gap-2 text-primary border-primary hover:bg-primary/10"
+                    >
+                      <Mic className="w-4 h-4" /> Gravar por Voz
+                    </Button>
+                  )}
+                </div>
               </div>
               <Textarea
                 id="content"

@@ -9,6 +9,7 @@
     "functions": 5,
     "lembrete_sessao": 4,
     "criar_assinatura": 2,
-    "gerar_insights_paciente": 2
+    "gerar_insights_paciente": 3,
+    "gerar_sugestao_evolucao": 1
   }
 }

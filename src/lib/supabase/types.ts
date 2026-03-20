@@ -1978,6 +1978,8 @@ export const Constants = {
 //       v_paciente record;
 //       v_agendamentos jsonb := '[]'::jsonb;
 //       v_documentos jsonb := '[]'::jsonb;
+//       v_laudos jsonb := '[]'::jsonb;
+//       v_recibos jsonb := '[]'::jsonb;
 //       v_testes jsonb := '[]'::jsonb;
 //       v_clinica record;
 //       v_past_appointments jsonb := '[]'::jsonb;
@@ -1996,7 +1998,7 @@ export const Constants = {
 //       FROM public.usuarios
 //       WHERE id = v_paciente.usuario_id LIMIT 1;
 //
-//       v_portal_settings := COALESCE(v_clinica.portal_settings, '{"show_tests": true, "show_appointments": true, "show_prescriptions": true}'::jsonb);
+//       v_portal_settings := COALESCE(v_clinica.portal_settings, '{"show_tests": true, "show_appointments": true, "show_prescriptions": true, "show_receipts": true}'::jsonb);
 //
 //       IF COALESCE((v_portal_settings->>'show_appointments')::boolean, true) THEN
 //           SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -2041,11 +2043,33 @@ export const Constants = {
 //               'id', pr.id,
 //               'data_emissao', pr.data_emissao,
 //               'hash_verificacao', pr.hash_verificacao,
-//               'conteudo_json', pr.conteudo_json
+//               'conteudo_json', pr.conteudo_json,
+//               'tipo', 'prescricao'
 //           ) ORDER BY pr.data_emissao DESC), '[]'::jsonb) INTO v_documentos
 //           FROM public.prescricoes pr
 //           WHERE pr.paciente_id = v_paciente.id;
+//
+//           SELECT COALESCE(jsonb_agg(jsonb_build_object(
+//               'id', l.id,
+//               'data_emissao', l.data_emissao,
+//               'conteudo', l.conteudo,
+//               'tipo', l.tipo
+//           ) ORDER BY l.data_emissao DESC), '[]'::jsonb) INTO v_laudos
+//           FROM public.laudos l
+//           WHERE l.paciente_id = v_paciente.id;
+//
+//           v_documentos := v_documentos || v_laudos;
 //       END IF;
+//
+//       SELECT COALESCE(jsonb_agg(jsonb_build_object(
+//           'id', f.id,
+//           'mes', f.mes,
+//           'ano', f.ano,
+//           'valor_recebido', f.valor_recebido,
+//           'data_atualizacao', f.data_atualizacao
+//       ) ORDER BY f.ano DESC, f.mes DESC), '[]'::jsonb) INTO v_recibos
+//       FROM public.financeiro f
+//       WHERE f.paciente_id = v_paciente.id AND f.valor_recebido > 0;
 //
 //       IF COALESCE((v_portal_settings->>'show_tests')::boolean, true) THEN
 //           SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -2074,6 +2098,7 @@ export const Constants = {
 //           'portal_settings', v_portal_settings,
 //           'agendamentos', v_agendamentos,
 //           'documentos', v_documentos,
+//           'recibos', v_recibos,
 //           'pending_survey', v_past_appointments,
 //           'past_sessions', v_all_past,
 //           'testes', v_testes

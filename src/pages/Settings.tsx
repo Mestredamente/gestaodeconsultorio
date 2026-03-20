@@ -89,7 +89,7 @@ export default function Settings() {
     agendamento_publico_ativo: false,
     whatsapp_confirmacao_ativa: false,
     template_confirmacao: 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
-    whatsapp_tipo: 'personal',
+    whatsapp_tipo: 'business',
     pre_consulta_ativa: false,
     template_pre_consulta: 'Olá [Nome]...',
     endereco_consultorio: '',
@@ -176,7 +176,7 @@ export default function Settings() {
               template_confirmacao:
                 (data as any).template_confirmacao ||
                 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
-              whatsapp_tipo: (data as any).whatsapp_tipo || 'personal',
+              whatsapp_tipo: (data as any).whatsapp_tipo || 'business',
               pre_consulta_ativa: (data as any).pre_consulta_ativa || false,
               template_pre_consulta:
                 (data as any).template_pre_consulta || 'Olá [Nome], sua consulta...',
@@ -981,9 +981,34 @@ export default function Settings() {
                 Notificações
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Configure os lembretes automáticos para evitar faltas e esquecimentos.
+                Configure os lembretes automáticos e a integração com a API do WhatsApp.
               </p>
             </div>
+
+            <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm space-y-4">
+              <div>
+                <Label className="text-base font-semibold text-slate-800">
+                  Tipo de Integração WhatsApp
+                </Label>
+                <p className="text-sm text-slate-500 mb-3">
+                  Recomendamos o uso do WhatsApp Business para maior compatibilidade com automações
+                  e links de abertura rápida.
+                </p>
+              </div>
+              <Select
+                value={formData.whatsapp_tipo}
+                onValueChange={(v) => setFormData({ ...formData, whatsapp_tipo: v })}
+              >
+                <SelectTrigger className="bg-slate-50 max-w-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">WhatsApp Pessoal (Padrão)</SelectItem>
+                  <SelectItem value="business">WhatsApp Business (Recomendado)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-6">
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
                 <div className="flex items-center justify-between">
