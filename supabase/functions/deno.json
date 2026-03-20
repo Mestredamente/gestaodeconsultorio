@@ -7,6 +7,7 @@
     "transcrever_audio": 2,
     "processar_cobrancas_recorrentes": 3,
     "functions": 5,
-    "lembrete_sessao": 4
+    "lembrete_sessao": 4,
+    "criar_assinatura": 1
   }
 }
