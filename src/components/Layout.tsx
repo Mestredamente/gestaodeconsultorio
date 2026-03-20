@@ -223,7 +223,7 @@ export default function Layout() {
             <div className="flex items-center gap-4">
               <SidebarTrigger className="text-slate-500 md:hidden" />
               <div className="hidden sm:block">
-                <h1 className="text-lg font-bold text-slate-800">App Gestão Clínica</h1>
+                <h1 className="text-lg font-bold text-slate-800">App Gestão Consultório</h1>
               </div>
             </div>
             <div className="flex items-center gap-4">
