@@ -1,13 +1,13 @@
-DO $
+DO $$
 BEGIN
   DROP FUNCTION IF EXISTS public.get_clinic_slots(uuid, text);
-END $;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.get_clinic_slots(p_clinic_id uuid, p_date text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
-AS $function$
+AS $$
 DECLARE
     v_ativo boolean;
     v_agendamentos jsonb;
@@ -43,4 +43,4 @@ BEGIN
 
     RETURN jsonb_build_object('ativo', true, 'agendamentos', v_agendamentos, 'bloqueios', v_bloqueios);
 END;
-$function$;
+$$;
