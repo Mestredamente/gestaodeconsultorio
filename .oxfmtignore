@@ -1,1 +1,5 @@
 supabase/functions/deno.json
+/supabase/functions/deno.json
+**/deno.json
+**/*.json
+*.json
