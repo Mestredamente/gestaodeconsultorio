@@ -28,6 +28,7 @@ import NotFound from './pages/NotFound'
 import Auth from './pages/Auth'
 import ResetPassword from './pages/ResetPassword'
 import UpdatePassword from './pages/UpdatePassword'
+import Plans from './pages/Plans'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth()
@@ -94,6 +95,7 @@ const AppRoutes = () => (
       <Route path="/notificacoes" element={<Notifications />} />
       <Route path="/configuracoes" element={<Settings />} />
       <Route path="/perfil" element={<Navigate to="/configuracoes" replace />} />
+      <Route path="/planos" element={<Plans />} />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>
