@@ -162,10 +162,10 @@ export default function Index() {
           apptsRes,
           wlRes,
           stockRes,
-          { count: atendimentosHoje },
-          { count: pacientesNovos },
-          { count: pacientesAtivos },
-          { data: agendamentosFinanceiros },
+          atendimentosHojeRes,
+          pacientesNovosRes,
+          pacientesAtivosRes,
+          agendamentosFinanceirosRes,
         ] = await Promise.all([
           supabase
             .from('agendamentos')
@@ -191,22 +191,25 @@ export default function Index() {
 
           supabase
             .from('agendamentos')
-            .select('id', { count: 'exact', head: true })
+            .select('id', { count: 'exact' })
             .eq('usuario_id', user.id)
             .gte('data_hora', startOfDay.toISOString())
             .lt('data_hora', endOfDay.toISOString())
-            .neq('status', 'desmarcou'),
+            .neq('status', 'desmarcou')
+            .limit(0),
 
           supabase
             .from('pacientes')
-            .select('id', { count: 'exact', head: true })
+            .select('id', { count: 'exact' })
             .eq('usuario_id', user.id)
-            .gte('data_criacao', thirtyDaysAgo.toISOString()),
+            .gte('data_criacao', thirtyDaysAgo.toISOString())
+            .limit(0),
 
           supabase
             .from('pacientes')
-            .select('id', { count: 'exact', head: true })
-            .eq('usuario_id', user.id),
+            .select('id', { count: 'exact' })
+            .eq('usuario_id', user.id)
+            .limit(0),
 
           supabase
             .from('agendamentos')
@@ -225,19 +228,20 @@ export default function Index() {
         }
 
         const alertasFinanceiros =
-          agendamentosFinanceiros?.reduce(
+          agendamentosFinanceirosRes.data?.reduce(
             (acc, curr) => acc + (Number(curr.valor_sinal) || 0),
             0,
           ) || 0
 
         setKpis({
-          atendimentosHoje: atendimentosHoje || 0,
-          pacientesNovos: pacientesNovos || 0,
-          pacientesAtivos: pacientesAtivos || 0,
+          atendimentosHoje: atendimentosHojeRes.count || 0,
+          pacientesNovos: pacientesNovosRes.count || 0,
+          pacientesAtivos: pacientesAtivosRes.count || 0,
           alertasFinanceiros,
         })
       })
     } catch (err) {
+      console.error('Error fetching dashboard data:', err)
       setError(true)
     } finally {
       setLoading(false)
@@ -250,8 +254,8 @@ export default function Index() {
 
   const updateStatus = async (id: string, status: string) => {
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
-    const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
-    if (!error) toast({ title: `Status atualizado: ${status.toUpperCase()}` })
+    const { error: updErr } = await supabase.from('agendamentos').update({ status }).eq('id', id)
+    if (!updErr) toast({ title: `Status atualizado: ${status.toUpperCase()}` })
     else fetchIndexData()
   }
 
