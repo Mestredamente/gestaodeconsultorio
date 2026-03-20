@@ -291,9 +291,41 @@ export default function Agenda() {
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
-    setIsSubmitting(true)
 
     const baseDate = new Date(formData.data_hora)
+
+    // Past date validation
+    if (baseDate < new Date()) {
+      toast({
+        title: 'Atenção',
+        description: 'Não é possível agendar em um horário no passado.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // Conflict validation for the first scheduled appointment
+    const hasConflict = appointments.some(
+      (a) =>
+        new Date(a.data_hora).getTime() === baseDate.getTime() &&
+        a.status !== 'desmarcou' &&
+        a.status !== 'faltou',
+    )
+    const hasBlock = blocks.some(
+      (b) => baseDate >= new Date(b.data_inicio) && baseDate < new Date(b.data_fim),
+    )
+
+    if (hasConflict || hasBlock) {
+      toast({
+        title: 'Conflito de Horário',
+        description: 'Já existe um agendamento ou bloqueio neste horário.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+
     const appointmentsToInsert = []
     const count =
       formData.recorrencia === 'semanal'
@@ -334,11 +366,6 @@ export default function Agenda() {
     if (error)
       toast({ title: 'Erro ao agendar', description: error.message, variant: 'destructive' })
     else {
-      if (usrSettings?.whatsapp_confirmacao_ativa && inserted && inserted.length > 0) {
-        supabase.functions.invoke('enviar_lembrete_consulta', {
-          body: { agendamento_id: inserted[0].id },
-        })
-      }
       toast({
         title:
           count > 1 ? `${count} sessões agendadas com sucesso!` : 'Agendamento salvo com sucesso!',

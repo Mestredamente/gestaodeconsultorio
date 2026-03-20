@@ -5,9 +5,7 @@ import {
   Calendar,
   Check,
   X,
-  LogOut,
   Settings2,
-  Bell,
   Users,
   MessageCircle,
   ChevronRight,
@@ -15,7 +13,6 @@ import {
   ArrowUp,
   ArrowDown,
   AlertTriangle,
-  Package,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -45,11 +42,10 @@ const DEFAULT_WIDGETS = [
 ]
 
 export default function Index() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
   const [appointments, setAppointments] = useState<any[]>([])
-  const [notifications, setNotifications] = useState<any[]>([])
   const [waitlist, setWaitlist] = useState<any[]>([])
   const [lowStockItems, setLowStockItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,59 +67,6 @@ export default function Index() {
     month: 'long',
   }).format(new Date())
 
-  useEffect(() => {
-    if (!user) return
-    const fetchNotifs = async () => {
-      const { data } = await supabase
-        .from('notificacoes')
-        .select('*')
-        .eq('usuario_id', user.id)
-        .order('data_criacao', { ascending: false })
-        .limit(6)
-      if (data) setNotifications(data)
-    }
-    fetchNotifs()
-
-    const channelNotif = supabase
-      .channel('notificacoes_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notificacoes',
-          filter: `usuario_id=eq.${user.id}`,
-        },
-        (payload) => {
-          setNotifications((prev) => [payload.new, ...prev].slice(0, 6))
-          toast({ title: payload.new.titulo, description: payload.new.mensagem })
-        },
-      )
-      .subscribe()
-
-    const channelApt = supabase
-      .channel('dashboard_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'agendamentos',
-          filter: `usuario_id=eq.${user.id}`,
-        },
-        (payload) => {
-          if (payload.new.status === 'confirmado' && payload.old.status !== 'confirmado')
-            fetchIndexData()
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channelNotif)
-      supabase.removeChannel(channelApt)
-    }
-  }, [user, toast])
-
   const fetchIndexData = useCallback(async () => {
     if (!user) return
     setLoading(true)
@@ -138,7 +81,10 @@ export default function Index() {
           .maybeSingle()
 
         if (u?.preferencias_dashboard?.widgets) {
-          setWidgets(u.preferencias_dashboard.widgets)
+          const loadedWidgets = u.preferencias_dashboard.widgets.filter(
+            (w: any) => w.id !== 'notifications',
+          )
+          setWidgets(loadedWidgets.length > 0 ? loadedWidgets : DEFAULT_WIDGETS)
         } else if (u?.preferencias_dashboard) {
           const mapped = DEFAULT_WIDGETS.map((w) => {
             if (w.id === 'agenda' && u.preferencias_dashboard.show_agenda === false)
@@ -250,7 +196,27 @@ export default function Index() {
 
   useEffect(() => {
     fetchIndexData()
-  }, [fetchIndexData])
+    const channelApt = supabase
+      .channel('dashboard_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agendamentos',
+          filter: `usuario_id=eq.${user?.id}`,
+        },
+        (payload) => {
+          if (payload.new.status === 'confirmado' && payload.old.status !== 'confirmado')
+            fetchIndexData()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channelApt)
+    }
+  }, [fetchIndexData, user?.id])
 
   const updateStatus = async (id: string, status: string) => {
     setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
@@ -278,7 +244,6 @@ export default function Index() {
     const temp = updated[index]
     updated[index] = updated[index + direction]
     updated[index + direction] = temp
-
     const reordered = updated.map((w, i) => ({ ...w, order: i }))
     savePrefs(reordered)
   }
@@ -498,34 +463,6 @@ export default function Index() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="shadow-sm border-slate-200">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-                <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
-                  <Bell className="w-4 h-4 text-primary" /> Notificações Recentes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="p-6 text-center text-sm text-slate-500">
-                      Nenhuma notificação.
-                    </div>
-                  ) : (
-                    notifications.map((n) => (
-                      <div key={n.id} className="p-4 hover:bg-slate-50 transition-colors">
-                        <p className="font-semibold text-sm text-slate-800 leading-tight">
-                          {n.titulo}
-                        </p>
-                        <p className="text-xs text-slate-600 mt-1 line-clamp-2">{n.mensagem}</p>
-                        <p className="text-[10px] text-slate-400 mt-1.5">
-                          {new Date(n.data_criacao).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )
       default:
@@ -554,49 +491,41 @@ export default function Index() {
                 <DialogTitle>Configurar Dashboard</DialogTitle>
               </DialogHeader>
               <div className="space-y-2 py-4">
-                {widgets
-                  .sort((a, b) => a.order - b.order)
-                  .map((w, index) => (
-                    <div
-                      key={w.id}
-                      className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100"
-                    >
-                      <div className="flex items-center gap-3">
-                        <GripVertical className="w-4 h-4 text-slate-400 cursor-grab" />
-                        <Label className="cursor-pointer">{w.label}</Label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Switch
-                          checked={w.visible}
-                          onCheckedChange={(v) => toggleWidget(w.id, v)}
-                        />
-                        <div className="flex flex-col gap-1">
-                          <button
-                            type="button"
-                            onClick={() => moveWidget(index, -1)}
-                            disabled={index === 0}
-                            className="text-slate-400 hover:text-primary disabled:opacity-30"
-                          >
-                            <ArrowUp className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveWidget(index, 1)}
-                            disabled={index === widgets.length - 1}
-                            className="text-slate-400 hover:text-primary disabled:opacity-30"
-                          >
-                            <ArrowDown className="w-3 h-3" />
-                          </button>
-                        </div>
+                {widgets.map((w, index) => (
+                  <div
+                    key={w.id}
+                    className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <GripVertical className="w-4 h-4 text-slate-400 cursor-grab" />
+                      <Label className="cursor-pointer">{w.label}</Label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Switch checked={w.visible} onCheckedChange={(v) => toggleWidget(w.id, v)} />
+                      <div className="flex flex-col gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveWidget(index, -1)}
+                          disabled={index === 0}
+                          className="text-slate-400 hover:text-primary disabled:opacity-30"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveWidget(index, 1)}
+                          disabled={index === widgets.length - 1}
+                          className="text-slate-400 hover:text-primary disabled:opacity-30"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                ))}
               </div>
             </DialogContent>
           </Dialog>
-          <Button variant="outline" className="text-slate-600 gap-2" onClick={() => signOut()}>
-            <LogOut className="w-4 h-4" /> Sair da Conta
-          </Button>
         </div>
       </div>
 

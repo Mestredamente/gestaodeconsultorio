@@ -1,11 +1,23 @@
 import { Link, useLocation } from 'react-router-dom'
 import { navItems } from '@/lib/nav'
 import { cn } from '@/lib/utils'
-import { Menu } from 'lucide-react'
+import {
+  Menu,
+  LayoutDashboard,
+  Calendar,
+  Users,
+  Wallet,
+  Settings,
+  PieChart,
+  Box,
+  MessageSquare,
+  Video,
+  ShieldAlert,
+} from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useState, useEffect } from 'react'
 
-export function MobileNav() {
+export default function MobileNav() {
   const location = useLocation()
   const [isOpen, setIsOpen] = useState(false)
 
@@ -13,18 +25,18 @@ export function MobileNav() {
     setIsOpen(false)
   }, [location.pathname])
 
-  const coreItems = navItems.slice(0, 3)
+  const coreItems = navItems.slice(0, 4)
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 bg-card border-t flex items-center justify-around p-2 pb-safe md:hidden z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+    <nav className="fixed bottom-0 inset-x-0 bg-card border-t flex items-center justify-around p-2 pb-safe lg:hidden z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
       {coreItems.map((item) => {
         const isActive =
-          location.pathname === item.href ||
-          (item.href !== '/' && location.pathname.startsWith(item.href))
+          location.pathname === item.path ||
+          (item.path !== '/' && location.pathname.startsWith(item.path))
         return (
           <Link
-            key={item.href}
-            to={item.href}
+            key={item.path}
+            to={item.path}
             className={cn(
               'flex flex-col items-center p-2 rounded-xl min-w-[64px] transition-colors',
               isActive ? 'text-primary' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50',
@@ -60,12 +72,12 @@ export function MobileNav() {
           <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
             {navItems.map((item) => {
               const isActive =
-                location.pathname === item.href ||
-                (item.href !== '/' && location.pathname.startsWith(item.href))
+                location.pathname === item.path ||
+                (item.path !== '/' && location.pathname.startsWith(item.path))
               return (
                 <Link
-                  key={item.href}
-                  to={item.href}
+                  key={item.path}
+                  to={item.path}
                   className={cn(
                     'flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all font-medium',
                     isActive

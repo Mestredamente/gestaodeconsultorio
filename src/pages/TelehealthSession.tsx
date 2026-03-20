@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Loader2,
   UserSquare,
+  Copy,
 } from 'lucide-react'
 
 export default function TelehealthSession() {
@@ -52,7 +53,7 @@ export default function TelehealthSession() {
 
       const { data } = await supabase
         .from('agendamentos')
-        .select('*, pacientes(nome, id)')
+        .select('*, pacientes(nome, id, hash_anamnese)')
         .eq('id', agendamentoId)
         .single()
       if (data) {
@@ -92,6 +93,23 @@ export default function TelehealthSession() {
   const formatTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
+  const copyPatientLink = () => {
+    const patientHash = Array.isArray(apt?.pacientes)
+      ? apt?.pacientes[0]?.hash_anamnese
+      : apt?.pacientes?.hash_anamnese
+    if (patientHash) {
+      const link = `${window.location.origin}/sessao/${patientHash}`
+      navigator.clipboard.writeText(link)
+      toast({ title: 'Link da sessão copiado!' })
+    } else {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível gerar o link do paciente.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   if (loading)
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950">
@@ -99,7 +117,8 @@ export default function TelehealthSession() {
       </div>
     )
 
-  const patientName = apt?.pacientes?.nome || 'Paciente'
+  const patient = Array.isArray(apt?.pacientes) ? apt?.pacientes[0] : apt?.pacientes
+  const patientName = patient?.nome || 'Paciente'
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden animate-fade-in">
@@ -112,8 +131,20 @@ export default function TelehealthSession() {
           >
             <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
           </Button>
-          <div className="bg-black/50 px-4 py-1.5 rounded-full flex items-center gap-2 font-mono text-sm tracking-widest border border-white/10 shadow-sm">
-            <Clock className="w-4 h-4 text-emerald-400" /> {formatTime(seconds)}
+          <div className="flex gap-3">
+            {patient?.hash_anamnese && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-black/50 text-white border-white/20 hover:bg-white/20 gap-2 backdrop-blur-sm"
+                onClick={copyPatientLink}
+              >
+                <Copy className="w-4 h-4" /> Copiar Link
+              </Button>
+            )}
+            <div className="bg-black/50 px-4 py-1.5 rounded-full flex items-center gap-2 font-mono text-sm tracking-widest border border-white/10 shadow-sm backdrop-blur-sm">
+              <Clock className="w-4 h-4 text-emerald-400" /> {formatTime(seconds)}
+            </div>
           </div>
         </div>
 

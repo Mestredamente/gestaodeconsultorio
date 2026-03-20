@@ -983,22 +983,29 @@ export type Database = {
         Row: {
           agendamento_publico_ativo: boolean | null
           anamnese_template: Json | null
+          bairro: string | null
+          cep: string | null
           chave_pix: string | null
+          cidade: string | null
+          complemento: string | null
           email: string | null
           endereco_consultorio: string | null
           especialidades_disponiveis: string[] | null
+          estado: string | null
           horario_funcionamento: Json | null
           id: string
           lembrete_whatsapp_ativo: boolean | null
           logo_url: string | null
           meta_mensal_consultas: number | null
           nome_consultorio: string | null
+          numero: string | null
           parent_id: string | null
           politica_cancelamento: string | null
           portal_settings: Json | null
           pre_consulta_ativa: boolean | null
           preferencias_dashboard: Json | null
           role: string | null
+          rua: string | null
           sync_calendarios: Json | null
           telefone_consultorio: string | null
           template_cobranca: string | null
@@ -1012,22 +1019,29 @@ export type Database = {
         Insert: {
           agendamento_publico_ativo?: boolean | null
           anamnese_template?: Json | null
+          bairro?: string | null
+          cep?: string | null
           chave_pix?: string | null
+          cidade?: string | null
+          complemento?: string | null
           email?: string | null
           endereco_consultorio?: string | null
           especialidades_disponiveis?: string[] | null
+          estado?: string | null
           horario_funcionamento?: Json | null
           id: string
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
           meta_mensal_consultas?: number | null
           nome_consultorio?: string | null
+          numero?: string | null
           parent_id?: string | null
           politica_cancelamento?: string | null
           portal_settings?: Json | null
           pre_consulta_ativa?: boolean | null
           preferencias_dashboard?: Json | null
           role?: string | null
+          rua?: string | null
           sync_calendarios?: Json | null
           telefone_consultorio?: string | null
           template_cobranca?: string | null
@@ -1041,22 +1055,29 @@ export type Database = {
         Update: {
           agendamento_publico_ativo?: boolean | null
           anamnese_template?: Json | null
+          bairro?: string | null
+          cep?: string | null
           chave_pix?: string | null
+          cidade?: string | null
+          complemento?: string | null
           email?: string | null
           endereco_consultorio?: string | null
           especialidades_disponiveis?: string[] | null
+          estado?: string | null
           horario_funcionamento?: Json | null
           id?: string
           lembrete_whatsapp_ativo?: boolean | null
           logo_url?: string | null
           meta_mensal_consultas?: number | null
           nome_consultorio?: string | null
+          numero?: string | null
           parent_id?: string | null
           politica_cancelamento?: string | null
           portal_settings?: Json | null
           pre_consulta_ativa?: boolean | null
           preferencias_dashboard?: Json | null
           role?: string | null
+          rua?: string | null
           sync_calendarios?: Json | null
           telefone_consultorio?: string | null
           template_cobranca?: string | null
@@ -1491,6 +1512,13 @@ export const Constants = {
 //   role: text (nullable, default: 'admin'::text)
 //   parent_id: uuid (nullable)
 //   portal_settings: jsonb (nullable, default: '{"show_tests": true, "show_appointments": true, "show_prescriptions": true, "show_medical_records": true}'::jsonb)
+//   cep: text (nullable)
+//   rua: text (nullable)
+//   numero: text (nullable)
+//   complemento: text (nullable)
+//   bairro: text (nullable)
+//   cidade: text (nullable)
+//   estado: text (nullable)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos

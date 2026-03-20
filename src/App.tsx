@@ -14,6 +14,7 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Stock from './pages/Stock'
 import Logs from './pages/Logs'
+import Notifications from './pages/Notifications'
 import Marketing from './pages/Marketing'
 import Supervision from './pages/Supervision'
 import TelehealthSession from './pages/TelehealthSession'
@@ -90,6 +91,7 @@ const AppRoutes = () => (
       <Route path="/relatorios" element={<Reports />} />
       <Route path="/estoque" element={<Stock />} />
       <Route path="/logs" element={<Logs />} />
+      <Route path="/notificacoes" element={<Notifications />} />
       <Route path="/configuracoes" element={<Settings />} />
       <Route path="/perfil" element={<Navigate to="/configuracoes" replace />} />
     </Route>

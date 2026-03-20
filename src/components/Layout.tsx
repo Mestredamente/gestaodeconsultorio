@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
-import Sidebar from './Sidebar'
-import MobileNav from './MobileNav'
+import Sidebar from './layout/Sidebar'
+import MobileNav from './layout/MobileNav'
+import Header from './layout/Header'
 import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
 
@@ -54,6 +55,7 @@ export default function Layout() {
     <div className="flex min-h-screen bg-slate-50/50 selection:bg-primary/20 selection:text-primary">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
+        <Header />
         <MobileNav />
         <main className="flex-1 p-4 pb-24 lg:p-8 lg:pb-8 overflow-x-hidden max-w-[1600px] w-full mx-auto">
           <Outlet />

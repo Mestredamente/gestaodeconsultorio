@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { navItems } from '@/lib/nav'
 import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
+import { navItems } from '@/lib/nav'
 
-export function Sidebar() {
+export default function Sidebar() {
   const location = useLocation()
-  const { user } = useAuth()
-  const [clinic, setClinic] = useState({ name: 'Clínica', logo: '' })
+  const { user, signOut } = useAuth()
+  const [clinic, setClinic] = useState({ name: '', logo: '' })
 
   useEffect(() => {
     if (!user) return
@@ -19,81 +19,97 @@ export function Sidebar() {
         .select('nome_consultorio, logo_url')
         .eq('id', user.id)
         .single()
-      if (data) setClinic({ name: data.nome_consultorio || 'Clínica', logo: data.logo_url || '' })
+      if (data) {
+        setClinic({ name: data.nome_consultorio || '', logo: data.logo_url || '' })
+      }
     }
-
     fetchClinic()
 
-    const sub = supabase
-      .channel('sidebar_updates_layout')
+    const channel = supabase
+      .channel('sidebar_clinic_layout')
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'usuarios', filter: `id=eq.${user.id}` },
         (payload) => {
-          setClinic({
-            name: payload.new.nome_consultorio || 'Clínica',
-            logo: payload.new.logo_url || '',
-          })
+          setClinic({ name: payload.new.nome_consultorio || '', logo: payload.new.logo_url || '' })
         },
       )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(sub)
+      supabase.removeChannel(channel)
     }
   }, [user])
 
   return (
-    <aside className="fixed inset-y-0 left-0 w-64 bg-card/80 backdrop-blur-xl border-r hidden md:flex flex-col z-20 shadow-sm">
-      <div className="p-6 flex items-center gap-3 border-b border-slate-100">
+    <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen shrink-0 sticky top-0 hidden lg:flex">
+      <div className="h-16 flex items-center px-6 bg-slate-950 font-bold text-white text-lg gap-3 tracking-tight border-b border-slate-800">
         {clinic.logo ? (
           <img
             src={clinic.logo}
             alt="Logo da Clínica"
-            className="w-8 h-8 rounded-md object-contain bg-white shadow-sm border border-slate-100"
+            className="w-8 h-8 rounded object-contain bg-white shadow-sm"
           />
         ) : (
           <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
             {clinic.name ? clinic.name.substring(0, 2).toUpperCase() : 'C'}
           </div>
         )}
-        <span
-          className="font-semibold text-lg text-slate-800 tracking-tight truncate"
-          title={clinic.name}
-        >
-          {clinic.name}
+        <span className="truncate flex-1">
+          {clinic.name || (
+            <>
+              Gestão<span className="text-primary">Consultório</span>
+            </>
+          )}
         </span>
       </div>
-      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+
+      <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
         {navItems.map((item) => {
           const isActive =
-            location.pathname === item.href ||
-            (item.href !== '/' && location.pathname.startsWith(item.href))
+            location.pathname === item.path ||
+            (item.path !== '/' && location.pathname.startsWith(item.path))
           return (
             <Link
-              key={item.href}
-              to={item.href}
+              key={item.name}
+              to={item.path}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-sm font-medium',
                 isActive
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                  ? 'bg-primary text-primary-foreground shadow-md'
+                  : 'hover:bg-slate-800 hover:text-white',
               )}
             >
-              <item.icon className={cn('w-5 h-5', isActive ? 'text-primary' : 'text-slate-400')} />
+              <item.icon
+                className={cn(
+                  'w-5 h-5 transition-colors',
+                  isActive ? 'text-primary-foreground' : 'text-slate-400 group-hover:text-primary',
+                )}
+              />
               {item.name}
             </Link>
           )
         })}
       </nav>
-      <div className="p-4 border-t border-slate-100">
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-          <p className="text-xs text-slate-500 font-medium mb-2">Suporte</p>
-          <a href="#" className="text-sm text-primary hover:underline">
-            Central de Ajuda
-          </a>
+
+      <div className="p-4 border-t border-slate-800">
+        <div className="bg-slate-800 rounded-lg p-4 flex items-center gap-3 cursor-pointer hover:bg-slate-700 transition-colors">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
+            {clinic.name ? clinic.name.substring(0, 2).toUpperCase() : 'GC'}
+          </div>
+          <div className="overflow-hidden flex-1">
+            <p className="text-sm font-medium text-white truncate">
+              {clinic.name || 'Minha Clínica'}
+            </p>
+            <p
+              className="text-xs text-slate-400 truncate hover:text-slate-300 transition-colors"
+              onClick={signOut}
+            >
+              Sair da Conta
+            </p>
+          </div>
         </div>
       </div>
-    </aside>
+    </div>
   )
 }

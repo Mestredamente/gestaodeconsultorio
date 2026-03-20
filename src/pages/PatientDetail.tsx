@@ -21,6 +21,8 @@ import {
   Edit,
   ExternalLink,
   Printer,
+  Copy,
+  Video,
 } from 'lucide-react'
 import PatientEditForm from '@/components/PatientEditForm'
 
@@ -84,6 +86,16 @@ export default function PatientDetail() {
   const portalLink = patient?.hash_anamnese
     ? `${window.location.origin}/portal/${patient.hash_anamnese}`
     : ''
+  const sessaoLink = patient?.hash_anamnese
+    ? `${window.location.origin}/sessao/${patient.hash_anamnese}`
+    : ''
+
+  const copyToClipboard = (text: string, title: string) => {
+    if (text) {
+      navigator.clipboard.writeText(text)
+      toast({ title })
+    }
+  }
 
   return (
     <>
@@ -332,9 +344,16 @@ export default function PatientDetail() {
               </Card>
 
               <Tabs defaultValue="agendamentos" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="agendamentos">Agendamentos</TabsTrigger>
-                  <TabsTrigger value="portal">Portal do Paciente</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-3 h-auto">
+                  <TabsTrigger value="agendamentos" className="py-2">
+                    Agendamentos
+                  </TabsTrigger>
+                  <TabsTrigger value="links" className="py-2">
+                    Links & Sessão
+                  </TabsTrigger>
+                  <TabsTrigger value="portal" className="py-2">
+                    Portal
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="agendamentos" className="mt-4 space-y-3">
                   {agendamentos.length === 0 ? (
@@ -386,6 +405,35 @@ export default function PatientDetail() {
                     ))
                   )}
                 </TabsContent>
+                <TabsContent value="links" className="mt-4 space-y-4">
+                  <Card className="border-slate-200 shadow-sm">
+                    <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Video className="w-5 h-5 text-indigo-500" /> Link da Sessão Online
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-4">
+                      <p className="text-sm text-slate-600">
+                        Envie este link para o paciente acessar a sala de videoconferência. O link é
+                        único e fixo para este paciente.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          value={sessaoLink}
+                          readOnly
+                          className="bg-slate-50 font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => copyToClipboard(sessaoLink, 'Link da sessão copiado!')}
+                          className="shrink-0 gap-2"
+                        >
+                          <Copy className="w-4 h-4" /> Copiar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
                 <TabsContent value="portal" className="mt-4">
                   <Card className="border-indigo-100 shadow-sm bg-indigo-50/30">
                     <CardContent className="p-6 text-center space-y-4">
@@ -408,15 +456,10 @@ export default function PatientDetail() {
                           className="bg-white border-indigo-200 focus-visible:ring-indigo-500 text-sm font-mono"
                         />
                         <Button
-                          onClick={() => {
-                            if (portalLink) {
-                              navigator.clipboard.writeText(portalLink)
-                              toast({ title: 'Link copiado!' })
-                            }
-                          }}
-                          className="shrink-0 bg-indigo-600 hover:bg-indigo-700"
+                          onClick={() => copyToClipboard(portalLink, 'Link do portal copiado!')}
+                          className="shrink-0 bg-indigo-600 hover:bg-indigo-700 gap-2"
                         >
-                          Copiar
+                          <Copy className="w-4 h-4" /> Copiar
                         </Button>
                       </div>
                     </CardContent>
