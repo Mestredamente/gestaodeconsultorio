@@ -25,15 +25,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogDescription as DialogDesc,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const formSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
@@ -47,7 +49,6 @@ const formSchema = z.object({
     .string()
     .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'E-mail inválido')
     .optional(),
-  endereco: z.string().optional(),
   cep: z.string().optional(),
   rua: z.string().optional(),
   numero: z.string().optional(),
@@ -68,6 +69,7 @@ const formSchema = z.object({
     .transform((v) => (v ? Number(v) : null)),
   convenio_id: z.string().optional(),
   numero_carteira: z.string().optional(),
+  consentimento_lgpd: z.boolean().default(false),
 })
 
 export default function NewPatientForm() {
@@ -82,7 +84,6 @@ export default function NewPatientForm() {
 
   useEffect(() => {
     if (user) {
-      // Fetch Convenios
       supabase
         .from('convenios' as any)
         .select('*')
@@ -91,7 +92,6 @@ export default function NewPatientForm() {
           if (data) setConvenios(data)
         })
 
-      // Fetch Plan and Usage for limits
       Promise.all([
         supabase.from('usuarios').select('plano').eq('id', user.id).single(),
         supabase.from('pacientes').select('id', { count: 'exact' }).eq('usuario_id', user.id),
@@ -112,7 +112,6 @@ export default function NewPatientForm() {
       cpf: '',
       telefone: '',
       email: '',
-      endereco: '',
       cep: '',
       rua: '',
       numero: '',
@@ -127,13 +126,13 @@ export default function NewPatientForm() {
       dia_pagamento: '' as any,
       convenio_id: '',
       numero_carteira: '',
+      consentimento_lgpd: false,
     },
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) return
 
-    // Verify Limits
     const { plan, count } = planLimits
     if ((plan === 'gratuito' && count >= 5) || (plan === 'basico' && count >= 15)) {
       setShowUpgradeModal(true)
@@ -141,7 +140,6 @@ export default function NewPatientForm() {
     }
 
     setLoading(true)
-
     try {
       const payload = {
         usuario_id: user.id,
@@ -150,7 +148,6 @@ export default function NewPatientForm() {
         cpf: values.cpf || null,
         telefone: values.telefone || null,
         email: values.email || null,
-        endereco: values.endereco || null,
         cep: values.cep || null,
         rua: values.rua || null,
         numero: values.numero || null,
@@ -158,6 +155,7 @@ export default function NewPatientForm() {
         bairro: values.bairro || null,
         cidade: values.cidade || null,
         estado: values.estado || null,
+        endereco: `${values.rua}, ${values.numero} - ${values.bairro}, ${values.cidade}/${values.estado}`,
         contato_emergencia_nome: values.contato_emergencia_nome || null,
         contato_emergencia_telefone: values.contato_emergencia_telefone || null,
         valor_sessao: values.valor_sessao,
@@ -165,20 +163,17 @@ export default function NewPatientForm() {
         dia_pagamento: values.dia_pagamento,
         convenio_id: values.convenio_id || null,
         numero_carteira: values.numero_carteira || null,
+        consentimento_lgpd: values.consentimento_lgpd,
+        data_consentimento_lgpd: values.consentimento_lgpd ? new Date().toISOString() : null,
       }
       const { error } = await supabase.from('pacientes').insert(payload as any)
-
       if (error) throw error
 
       toast({ title: 'Paciente cadastrado com sucesso!' })
       form.reset()
       setPlanLimits((prev) => ({ ...prev, count: prev.count + 1 }))
     } catch (error: any) {
-      toast({
-        title: 'Erro ao salvar',
-        description: error.message || 'Verifique sua conexão e tente novamente.',
-        variant: 'destructive',
-      })
+      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -187,7 +182,6 @@ export default function NewPatientForm() {
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
     const masked = maskCEP(e.target.value)
     field.onChange(masked)
-
     if (masked.length === 9) {
       const address = await fetchAddressByCEP(masked)
       if (address) {
@@ -290,7 +284,7 @@ export default function NewPatientForm() {
 
               <div className="pt-4 border-t border-slate-100">
                 <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">
-                  Configurações de Pagamento e Convênio
+                  Pagamento e Convênio
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
@@ -422,7 +416,7 @@ export default function NewPatientForm() {
                       name="rua"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Rua</FormLabel>
+                          <FormLabel>Rua / Logradouro</FormLabel>
                           <FormControl>
                             <Input {...field} value={field.value || ''} />
                           </FormControl>
@@ -454,43 +448,73 @@ export default function NewPatientForm() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="bairro"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Bairro</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ''} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="cidade"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Cidade</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ''} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="estado"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Estado</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ''} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="bairro"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bairro</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="cidade"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cidade</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="estado"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Estado</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <FormField
+                  control={form.control}
+                  name="consentimento_lgpd"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-slate-50/80">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="text-slate-800">
+                          Consentimento de Tratamento de Dados (LGPD)
+                        </FormLabel>
+                        <FormDescription className="text-slate-500">
+                          Confirmo que o paciente autorizou expressamente o tratamento de seus dados
+                          pessoais sensíveis em conformidade com a Lei Geral de Proteção de Dados,
+                          para fins de saúde e gestão clínica.
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t border-slate-100">
@@ -510,10 +534,10 @@ export default function NewPatientForm() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl">Limite de Pacientes Atingido</DialogTitle>
-            <DialogDescription>
+            <DialogDesc>
               Você atingiu o limite do seu plano atual ({planLimits.plan.toUpperCase()} -{' '}
               {planLimits.count} pacientes).
-            </DialogDescription>
+            </DialogDesc>
           </DialogHeader>
           <div className="py-6 flex flex-col items-center justify-center text-center gap-4 bg-amber-50 rounded-lg border border-amber-100 mt-2">
             <div className="p-4 bg-amber-100 rounded-full">

@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const formSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
@@ -23,7 +24,6 @@ const formSchema = z.object({
   cpf: z.string().optional().nullable(),
   telefone: z.string().optional().nullable(),
   email: z.string().email('E-mail inválido').optional().or(z.literal('')).nullable(),
-  endereco: z.string().optional().nullable(),
   cep: z.string().optional().nullable(),
   rua: z.string().optional().nullable(),
   numero: z.string().optional().nullable(),
@@ -46,6 +46,7 @@ const formSchema = z.object({
     .transform((v) => (v ? Number(v) : null)),
   convenio_id: z.string().optional().nullable(),
   numero_carteira: z.string().optional().nullable(),
+  consentimento_lgpd: z.boolean().default(false),
 })
 
 export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
@@ -80,7 +81,6 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
       cpf: patient?.cpf || '',
       telefone: patient?.telefone || '',
       email: patient?.email || '',
-      endereco: patient?.endereco || '',
       cep: patient?.cep || '',
       rua: patient?.rua || '',
       numero: patient?.numero || '',
@@ -95,38 +95,39 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
       dia_pagamento: patient?.dia_pagamento ? String(patient.dia_pagamento) : '',
       convenio_id: patient?.convenio_id || '',
       numero_carteira: patient?.numero_carteira || '',
+      consentimento_lgpd: patient?.consentimento_lgpd || false,
     },
   })
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true)
-
     try {
+      const payload: any = {
+        ...values,
+        endereco: `${values.rua}, ${values.numero} - ${values.bairro}, ${values.cidade}/${values.estado}`,
+      }
+
+      if (values.consentimento_lgpd && !patient?.consentimento_lgpd) {
+        payload.data_consentimento_lgpd = new Date().toISOString()
+      }
+
       if (patient?.id) {
         const { error: updateError } = await supabase
           .from('pacientes')
-          .update(values as any)
+          .update(payload)
           .eq('id', patient.id)
         if (updateError) throw updateError
       } else {
         const { error: insertError } = await supabase
           .from('pacientes')
-          .insert([{ ...values, usuario_id: user?.id }] as any)
+          .insert([{ ...payload, usuario_id: user?.id }])
         if (insertError) throw insertError
       }
 
-      toast({
-        title: patient?.id
-          ? 'Paciente atualizado com sucesso!'
-          : 'Paciente cadastrado com sucesso!',
-      })
+      toast({ title: patient?.id ? 'Paciente atualizado!' : 'Paciente cadastrado com sucesso!' })
       onSuccess()
     } catch (error: any) {
-      toast({
-        title: 'Erro ao salvar',
-        description: error.message || 'Tente novamente.',
-        variant: 'destructive',
-      })
+      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -158,6 +159,7 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
 
   const freqPagamento = watch('frequencia_pagamento')
   const convId = watch('convenio_id')
+  const lgpdVal = watch('consentimento_lgpd')
 
   return (
     <form
@@ -233,34 +235,72 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
         <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
           Endereço
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-          <Field
-            id="cep"
-            label="CEP"
-            placeholder="00000-000"
-            onChange={(e: any) => {
-              const masked = maskCEP(e.target.value)
-              setValue('cep', masked)
-              if (masked.length === 9) {
-                fetchAddressByCEP(masked).then((addr) => {
-                  if (addr) {
-                    setValue('rua', addr.rua)
-                    setValue('bairro', addr.bairro)
-                    setValue('cidade', addr.cidade)
-                    setValue('estado', addr.estado)
-                  }
-                })
-              }
-            }}
-          />
-          <div className="md:col-span-3">
-            <Field id="rua" label="Rua" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-slate-600">CEP</Label>
+            <Input
+              className="bg-slate-50"
+              placeholder="00000-000"
+              {...register('cep')}
+              onChange={(e: any) => {
+                const masked = maskCEP(e.target.value)
+                setValue('cep', masked)
+                if (masked.length === 9) {
+                  fetchAddressByCEP(masked).then((addr) => {
+                    if (addr) {
+                      setValue('rua', addr.rua)
+                      setValue('bairro', addr.bairro)
+                      setValue('cidade', addr.cidade)
+                      setValue('estado', addr.estado)
+                    }
+                  })
+                }
+              }}
+            />
           </div>
-          <Field id="numero" label="Número" />
-          <Field id="complemento" label="Complemento" />
-          <Field id="bairro" label="Bairro" />
-          <Field id="cidade" label="Cidade" />
-          <Field id="estado" label="Estado" />
+          <div className="md:col-span-3 space-y-1.5">
+            <Label className="text-slate-600">Rua / Logradouro</Label>
+            <Input className="bg-slate-50" {...register('rua')} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-slate-600">Número</Label>
+            <Input className="bg-slate-50" {...register('numero')} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-slate-600">Complemento</Label>
+            <Input className="bg-slate-50" {...register('complemento')} />
+          </div>
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-slate-600">Bairro</Label>
+            <Input className="bg-slate-50" {...register('bairro')} />
+          </div>
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-slate-600">Cidade</Label>
+            <Input className="bg-slate-50" {...register('cidade')} />
+          </div>
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-slate-600">Estado</Label>
+            <Input className="bg-slate-50" {...register('estado')} />
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-2 border-t border-slate-100">
+        <div className="flex items-start space-x-3 p-4 bg-slate-50 rounded-md border border-slate-100">
+          <Checkbox
+            id="lgpd"
+            checked={lgpdVal}
+            onCheckedChange={(v) => setValue('consentimento_lgpd', !!v)}
+          />
+          <div className="space-y-1 leading-none">
+            <Label htmlFor="lgpd" className="text-slate-800 font-medium">
+              Consentimento LGPD
+            </Label>
+            <p className="text-xs text-slate-500 pt-1">
+              Confirmo que o paciente autorizou o tratamento de seus dados em conformidade com a
+              LGPD.
+            </p>
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,44 @@ export default function TelehealthSession() {
   const [camOn, setCamOn] = useState(true)
   const [seconds, setSeconds] = useState(0)
 
+  const localVideoRef = useRef<HTMLVideoElement>(null)
+  const [stream, setStream] = useState<MediaStream | null>(null)
+
+  useEffect(() => {
+    let activeStream: MediaStream | null = null
+    const initMedia = async () => {
+      try {
+        activeStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        setStream(activeStream)
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = activeStream
+        }
+      } catch (err) {
+        toast({
+          title: 'Atenção (Permissão Negada)',
+          description:
+            'Não foi possível acessar a câmera ou microfone. O paciente não conseguirá ver ou ouvir você.',
+          variant: 'destructive',
+        })
+      }
+    }
+    initMedia()
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach((t) => t.stop())
+      }
+    }
+  }, [toast])
+
+  useEffect(() => {
+    if (stream) {
+      const videoTrack = stream.getVideoTracks()[0]
+      if (videoTrack) videoTrack.enabled = camOn
+      const audioTrack = stream.getAudioTracks()[0]
+      if (audioTrack) audioTrack.enabled = micOn
+    }
+  }, [camOn, micOn, stream])
+
   useEffect(() => {
     const interval = setInterval(() => setSeconds((s) => s + 1), 1000)
     return () => clearInterval(interval)
@@ -41,11 +79,9 @@ export default function TelehealthSession() {
   useEffect(() => {
     const fetchApt = async () => {
       if (!agendamentoId) return
-
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         agendamentoId,
       )
-
       if (agendamentoId === 'nova' || !isUUID) {
         setLoading(false)
         return
@@ -104,7 +140,7 @@ export default function TelehealthSession() {
     } else {
       toast({
         title: 'Erro',
-        description: 'Não foi possível gerar o link do paciente.',
+        description: 'Não foi possível gerar o link.',
         variant: 'destructive',
       })
     }
@@ -159,12 +195,15 @@ export default function TelehealthSession() {
             </p>
 
             <div className="absolute top-4 right-4 w-32 md:w-48 aspect-video bg-slate-800 rounded-lg overflow-hidden border border-slate-700 shadow-xl flex items-center justify-center z-10">
-              {camOn ? (
-                <UserSquare className="w-16 h-16 text-slate-600" />
-              ) : (
-                <VideoOff className="w-8 h-8 text-slate-600" />
-              )}
-              <span className="absolute bottom-1 left-2 text-[10px] bg-black/50 px-1.5 rounded text-white shadow-sm">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
+              />
+              {!camOn && <VideoOff className="w-8 h-8 text-slate-600 absolute" />}
+              <span className="absolute bottom-1 left-2 text-[10px] bg-black/50 px-1.5 rounded text-white shadow-sm z-20">
                 Você
               </span>
             </div>
@@ -222,7 +261,6 @@ export default function TelehealthSession() {
               <Save className="w-4 h-4" /> Salvar Evolução
             </Button>
           </div>
-
           <div className="pt-6 border-t border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">
               Histórico Recente
@@ -241,11 +279,6 @@ export default function TelehealthSession() {
                   </p>
                 </div>
               ))}
-              {historico.length === 0 && (
-                <p className="text-sm text-slate-500 text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  Nenhum registro anterior encontrado.
-                </p>
-              )}
             </div>
           </div>
         </div>

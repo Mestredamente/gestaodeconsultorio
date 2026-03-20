@@ -31,6 +31,7 @@ import {
   ShieldAlert,
   BrainCircuit,
   X,
+  ChevronDown,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -38,6 +39,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { TemplatesManager } from '@/components/TemplatesManager'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const predefinedApproaches = [
   'Terapia Cognitivo-Comportamental (TCC)',
@@ -105,23 +113,46 @@ export default function Settings() {
   const [lembreteAtivo, setLembreteAtivo] = useState(false)
   const [templateLembrete, setTemplateLembrete] = useState('Olá [Nome]...')
   const [especialidades, setEspecialidades] = useState<string[]>([])
-  const [novaEspecialidade, setNovaEspecialidade] = useState('')
 
   const [metaConsultas, setMetaConsultas] = useState(50)
   const [syncCals, setSyncCals] = useState({ google: false, outlook: false })
 
   const [convenios, setConvenios] = useState<any[]>([])
-  const [novoConvenio, setNewConvenio] = useState({ nome: '', registro_ans: '', contato: '' })
 
   const [horarios, setHorarios] = useState(
-    DIAS.map((dia) => ({ dia, ativo: true, inicio: '08:00', fim: '18:00' })),
+    DIAS.map((dia) => ({
+      dia,
+      ativo: true,
+      turnos: [
+        { inicio: '08:00', fim: '12:00' },
+        { inicio: '13:00', fim: '18:00' },
+      ],
+    })),
   )
+
   const [themeColor, setThemeColor] = useState('indigo')
   const [preferenciasOriginal, setPreferenciasOriginal] = useState<any>({})
 
   const [team, setTeam] = useState<any[]>([])
   const [newMemberEmail, setNewMemberEmail] = useState('')
   const [newMemberRole, setNewMemberRole] = useState('profissional')
+
+  const [rolePermissions, setRolePermissions] = useState({
+    profissional: {
+      agenda: true,
+      pacientes: true,
+      prontuarios: true,
+      financeiro: false,
+      relatorios: false,
+    },
+    recepcao: {
+      agenda: true,
+      pacientes: true,
+      prontuarios: false,
+      financeiro: false,
+      relatorios: false,
+    },
+  })
 
   useEffect(() => {
     if (user) {
@@ -160,9 +191,7 @@ export default function Settings() {
               estado: (data as any).estado || '',
             })
 
-            if ((data as any).portal_settings) {
-              setPortalSettings((data as any).portal_settings)
-            }
+            if ((data as any).portal_settings) setPortalSettings((data as any).portal_settings)
 
             setAnamneseTemplates(
               Array.isArray(data.anamnese_template) ? data.anamnese_template : [],
@@ -176,12 +205,21 @@ export default function Settings() {
             const prefs = data.preferencias_dashboard || {}
             setPreferenciasOriginal(prefs)
             setThemeColor(prefs.theme_color || 'indigo')
+            if (prefs.role_permissions) setRolePermissions(prefs.role_permissions)
 
             if (
               (data as any).horario_funcionamento &&
               (data as any).horario_funcionamento.length > 0
             ) {
-              setHorarios((data as any).horario_funcionamento)
+              const mapped = (data as any).horario_funcionamento.map((h: any) => {
+                if (h.turnos) return h
+                return {
+                  dia: h.dia,
+                  ativo: h.ativo,
+                  turnos: [{ inicio: h.inicio || '08:00', fim: h.fim || '18:00' }],
+                }
+              })
+              setHorarios(mapped)
             }
           }
         })
@@ -236,17 +274,14 @@ export default function Settings() {
         preferencias_dashboard: {
           ...preferenciasOriginal,
           theme_color: themeColor,
+          role_permissions: rolePermissions,
         },
       }
       const { error } = await supabase.from('usuarios').upsert(payload as any)
       if (error) throw error
       toast({ title: 'Configurações salvas!' })
     } catch (error: any) {
-      toast({
-        title: 'Erro ao salvar',
-        description: error.message || 'Verifique sua conexão',
-        variant: 'destructive',
-      })
+      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -263,17 +298,31 @@ export default function Settings() {
         description: `Foram processados ${data.processed || 0} lembretes.`,
       })
     } catch (err: any) {
-      toast({
-        title: 'Erro ao disparar lembretes',
-        description: err.message,
-        variant: 'destructive',
-      })
+      toast({ title: 'Erro ao disparar', description: err.message, variant: 'destructive' })
     }
   }
 
-  const updateHorario = (index: number, field: string, value: any) => {
+  const updateHorarioAtivo = (index: number, ativo: boolean) => {
     const newHorarios = [...horarios]
-    newHorarios[index] = { ...newHorarios[index], [field]: value }
+    newHorarios[index].ativo = ativo
+    setHorarios(newHorarios)
+  }
+
+  const addTurno = (index: number) => {
+    const newHorarios = [...horarios]
+    newHorarios[index].turnos.push({ inicio: '18:00', fim: '19:00' })
+    setHorarios(newHorarios)
+  }
+
+  const removeTurno = (hIndex: number, tIndex: number) => {
+    const newHorarios = [...horarios]
+    newHorarios[hIndex].turnos.splice(tIndex, 1)
+    setHorarios(newHorarios)
+  }
+
+  const updateTurno = (hIndex: number, tIndex: number, field: string, value: string) => {
+    const newHorarios = [...horarios]
+    newHorarios[hIndex].turnos[tIndex] = { ...newHorarios[hIndex].turnos[tIndex], [field]: value }
     setHorarios(newHorarios)
   }
 
@@ -290,7 +339,6 @@ export default function Settings() {
       if (uploadError) throw uploadError
 
       const { data } = supabase.storage.from('logos').getPublicUrl(path)
-
       setFormData((prev) => ({ ...prev, logo_url: data.publicUrl }))
       await supabase.from('usuarios').update({ logo_url: data.publicUrl }).eq('id', user.id)
 
@@ -300,6 +348,23 @@ export default function Settings() {
     } finally {
       setUploadingLogo(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskCEP(e.target.value)
+    setFormData((prev) => ({ ...prev, cep: masked }))
+    if (masked.length === 9) {
+      const addr = await fetchAddressByCEP(masked)
+      if (addr) {
+        setFormData((prev) => ({
+          ...prev,
+          rua: addr.rua,
+          bairro: addr.bairro,
+          cidade: addr.cidade,
+          estado: addr.estado,
+        }))
+      }
     }
   }
 
@@ -352,7 +417,7 @@ export default function Settings() {
               value="perfil"
               className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
             >
-              <UserRound className="w-4 h-4" /> Perfil & Identidade
+              <UserRound className="w-4 h-4" /> Perfil
             </TabsTrigger>
             <TabsTrigger
               value="clinica"
@@ -364,7 +429,7 @@ export default function Settings() {
               value="equipe"
               className="rounded-none py-3 px-4 data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none flex items-center gap-2"
             >
-              <Users className="w-4 h-4" /> Equipe
+              <Users className="w-4 h-4" /> Equipe & Acessos
             </TabsTrigger>
             <TabsTrigger
               value="portal"
@@ -416,7 +481,6 @@ export default function Settings() {
               <p className="text-sm text-slate-500 mb-4">
                 Esta foto e nome serão exibidos no seu perfil, documentos e portal do paciente.
               </p>
-
               <div className="flex flex-col sm:flex-row gap-8 items-start bg-slate-50/50 p-5 rounded-lg border border-slate-100">
                 <div className="flex flex-col items-center gap-3">
                   <Avatar className="w-28 h-28 border-4 border-white shadow-sm">
@@ -439,19 +503,17 @@ export default function Settings() {
                     disabled={uploadingLogo}
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {uploadingLogo ? 'Enviando...' : 'Alterar Logo'}
+                    <Upload className="w-4 h-4 mr-2" /> Alterar Logo
                   </Button>
                   <input
                     type="file"
                     className="hidden"
-                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    accept="image/png, image/jpeg, image/webp"
                     ref={fileInputRef}
                     onChange={handleFileUpload}
                   />
                   <p className="text-[10px] text-slate-400 text-center">JPG, PNG. Máx 2MB.</p>
                 </div>
-
                 <div className="flex-1 space-y-4 w-full">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -462,7 +524,6 @@ export default function Settings() {
                           setFormData({ ...formData, nome_consultorio: e.target.value })
                         }
                         required
-                        placeholder="Dr. João Silva"
                       />
                     </div>
                     <div className="space-y-2">
@@ -493,10 +554,7 @@ export default function Settings() {
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-primary" /> Dados do Consultório
               </h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Informações de contato e endereço que aparecerão no cabeçalho de laudos e
-                prescrições.
-              </p>
+              <p className="text-sm text-slate-500 mt-1">Endereço e horários de atendimento.</p>
             </div>
 
             <div className="bg-slate-50/50 p-5 rounded-lg border border-slate-100">
@@ -505,23 +563,7 @@ export default function Settings() {
                   <Label>CEP</Label>
                   <Input
                     value={formData.cep}
-                    onChange={(e) => {
-                      const masked = maskCEP(e.target.value)
-                      setFormData((prev) => ({ ...prev, cep: masked }))
-                      if (masked.length === 9) {
-                        fetchAddressByCEP(masked).then((addr) => {
-                          if (addr) {
-                            setFormData((prev) => ({
-                              ...prev,
-                              rua: addr.rua,
-                              bairro: addr.bairro,
-                              cidade: addr.cidade,
-                              estado: addr.estado,
-                            }))
-                          }
-                        })
-                      }
-                    }}
+                    onChange={handleCepChange}
                     placeholder="00000-000"
                     className="bg-white"
                   />
@@ -531,7 +573,6 @@ export default function Settings() {
                   <Input
                     value={formData.rua}
                     onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
-                    placeholder="Nome da rua"
                     className="bg-white"
                   />
                 </div>
@@ -540,7 +581,6 @@ export default function Settings() {
                   <Input
                     value={formData.numero}
                     onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                    placeholder="123"
                     className="bg-white"
                   />
                 </div>
@@ -549,7 +589,6 @@ export default function Settings() {
                   <Input
                     value={formData.complemento}
                     onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
-                    placeholder="Sala 402"
                     className="bg-white"
                   />
                 </div>
@@ -558,7 +597,6 @@ export default function Settings() {
                   <Input
                     value={formData.bairro}
                     onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
-                    placeholder="Centro"
                     className="bg-white"
                   />
                 </div>
@@ -567,7 +605,6 @@ export default function Settings() {
                   <Input
                     value={formData.cidade}
                     onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                    placeholder="São Paulo"
                     className="bg-white"
                   />
                 </div>
@@ -576,12 +613,10 @@ export default function Settings() {
                   <Input
                     value={formData.estado}
                     onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    placeholder="SP"
                     className="bg-white"
                   />
                 </div>
               </div>
-
               <div className="mt-4 pt-4 border-t border-slate-200">
                 <div className="space-y-2 max-w-sm">
                   <Label>Telefone / WhatsApp da Clínica</Label>
@@ -599,42 +634,31 @@ export default function Settings() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
               <div className="space-y-2">
-                <Label>Especialidades Disponíveis</Label>
-                <div className="flex gap-2">
-                  <Input
-                    list="especialidades-list"
-                    value={novaEspecialidade}
-                    onChange={(e) => setNovaEspecialidade(e.target.value)}
-                    placeholder="Selecione ou digite..."
-                    className="bg-white"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        if (novaEspecialidade && !especialidades.includes(novaEspecialidade)) {
-                          setEspecialidades([...especialidades, novaEspecialidade])
-                          setNovaEspecialidade('')
-                        }
-                      }
-                    }}
-                  />
-                  <datalist id="especialidades-list">
+                <Label>Especialidades (Aparecem no Agendamento)</Label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between bg-white">
+                      {especialidades.length > 0
+                        ? `${especialidades.length} selecionadas`
+                        : 'Selecionar Especialidades'}
+                      <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-full sm:w-[300px]">
                     {predefinedApproaches.map((app) => (
-                      <option key={app} value={app} />
+                      <DropdownMenuCheckboxItem
+                        key={app}
+                        checked={especialidades.includes(app)}
+                        onCheckedChange={(checked) => {
+                          if (checked) setEspecialidades([...especialidades, app])
+                          else setEspecialidades(especialidades.filter((e) => e !== app))
+                        }}
+                      >
+                        {app}
+                      </DropdownMenuCheckboxItem>
                     ))}
-                  </datalist>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      if (novaEspecialidade && !especialidades.includes(novaEspecialidade)) {
-                        setEspecialidades([...especialidades, novaEspecialidade])
-                        setNovaEspecialidade('')
-                      }
-                    }}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {especialidades.map((esp, i) => (
                     <Badge key={i} variant="secondary" className="gap-1 items-center">
@@ -649,7 +673,6 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label>Meta Mensal de Consultas</Label>
                 <Input
@@ -662,42 +685,66 @@ export default function Settings() {
             </div>
 
             <div className="pt-4 border-t border-slate-100">
-              <h4 className="font-semibold text-slate-800 mb-3">Horário de Funcionamento</h4>
+              <h4 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-primary" /> Horários de Atendimento
+              </h4>
+              <p className="text-sm text-slate-500 mb-4">
+                Adicione turnos e intervalos para gerar os horários disponíveis automaticamente.
+              </p>
               <div className="space-y-3">
                 {horarios.map((h, i) => (
                   <div
                     key={h.dia}
-                    className="flex flex-col sm:flex-row sm:items-center gap-4 p-3 bg-slate-50 border border-slate-100 rounded-lg"
+                    className="flex flex-col gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg"
                   >
-                    <div className="flex items-center gap-3 w-40">
-                      <Switch
-                        checked={h.ativo}
-                        onCheckedChange={(v) => updateHorario(i, 'ativo', v)}
-                      />
+                    <div className="flex items-center gap-3">
+                      <Switch checked={h.ativo} onCheckedChange={(v) => updateHorarioAtivo(i, v)} />
                       <span
                         className={`font-medium ${h.ativo ? 'text-slate-800' : 'text-slate-400'}`}
                       >
                         {h.dia}
                       </span>
                     </div>
-                    {h.ativo ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="time"
-                          value={h.inicio}
-                          onChange={(e) => updateHorario(i, 'inicio', e.target.value)}
-                          className="w-32 bg-white"
-                        />
-                        <span className="text-slate-500 text-sm">até</span>
-                        <Input
-                          type="time"
-                          value={h.fim}
-                          onChange={(e) => updateHorario(i, 'fim', e.target.value)}
-                          className="w-32 bg-white"
-                        />
+                    {h.ativo && (
+                      <div className="space-y-3 pl-14">
+                        {h.turnos.map((t, tIdx) => (
+                          <div
+                            key={tIdx}
+                            className="flex items-center gap-2 flex-wrap sm:flex-nowrap"
+                          >
+                            <Input
+                              type="time"
+                              value={t.inicio}
+                              onChange={(e) => updateTurno(i, tIdx, 'inicio', e.target.value)}
+                              className="w-32 bg-white"
+                            />
+                            <span className="text-slate-500 text-sm">até</span>
+                            <Input
+                              type="time"
+                              value={t.fim}
+                              onChange={(e) => updateTurno(i, tIdx, 'fim', e.target.value)}
+                              className="w-32 bg-white"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-500 hover:bg-red-50 shrink-0"
+                              onClick={() => removeTurno(i, tIdx)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 text-xs"
+                          onClick={() => addTurno(i)}
+                        >
+                          <Plus className="w-3 h-3 mr-1" /> Adicionar Intervalo/Turno
+                        </Button>
                       </div>
-                    ) : (
-                      <span className="text-sm text-slate-400 italic">Fechado</span>
                     )}
                   </div>
                 ))}
@@ -708,11 +755,11 @@ export default function Settings() {
           <TabsContent value="equipe" className="p-6 m-0 space-y-6">
             <div>
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" /> Gerenciamento de Equipe
+                <Users className="w-5 h-5 text-primary" /> Gerenciamento de Equipe e Acessos
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Convide profissionais e recepcionistas para sua clínica. Defina seus papéis e níveis
-                de acesso.
+                Convide profissionais e recepcionistas. Defina exatamente o que cada perfil pode
+                acessar.
               </p>
             </div>
 
@@ -773,6 +820,57 @@ export default function Settings() {
                 ))
               )}
             </div>
+
+            <div className="pt-6 border-t border-slate-200 mt-6">
+              <h4 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-emerald-600" /> Permissões e LGPD
+              </h4>
+              <p className="text-sm text-slate-500 mb-4">
+                Controle rigorosamente quais dados cada perfil visualiza no sistema.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-5 rounded-lg border border-slate-200 shadow-sm">
+                <div className="space-y-4">
+                  <h5 className="font-bold text-slate-700 border-b pb-2">Perfil: Profissional</h5>
+                  {Object.keys(rolePermissions.profissional).map((module) => (
+                    <div key={`prof-${module}`} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`prof-${module}`}
+                        checked={(rolePermissions.profissional as any)[module]}
+                        onCheckedChange={(v) =>
+                          setRolePermissions((prev) => ({
+                            ...prev,
+                            profissional: { ...prev.profissional, [module]: !!v },
+                          }))
+                        }
+                      />
+                      <Label htmlFor={`prof-${module}`} className="capitalize">
+                        {module}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-4">
+                  <h5 className="font-bold text-slate-700 border-b pb-2">Perfil: Recepção</h5>
+                  {Object.keys(rolePermissions.recepcao).map((module) => (
+                    <div key={`rec-${module}`} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`rec-${module}`}
+                        checked={(rolePermissions.recepcao as any)[module]}
+                        onCheckedChange={(v) =>
+                          setRolePermissions((prev) => ({
+                            ...prev,
+                            recepcao: { ...prev.recepcao, [module]: !!v },
+                          }))
+                        }
+                      />
+                      <Label htmlFor={`rec-${module}`} className="capitalize">
+                        {module}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="portal" className="p-6 m-0 space-y-6">
@@ -785,7 +883,6 @@ export default function Settings() {
                 dele.
               </p>
             </div>
-
             <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -793,8 +890,7 @@ export default function Settings() {
                     Meus Agendamentos
                   </Label>
                   <p className="text-sm text-slate-500">
-                    Permite que o paciente visualize e solicite cancelamento de consultas futuras e
-                    passadas.
+                    Permite que o paciente visualize e solicite cancelamento de consultas.
                   </p>
                 </div>
                 <Switch
@@ -804,7 +900,6 @@ export default function Settings() {
                   }
                 />
               </div>
-
               <div className="flex items-center justify-between border-t border-slate-200 pt-4">
                 <div>
                   <Label className="text-base font-semibold text-slate-800">
@@ -821,7 +916,6 @@ export default function Settings() {
                   }
                 />
               </div>
-
               <div className="flex items-center justify-between border-t border-slate-200 pt-4">
                 <div>
                   <Label className="text-base font-semibold text-slate-800">
@@ -848,7 +942,6 @@ export default function Settings() {
                 Escolha a cor principal que representa a sua marca.
               </p>
             </div>
-
             <div className="flex flex-wrap gap-6 bg-slate-50/50 p-6 rounded-lg border border-slate-100">
               {themeOptions.map((t) => (
                 <div key={t.id} className="flex flex-col items-center gap-3">
@@ -891,7 +984,6 @@ export default function Settings() {
                 Configure os lembretes automáticos para evitar faltas e esquecimentos.
               </p>
             </div>
-
             <div className="space-y-6">
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
                 <div className="flex items-center justify-between">
@@ -918,7 +1010,6 @@ export default function Settings() {
                     <p className="text-xs text-slate-500">Variáveis: [Nome], [data], [hora]</p>
                   </div>
                 )}
-
                 <div className="mt-4 pt-4 border-t border-slate-200">
                   <Button
                     type="button"
@@ -928,13 +1019,8 @@ export default function Settings() {
                   >
                     <MessageCircle className="w-4 h-4" /> Disparar Lembretes Agora
                   </Button>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Aciona o sistema manualmente para enviar os lembretes agendados para o próximo
-                    dia.
-                  </p>
                 </div>
               </div>
-
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">
                 <div>
                   <Label className="text-base font-semibold text-slate-800">
@@ -975,15 +1061,11 @@ export default function Settings() {
                 <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                   <BrainCircuit className="w-5 h-5 text-primary" /> Anamnese Inteligente
                 </h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Crie questionários personalizados baseados na especialidade do atendimento.
-                </p>
               </div>
               <Button type="button" onClick={addAnamneseTemplate} className="gap-2">
                 <Plus className="w-4 h-4" /> Novo Modelo
               </Button>
             </div>
-
             <div className="space-y-6">
               {anamneseTemplates.map((tpl, tplIndex) => (
                 <div
@@ -1001,7 +1083,6 @@ export default function Settings() {
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pr-10">
                     <div className="space-y-1">
                       <Label>Título do Modelo</Label>
@@ -1009,7 +1090,6 @@ export default function Settings() {
                         value={tpl.titulo}
                         onChange={(e) => updateAnamneseTemplate(tplIndex, 'titulo', e.target.value)}
                         className="bg-white"
-                        placeholder="Ex: Anamnese TCC Adulto"
                       />
                     </div>
                     <div className="space-y-1">
@@ -1020,11 +1100,9 @@ export default function Settings() {
                           updateAnamneseTemplate(tplIndex, 'especialidade', e.target.value)
                         }
                         className="bg-white"
-                        placeholder="Ex: TCC, Psicanálise, etc."
                       />
                     </div>
                   </div>
-
                   <div className="space-y-3 pt-4 border-t border-slate-200">
                     <Label className="text-slate-700">Perguntas</Label>
                     {tpl.perguntas.map((q: string, qIndex: number) => (
@@ -1057,12 +1135,6 @@ export default function Settings() {
                   </div>
                 </div>
               ))}
-
-              {anamneseTemplates.length === 0 && (
-                <div className="text-center py-10 border border-dashed border-slate-300 rounded-lg text-slate-500">
-                  Nenhum modelo de anamnese criado. Clique em "Novo Modelo" para começar.
-                </div>
-              )}
             </div>
           </TabsContent>
 
@@ -1071,18 +1143,14 @@ export default function Settings() {
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                 <Scale className="w-5 h-5 text-primary" /> Textos Legais e Políticas
               </h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Textos exibidos no Portal do Paciente para leitura e aceite digital.
-              </p>
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Contrato de Prestação de Serviços</Label>
+                <Label>Contrato de Prestação de Serviços (Aceite Eletrônico)</Label>
                 <Textarea
                   value={formData.texto_contrato}
                   onChange={(e) => setFormData({ ...formData, texto_contrato: e.target.value })}
                   className="min-h-[150px]"
-                  placeholder="Termos do tratamento..."
                 />
               </div>
               <div className="space-y-2">
@@ -1093,7 +1161,6 @@ export default function Settings() {
                     setFormData({ ...formData, politica_cancelamento: e.target.value })
                   }
                   className="min-h-[100px]"
-                  placeholder="Regras sobre remarcações..."
                 />
               </div>
             </div>
@@ -1108,9 +1175,6 @@ export default function Settings() {
               <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-primary" /> Agendamento Público Online
               </h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Permite que pacientes agendem sozinhos pelos horários disponíveis.
-              </p>
             </div>
             <div className="pt-2 border-t border-slate-100">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-100 gap-4">
