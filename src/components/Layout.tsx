@@ -87,12 +87,18 @@ export default function Layout() {
 
       supabase
         .from('notificacoes')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'exact' })
         .eq('usuario_id', user.id)
         .eq('lida', false)
-        .then(({ count }) => {
-          if (count !== null) setUnreadCount(count)
+        .limit(0)
+        .then(({ count, error }) => {
+          if (error) {
+            console.error('Erro ao buscar total de notificações:', error)
+          } else if (count !== null) {
+            setUnreadCount(count)
+          }
         })
+        .catch((err) => console.error('Erro inesperado ao buscar notificações:', err))
 
       const sub = supabase
         .channel('notificacoes_changes')

@@ -12,12 +12,22 @@ export default function Header() {
   useEffect(() => {
     if (!user) return
     const fetchNotifs = async () => {
-      const { count } = await supabase
-        .from('notificacoes')
-        .select('id', { count: 'exact' })
-        .eq('usuario_id', user.id)
-        .eq('lida', false)
-      setUnreadCount(count || 0)
+      try {
+        const { count, error } = await supabase
+          .from('notificacoes')
+          .select('id', { count: 'exact' })
+          .eq('usuario_id', user.id)
+          .eq('lida', false)
+          .limit(0)
+
+        if (error) {
+          console.error('Erro ao buscar total de notificações:', error)
+          return
+        }
+        setUnreadCount(count || 0)
+      } catch (err) {
+        console.error('Erro inesperado ao buscar notificações:', err)
+      }
     }
     fetchNotifs()
 
