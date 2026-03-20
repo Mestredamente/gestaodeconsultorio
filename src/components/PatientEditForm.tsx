@@ -31,8 +31,8 @@ const formSchema = z.object({
   bairro: z.string().optional().nullable(),
   cidade: z.string().optional().nullable(),
   estado: z.string().optional().nullable(),
-  contato_emergencia_nome: z.string().optional().nullable(),
-  contato_emergencia_telefone: z.string().optional().nullable(),
+  contato_emergencia_nome: z.string().min(1, 'Nome do contato é obrigatório').nullable(),
+  contato_emergencia_telefone: z.string().min(1, 'Telefone de emergência é obrigatório').nullable(),
   valor_sessao: z
     .string()
     .optional()
@@ -189,6 +189,23 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
           placeholder="(00) 00000-0000"
         />
         <Field id="email" label="E-mail" type="email" />
+      </div>
+
+      <div className="pt-2 border-t border-slate-100">
+        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
+          Contato de Emergência
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Field id="contato_emergencia_nome" label="Nome do Contato *" />
+          <Field
+            id="contato_emergencia_telefone"
+            label="Telefone do Contato *"
+            onChange={(e: any) =>
+              setValue('contato_emergencia_telefone', maskPhone(e.target.value))
+            }
+            placeholder="(00) 00000-0000"
+          />
+        </div>
       </div>
 
       <div className="pt-2 border-t border-slate-100">

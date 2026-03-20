@@ -24,6 +24,7 @@ import {
   MoreVertical,
   CalendarSync,
   FileText,
+  Link as LinkIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -886,6 +887,16 @@ export default function Agenda() {
           </div>
         </div>
         <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full lg:w-auto justify-end shrink-0">
+          <Button
+            variant="outline"
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/agendar/${user?.id}`)
+              toast({ title: 'Link de agendamento copiado!' })
+            }}
+            className="gap-2 text-primary border-primary flex-1 sm:flex-none"
+          >
+            <LinkIcon className="w-4 h-4" /> <span className="hidden sm:inline">Copiar Link</span>
+          </Button>
           <Button
             variant="outline"
             onClick={() => setIsBlockModalOpen(true)}

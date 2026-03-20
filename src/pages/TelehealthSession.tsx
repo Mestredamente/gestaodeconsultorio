@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   Video,
   Mic,
@@ -16,6 +18,9 @@ import {
   Loader2,
   UserSquare,
   Copy,
+  ChevronRight,
+  Wallet,
+  Sparkles,
 } from 'lucide-react'
 
 export default function TelehealthSession() {
@@ -35,6 +40,14 @@ export default function TelehealthSession() {
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
+
+  const [inWaitingRoom, setInWaitingRoom] = useState(true)
+  const [generatingAI, setGeneratingAI] = useState(false)
+
+  const [avulsaName, setAvulsaName] = useState('')
+  const [avulsaValue, setAvulsaValue] = useState('')
+
+  const isAvulsa = agendamentoId === 'nova'
 
   useEffect(() => {
     let activeStream: MediaStream | null = null
@@ -72,17 +85,23 @@ export default function TelehealthSession() {
   }, [camOn, micOn, stream])
 
   useEffect(() => {
-    const interval = setInterval(() => setSeconds((s) => s + 1), 1000)
-    return () => clearInterval(interval)
-  }, [])
+    if (!inWaitingRoom) {
+      const interval = setInterval(() => setSeconds((s) => s + 1), 1000)
+      return () => clearInterval(interval)
+    }
+  }, [inWaitingRoom])
 
   useEffect(() => {
     const fetchApt = async () => {
-      if (!agendamentoId) return
+      if (!agendamentoId || isAvulsa) {
+        setLoading(false)
+        return
+      }
+
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         agendamentoId,
       )
-      if (agendamentoId === 'nova' || !isUUID) {
+      if (!isUUID) {
         setLoading(false)
         return
       }
@@ -110,10 +129,14 @@ export default function TelehealthSession() {
       setLoading(false)
     }
     fetchApt()
-  }, [agendamentoId])
+  }, [agendamentoId, isAvulsa])
 
   const handleSaveNotes = async () => {
-    if (!notes.trim() || !prontuarioId) return
+    if (!notes.trim() || (!prontuarioId && !isAvulsa)) return
+    if (isAvulsa) {
+      toast({ title: 'Anotações temporárias salvas.' })
+      return
+    }
     const newEntry = {
       id: Math.random().toString(36).substring(2),
       date: new Date().toISOString().split('T')[0],
@@ -126,15 +149,33 @@ export default function TelehealthSession() {
     toast({ title: 'Anotações salvas com sucesso!' })
   }
 
+  const handleAIAssist = async () => {
+    setGeneratingAI(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('gerar_sugestao_evolucao', {
+        body: { historico: historico.slice(0, 3), queixa: 'acompanhamento contínuo' },
+      })
+      if (error) throw error
+      if (data?.text) {
+        setNotes((prev) => prev + (prev ? '\n\n' : '') + data.text)
+        toast({ title: 'Sugestão gerada com sucesso!' })
+      }
+    } catch (e) {
+      toast({ title: 'Erro na IA', variant: 'destructive' })
+    } finally {
+      setGeneratingAI(false)
+    }
+  }
+
   const formatTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
+  const patient = Array.isArray(apt?.pacientes) ? apt?.pacientes[0] : apt?.pacientes
+  const patientName = isAvulsa ? avulsaName || 'Paciente Avulso' : patient?.nome || 'Paciente'
+
   const copyPatientLink = () => {
-    const patientHash = Array.isArray(apt?.pacientes)
-      ? apt?.pacientes[0]?.hash_anamnese
-      : apt?.pacientes?.hash_anamnese
-    if (patientHash) {
-      const link = `${window.location.origin}/sessao/${patientHash}`
+    if (patient?.hash_anamnese) {
+      const link = `${window.location.origin}/sessao/${patient.hash_anamnese}`
       navigator.clipboard.writeText(link)
       toast({ title: 'Link da sessão copiado!' })
     } else {
@@ -146,15 +187,124 @@ export default function TelehealthSession() {
     }
   }
 
+  const handleGerarLinkAvulsa = () => {
+    if (!avulsaName) {
+      toast({
+        title: 'Atenção',
+        description: 'Preencha o nome do paciente',
+        variant: 'destructive',
+      })
+      return
+    }
+    const fakePix = `00020126...${avulsaName.replace(/\s+/g, '')}`
+    navigator.clipboard.writeText(
+      `Olá ${avulsaName}, segue o link para pagamento da sessão avulsa (R$ ${avulsaValue || '0'}): \n\n${fakePix}\n\nAcesse a sala de vídeo: ${window.location.href}`,
+    )
+    toast({
+      title: 'Sessão Avulsa Registrada',
+      description: 'Link de pagamento e acesso copiado para a área de transferência.',
+    })
+  }
+
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950">
+      <div className="flex h-screen items-center justify-center bg-slate-50">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     )
 
-  const patient = Array.isArray(apt?.pacientes) ? apt?.pacientes[0] : apt?.pacientes
-  const patientName = patient?.nome || 'Paciente'
+  if (inWaitingRoom) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg shadow-xl border-slate-200">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl flex justify-center items-center gap-2 text-slate-800">
+              <Video className="w-6 h-6 text-primary" /> Sala de Espera
+            </CardTitle>
+            <CardDescription>
+              Prepare sua câmera e microfone antes de iniciar o atendimento.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center border border-slate-200 shadow-inner">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
+              />
+              {!camOn && <VideoOff className="w-12 h-12 text-slate-600" />}
+            </div>
+            <div className="flex justify-center gap-4">
+              <Button
+                variant={micOn ? 'default' : 'destructive'}
+                onClick={() => setMicOn(!micOn)}
+                className="w-40"
+              >
+                {micOn ? <Mic className="w-4 h-4 mr-2" /> : <MicOff className="w-4 h-4 mr-2" />}
+                {micOn ? 'Microfone Ativo' : 'Mudo'}
+              </Button>
+              <Button
+                variant={camOn ? 'default' : 'destructive'}
+                onClick={() => setCamOn(!camOn)}
+                className="w-40"
+              >
+                {camOn ? <Video className="w-4 h-4 mr-2" /> : <VideoOff className="w-4 h-4 mr-2" />}
+                {camOn ? 'Câmera Ativa' : 'Desligada'}
+              </Button>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
+              {patient?.hash_anamnese ? (
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 text-primary border-primary hover:bg-primary/5"
+                  onClick={copyPatientLink}
+                >
+                  <Copy className="w-4 h-4" /> Copiar Link do Paciente
+                </Button>
+              ) : isAvulsa ? (
+                <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <p className="text-sm font-semibold text-slate-700">Registro de Sessão Avulsa</p>
+                  <Input
+                    placeholder="Nome do Paciente"
+                    value={avulsaName}
+                    onChange={(e) => setAvulsaName(e.target.value)}
+                    className="bg-white"
+                  />
+                  <Input
+                    placeholder="Valor da Sessão (R$)"
+                    type="number"
+                    value={avulsaValue}
+                    onChange={(e) => setAvulsaValue(e.target.value)}
+                    className="bg-white"
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                    onClick={handleGerarLinkAvulsa}
+                  >
+                    <Wallet className="w-4 h-4" /> Gerar Link PIX + Sala
+                  </Button>
+                </div>
+              ) : null}
+
+              <Button
+                className="w-full gap-2 text-lg h-12 mt-2"
+                onClick={() => {
+                  if (localVideoRef.current) localVideoRef.current.srcObject = null
+                  setInWaitingRoom(false)
+                }}
+              >
+                Entrar na Sessão <ChevronRight className="w-5 h-5" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="h-screen bg-slate-50 flex flex-col md:flex-row overflow-hidden animate-fade-in">
@@ -201,6 +351,11 @@ export default function TelehealthSession() {
                 playsInline
                 muted
                 className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
+                ref={(node) => {
+                  if (node && stream && node.srcObject !== stream) {
+                    node.srcObject = stream
+                  }
+                }}
               />
               {!camOn && <VideoOff className="w-8 h-8 text-slate-600 absolute" />}
               <span className="absolute bottom-1 left-2 text-[10px] bg-black/50 px-1.5 rounded text-white shadow-sm z-20">
@@ -239,16 +394,32 @@ export default function TelehealthSession() {
       </div>
 
       <div className="w-full md:w-[450px] lg:w-[500px] bg-white border-l border-slate-200 flex flex-col h-[40vh] md:h-screen shadow-2xl z-10">
-        <div className="p-5 border-b border-slate-100 bg-slate-50/80 backdrop-blur-sm">
-          <h2 className="font-bold text-slate-800 text-lg">Prontuário e Anotações</h2>
-          <p className="text-sm font-medium text-slate-500 mt-0.5 flex items-center gap-2">
-            {patientName}
-          </p>
+        <div className="p-5 border-b border-slate-100 bg-slate-50/80 backdrop-blur-sm flex justify-between items-center">
+          <div>
+            <h2 className="font-bold text-slate-800 text-lg">Evolução Clínica</h2>
+            <p className="text-sm font-medium text-slate-500 mt-0.5 flex items-center gap-2">
+              {patientName}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-indigo-600 border-indigo-200 bg-indigo-50 hover:bg-indigo-100"
+            onClick={handleAIAssist}
+            disabled={generatingAI}
+          >
+            {generatingAI ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4" />
+            )}
+            Sugerir com IA
+          </Button>
         </div>
         <div className="p-5 flex-1 overflow-y-auto space-y-6">
           <div className="space-y-3">
             <Textarea
-              className="min-h-[150px] md:min-h-[250px] resize-y border-amber-200 bg-amber-50/50 focus-visible:ring-amber-500 text-base leading-relaxed p-4"
+              className="min-h-[150px] md:min-h-[250px] resize-y border-indigo-200 focus-visible:ring-indigo-500 text-base leading-relaxed p-4"
               placeholder="Digite as anotações e evolução da sessão atual..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -256,31 +427,33 @@ export default function TelehealthSession() {
             <Button
               className="w-full gap-2 h-11"
               onClick={handleSaveNotes}
-              disabled={!notes.trim() || !prontuarioId}
+              disabled={!notes.trim() || (!prontuarioId && !isAvulsa)}
             >
               <Save className="w-4 h-4" /> Salvar Evolução
             </Button>
           </div>
-          <div className="pt-6 border-t border-slate-100">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">
-              Histórico Recente
-            </h3>
-            <div className="space-y-3">
-              {historico.slice(0, 5).map((h: any) => (
-                <div
-                  key={h.id}
-                  className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm"
-                >
-                  <p className="font-bold text-slate-700 text-xs mb-2 border-b border-slate-200 pb-1">
-                    {new Date(h.date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                  </p>
-                  <p className="text-slate-600 leading-relaxed whitespace-pre-wrap line-clamp-4">
-                    {h.content}
-                  </p>
-                </div>
-              ))}
+          {!isAvulsa && (
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">
+                Histórico Recente
+              </h3>
+              <div className="space-y-3">
+                {historico.slice(0, 5).map((h: any) => (
+                  <div
+                    key={h.id}
+                    className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm"
+                  >
+                    <p className="font-bold text-slate-700 text-xs mb-2 border-b border-slate-200 pb-1">
+                      {new Date(h.date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                    </p>
+                    <p className="text-slate-600 leading-relaxed whitespace-pre-wrap line-clamp-4">
+                      {h.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -205,17 +205,25 @@ export default function Settings() {
             const prefs = data.preferencias_dashboard || {}
             setPreferenciasOriginal(prefs)
             setThemeColor(prefs.theme_color || 'indigo')
-            if (prefs.role_permissions) setRolePermissions(prefs.role_permissions)
+            if (prefs.role_permissions) {
+              setRolePermissions((prev: any) => ({
+                profissional: {
+                  ...prev.profissional,
+                  ...(prefs.role_permissions.profissional || {}),
+                },
+                recepcao: { ...prev.recepcao, ...(prefs.role_permissions.recepcao || {}) },
+              }))
+            }
 
             if (
               (data as any).horario_funcionamento &&
-              (data as any).horario_funcionamento.length > 0
+              Array.isArray((data as any).horario_funcionamento)
             ) {
               const mapped = (data as any).horario_funcionamento.map((h: any) => {
-                if (h.turnos) return h
+                if (h.turnos && Array.isArray(h.turnos)) return h
                 return {
-                  dia: h.dia,
-                  ativo: h.ativo,
+                  dia: h.dia || 'Segunda',
+                  ativo: !!h.ativo,
                   turnos: [{ inicio: h.inicio || '08:00', fim: h.fim || '18:00' }],
                 }
               })

@@ -29,6 +29,8 @@ import Auth from './pages/Auth'
 import ResetPassword from './pages/ResetPassword'
 import UpdatePassword from './pages/UpdatePassword'
 import Plans from './pages/Plans'
+import Onboarding from './pages/Onboarding'
+import HR from './pages/HR'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth()
@@ -55,6 +57,15 @@ const AppRoutes = () => (
     <Route path="/sessao/:hash" element={<PublicTelehealth />} />
     <Route path="/validar-prescricao/:hash" element={<PublicPrescription />} />
     <Route path="/confirmar/:hash/:appointmentId" element={<PublicConfirmation />} />
+
+    <Route
+      path="/onboarding"
+      element={
+        <ProtectedRoute>
+          <Onboarding />
+        </ProtectedRoute>
+      }
+    />
 
     <Route
       path="/atendimento/:agendamentoId"
@@ -87,6 +98,7 @@ const AppRoutes = () => (
       <Route path="/pacientes/:id/prontuario" element={<PatientRecord />} />
       <Route path="/carteira" element={<Finances />} />
       <Route path="/financeiro" element={<Navigate to="/carteira" replace />} />
+      <Route path="/rh" element={<HR />} />
       <Route path="/marketing" element={<Marketing />} />
       <Route path="/supervisao" element={<Supervision />} />
       <Route path="/relatorios" element={<Reports />} />

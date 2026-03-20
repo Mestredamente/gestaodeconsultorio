@@ -56,8 +56,8 @@ const formSchema = z.object({
   bairro: z.string().optional(),
   cidade: z.string().optional(),
   estado: z.string().optional(),
-  contato_emergencia_nome: z.string().optional(),
-  contato_emergencia_telefone: z.string().optional(),
+  contato_emergencia_nome: z.string().min(1, 'Nome do contato é obrigatório'),
+  contato_emergencia_telefone: z.string().min(1, 'Telefone de emergência é obrigatório'),
   valor_sessao: z
     .string()
     .optional()
@@ -280,6 +280,49 @@ export default function NewPatientForm() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">
+                  Contato de Emergência
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="contato_emergencia_nome"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome do Contato *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Ex: Maria da Silva"
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="contato_emergencia_telefone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefone do Contato *</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="(00) 00000-0000"
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-100">

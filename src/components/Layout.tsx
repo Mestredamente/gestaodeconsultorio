@@ -13,6 +13,7 @@ import {
   Bell,
   Megaphone,
   BookOpenCheck,
+  Briefcase,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -135,6 +136,7 @@ export default function Layout() {
       ? [{ icon: BookOpenCheck, label: 'Supervisão', path: '/supervisao' }]
       : []),
     { icon: PackageSearch, label: 'Estoque', path: '/estoque' },
+    { icon: Briefcase, label: 'RH & Gestão', path: '/rh' },
   ]
 
   const isActive = (path: string) => {

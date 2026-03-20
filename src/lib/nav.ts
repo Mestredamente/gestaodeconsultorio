@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Video,
   ShieldAlert,
+  Briefcase,
 } from 'lucide-react'
 
 export const navItems = [
@@ -18,6 +19,7 @@ export const navItems = [
   { name: 'Sessão Online', path: '/atendimento/nova', icon: Video },
   { name: 'Financeiro', path: '/carteira', icon: Wallet },
   { name: 'Estoque', path: '/estoque', icon: Box },
+  { name: 'RH & Gestão', path: '/rh', icon: Briefcase },
   { name: 'Marketing', path: '/marketing', icon: MessageSquare },
   { name: 'Relatórios', path: '/relatorios', icon: PieChart },
   { name: 'Logs', path: '/logs', icon: ShieldAlert },

@@ -3,6 +3,7 @@ import { TemplatesManager } from '@/components/TemplatesManager'
 import { SelfCareNewsletter } from '@/components/SelfCareNewsletter'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Megaphone } from 'lucide-react'
 
 export default function Marketing() {
   const [activeTab, setActiveTab] = useState('comunicacao')
@@ -10,31 +11,33 @@ export default function Marketing() {
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Marketing e Comunicação
-          </h1>
-          <p className="text-slate-500 mt-1 text-sm">Gerencie templates e envio de mensagens</p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 text-primary rounded-xl">
+            <Megaphone className="w-8 h-8" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Marketing e Comunicação
+            </h1>
+            <p className="text-slate-500 mt-1 text-sm">Gerencie templates e envio de mensagens</p>
+          </div>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-4 flex-wrap h-auto">
+        <TabsList className="mb-4 flex-wrap h-auto bg-slate-100/50 p-1 rounded-lg">
           <TabsTrigger value="comunicacao" className="py-2">
             Comunicações e Emails
           </TabsTrigger>
           <TabsTrigger value="newsletter" className="py-2">
             Newsletter Autocuidado
           </TabsTrigger>
-          <TabsTrigger value="testes" className="py-2">
-            Testes Psicológicos
-          </TabsTrigger>
           <TabsTrigger value="juridico" className="py-2">
             Jurídico e Contratos
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="comunicacao">
+        <TabsContent value="comunicacao" className="animate-fade-in-up">
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="bg-slate-50/50 border-b border-slate-100">
               <CardTitle className="text-lg">Campanhas e Lembretes</CardTitle>
@@ -50,29 +53,11 @@ export default function Marketing() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="newsletter">
+        <TabsContent value="newsletter" className="animate-fade-in-up">
           <SelfCareNewsletter />
         </TabsContent>
 
-        <TabsContent value="testes">
-          <Card className="shadow-sm border-slate-200">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100">
-              <CardTitle className="text-lg">Biblioteca de Testes e Escalas</CardTitle>
-              <CardDescription>
-                Crie questionários que os pacientes podem responder via Portal.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <TemplatesManager
-                defaultTipo="teste"
-                title="Modelos de Avaliação"
-                description="Formate suas perguntas como uma lista. Elas aparecerão no portal do paciente."
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="juridico">
+        <TabsContent value="juridico" className="animate-fade-in-up">
           <Card className="shadow-sm border-slate-200">
             <CardHeader className="bg-slate-50/50 border-b border-slate-100">
               <CardTitle className="text-lg">Modelos Legais</CardTitle>

@@ -92,8 +92,11 @@ export default function Auth() {
       } else {
         const { error } = await signUp(email, password, clinicName)
         if (error) throw error
-        toast({ title: 'Conta criada!', description: 'Bem-vindo ao sistema da sua clínica.' })
-        navigate('/', { replace: true })
+        toast({
+          title: 'Conta criada!',
+          description: 'Bem-vindo ao sistema. Complete seu cadastro.',
+        })
+        navigate('/onboarding', { replace: true })
       }
     } catch (error: any) {
       const isRateLimit =
