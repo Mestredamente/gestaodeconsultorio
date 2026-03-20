@@ -538,10 +538,10 @@ export default function Agenda() {
       return (
         <Card
           key={item.id}
-          className="bg-slate-50/80 border-l-4 border-slate-400 shadow-none border-t-0 border-r-0 border-b-0 border-dashed"
+          className="bg-slate-50/80 border-l-4 border-slate-400 shadow-none border-t-0 border-r-0 border-b-0 border-dashed h-full flex flex-col"
         >
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="bg-slate-200 min-w-[80px] py-1.5 rounded text-center border border-slate-300 shrink-0">
+          <CardContent className="p-4 flex flex-col items-start gap-3 h-full">
+            <div className="bg-slate-200 px-3 py-1.5 rounded text-center border border-slate-300 w-fit">
               <span className="font-bold text-slate-600 text-sm">
                 {timeStart} - {timeEnd}
               </span>
@@ -550,12 +550,12 @@ export default function Agenda() {
               <h3 className="font-semibold text-slate-700 flex items-center gap-2">
                 <Lock className="w-4 h-4" /> Horário Bloqueado
               </h3>
-              {item.descricao && <p className="text-xs text-slate-500 mt-0.5">{item.descricao}</p>}
+              {item.descricao && <p className="text-xs text-slate-500 mt-1">{item.descricao}</p>}
             </div>
             <Button
               variant="ghost"
               size="sm"
-              className="text-red-500"
+              className="text-red-500 w-full mt-auto"
               onClick={async () => {
                 await supabase.from('bloqueios_agenda').delete().eq('id', item.id)
                 fetchAppointments()
@@ -576,13 +576,13 @@ export default function Agenda() {
       return (
         <Card
           key={item.id}
-          className="bg-indigo-50/30 border-l-4 border-indigo-400 shadow-none border-t-0 border-r-0 border-b-0"
+          className="bg-indigo-50/30 border-l-4 border-indigo-400 shadow-none border-t-0 border-r-0 border-b-0 h-full flex flex-col"
         >
-          <CardContent className="p-5 flex items-center gap-4">
-            <div className="bg-indigo-100 min-w-[70px] py-2 rounded-lg text-center border border-indigo-200 shrink-0">
-              <span className="font-bold text-indigo-700 text-lg">{timeStr}</span>
+          <CardContent className="p-4 flex flex-col items-start gap-3 h-full">
+            <div className="bg-indigo-100 px-3 py-1.5 rounded-lg text-center border border-indigo-200 w-fit">
+              <span className="font-bold text-indigo-700 text-sm">{timeStr}</span>
             </div>
-            <div>
+            <div className="flex-1">
               <h3 className="font-semibold text-slate-700">{item.pacientes.nome}</h3>
               <p className="text-xs font-medium text-indigo-600 mt-1 flex items-center gap-1">
                 <CalendarIcon className="w-3 h-3" /> {item.titulo}
@@ -615,29 +615,32 @@ export default function Agenda() {
       <Card
         key={apt.id}
         className={cn(
-          'bg-white shadow-sm transition-all border-l-4 border-t-0 border-r-0 border-b-0',
+          'bg-white shadow-sm transition-all border-l-4 border-t-0 border-r-0 border-b-0 h-full flex flex-col hover:shadow-md',
           statusColors[apt.status] || statusColors.agendado,
         )}
       >
-        <CardContent className="p-4 sm:p-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <div className="flex items-start lg:items-center gap-4 sm:gap-5 w-full lg:w-auto">
-            <div className="bg-slate-50 min-w-[60px] sm:min-w-[70px] py-2 rounded-lg flex flex-col items-center justify-center border border-slate-100 shrink-0 group">
-              <span className="font-bold text-slate-700 text-base sm:text-lg leading-none mb-1">
-                {timeStr}
-              </span>
+        <CardContent className="p-4 flex flex-col h-full gap-3">
+          <div className="flex items-start gap-3">
+            <div className="bg-slate-50 px-2.5 py-1.5 rounded-lg flex flex-col items-center justify-center border border-slate-100 shrink-0">
+              <span className="font-bold text-slate-700 text-sm leading-none">{timeStr}</span>
             </div>
-            <div className="space-y-1 w-full">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-semibold text-base sm:text-lg text-slate-900">{patientName}</h3>
+            <div className="space-y-1 w-full min-w-0">
+              <h3
+                className="font-semibold text-sm text-slate-900 truncate max-w-full"
+                title={patientName}
+              >
+                {patientName}
+              </h3>
+              <div className="flex flex-wrap gap-1 mt-1">
                 {apt.especialidade && (
-                  <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                     {apt.especialidade}
                   </Badge>
                 )}
                 {apt.is_online && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] sm:text-xs bg-indigo-50 text-indigo-700 border-indigo-200 gap-1"
+                    className="text-[10px] px-1.5 py-0 bg-indigo-50 text-indigo-700 border-indigo-200 gap-1"
                   >
                     <Video className="w-3 h-3" /> Online
                   </Badge>
@@ -645,125 +648,128 @@ export default function Agenda() {
                 {apt.status === 'confirmado' && (
                   <Badge
                     variant="outline"
-                    className="text-[10px] bg-indigo-100 text-indigo-700 border-transparent h-5"
+                    className="text-[10px] px-1.5 py-0 bg-indigo-100 text-indigo-700 border-transparent"
                   >
                     Confirmado
                   </Badge>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium flex flex-wrap items-center gap-2">
-                <span>Valor: {valueStr}</span>
+              <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-1.5">
+                {valueStr}
                 {apt.tipo_pagamento === 'convenio' && (
-                  <Badge variant="outline" className="text-[10px]">
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
                     Convênio
                   </Badge>
                 )}
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full lg:w-auto justify-start lg:justify-end mt-2 lg:mt-0">
-            {apt.status === 'confirmado' && usrSettings?.pre_consulta_ativa && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50 px-2 sm:px-3"
-                onClick={() => sendPreConsulta(apt)}
-              >
-                <Send className="w-3 h-3 sm:w-4 sm:h-4" />{' '}
-                <span className="hidden sm:inline">Pré-Consulta</span>
-              </Button>
-            )}
-            {(apt.status === 'agendado' || apt.status === 'confirmado') && apt.is_online && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white px-2 sm:px-3"
-                onClick={() => navigate(`/consulta-online/${apt.id}`)}
-              >
-                <Video className="w-3 h-3 sm:w-4 sm:h-4" />{' '}
-                <span className="hidden sm:inline">Entrar</span>
-              </Button>
-            )}
-            <div className="w-px h-8 bg-slate-200 mx-1 hidden sm:block"></div>
 
-            <Button
-              size="icon"
-              variant="outline"
-              className="text-blue-500 hover:bg-blue-50 border-blue-100 hover:text-blue-600"
-              onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
-              title="Prontuário Rápido"
-            >
-              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-            </Button>
-
-            <Button
-              size="icon"
-              variant="outline"
-              className={cn(
-                'hover:bg-emerald-50',
-                apt.status === 'compareceu' && 'bg-emerald-50 border-emerald-200',
-              )}
-              onClick={() => handleUpdateStatus(apt, 'compareceu')}
-              title="Compareceu"
-            >
-              <Check className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
-            </Button>
-            <Button
-              size="icon"
-              variant="outline"
-              className={cn(
-                'hover:bg-red-50',
-                apt.status === 'faltou' && 'bg-red-50 border-red-200',
-              )}
-              onClick={() => handleUpdateStatus(apt, 'faltou')}
-              title="Faltou"
-            >
-              <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
-            </Button>
-            <Button
-              size="icon"
-              variant="outline"
-              className={cn(
-                'hover:bg-amber-50 font-bold text-amber-500',
-                apt.status === 'desmarcou' && 'bg-amber-50 border-amber-200',
-              )}
-              onClick={() => handleUpdateStatus(apt, 'desmarcou')}
-              title="Desmarcou"
-            >
-              D
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+          <div className="mt-auto pt-3 flex items-center gap-1 justify-between border-t border-slate-100">
+            <div className="flex items-center gap-1">
+              {apt.status === 'confirmado' && usrSettings?.pre_consulta_ativa && (
                 <Button
                   size="icon"
                   variant="outline"
-                  className="ml-1 sm:ml-2 text-slate-500 hover:text-slate-800"
+                  className="h-7 w-7 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                  onClick={() => sendPreConsulta(apt)}
+                  title="Pré-Consulta"
                 >
-                  <MoreVertical className="w-4 h-4" />
+                  <Send className="w-3 h-3" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={() => {
-                    setRescheduleData({
-                      id: apt.id,
-                      paciente_id: apt.paciente_id,
-                      data_hora: apt.data_hora.slice(0, 16),
-                      patientName: patientName,
-                    })
-                    setIsRescheduleModalOpen(true)
-                  }}
+              )}
+              {(apt.status === 'agendado' || apt.status === 'confirmado') && apt.is_online && (
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-7 w-7 bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white"
+                  onClick={() => navigate(`/consulta-online/${apt.id}`)}
+                  title="Entrar"
                 >
-                  <CalendarSync className="w-4 h-4 mr-2" /> Remarcar Sessão
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
-                >
-                  <FileText className="w-4 h-4 mr-2" /> Acessar Prontuário
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <Video className="w-3 h-3" />
+                </Button>
+              )}
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-7 w-7 text-blue-500 hover:bg-blue-50 border-blue-100"
+                onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
+                title="Prontuário Rápido"
+              >
+                <FileText className="w-3 h-3" />
+              </Button>
+            </div>
+
+            <div className="flex gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  'h-6 w-6 hover:bg-emerald-100 rounded-sm',
+                  apt.status === 'compareceu' && 'bg-emerald-100 text-emerald-600',
+                )}
+                onClick={() => handleUpdateStatus(apt, 'compareceu')}
+                title="Compareceu"
+              >
+                <Check className="w-3 h-3 text-emerald-500" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  'h-6 w-6 hover:bg-red-100 rounded-sm',
+                  apt.status === 'faltou' && 'bg-red-100 text-red-600',
+                )}
+                onClick={() => handleUpdateStatus(apt, 'faltou')}
+                title="Faltou"
+              >
+                <X className="w-3 h-3 text-red-500" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  'h-6 w-6 hover:bg-amber-100 font-bold text-amber-500 text-[10px] rounded-sm',
+                  apt.status === 'desmarcou' && 'bg-amber-100 text-amber-600',
+                )}
+                onClick={() => handleUpdateStatus(apt, 'desmarcou')}
+                title="Desmarcou"
+              >
+                D
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 text-slate-500 hover:text-slate-800 rounded-sm"
+                  >
+                    <MoreVertical className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setRescheduleData({
+                        id: apt.id,
+                        paciente_id: apt.paciente_id,
+                        data_hora: apt.data_hora.slice(0, 16),
+                        patientName: patientName,
+                      })
+                      setIsRescheduleModalOpen(true)
+                    }}
+                  >
+                    <CalendarSync className="w-3 h-3 mr-2" /> Remarcar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
+                  >
+                    <FileText className="w-3 h-3 mr-2" /> Prontuário
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -790,10 +796,10 @@ export default function Agenda() {
   })
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
-          <div className="flex items-center justify-between gap-1 bg-white border rounded-md shadow-sm p-1 w-full sm:w-auto">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-10">
+      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
+          <div className="flex items-center justify-between gap-1 bg-white border rounded-md shadow-sm p-1 w-full sm:w-auto shrink-0">
             <Button variant="ghost" size="icon" onClick={prevPeriod} className="h-8 w-8">
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -825,7 +831,7 @@ export default function Agenda() {
           <Tabs
             value={view}
             onValueChange={(v) => setView(v as any)}
-            className="bg-white border rounded-md shadow-sm w-full sm:w-auto overflow-x-auto"
+            className="bg-white border rounded-md shadow-sm w-full sm:w-auto overflow-x-auto shrink-0"
           >
             <TabsList className="h-10 p-1 bg-transparent min-w-max flex">
               <TabsTrigger value="daily" className="flex-1">
@@ -879,7 +885,7 @@ export default function Agenda() {
             </Button>
           </div>
         </div>
-        <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto justify-end">
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full lg:w-auto justify-end shrink-0">
           <Button
             variant="outline"
             onClick={() => setIsBlockModalOpen(true)}
@@ -903,7 +909,7 @@ export default function Agenda() {
       ) : (
         <div className="flex flex-col gap-4">
           {view === 'waitlist' ? (
-            <div className="space-y-4">
+            <div className="space-y-4 max-w-4xl mx-auto w-full">
               <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
                 <div>
                   <h3 className="font-semibold text-slate-800">Lista de Espera Inteligente</h3>
@@ -967,7 +973,7 @@ export default function Agenda() {
               )}
             </div>
           ) : view === 'monthly' ? (
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 max-w-4xl mx-auto w-full">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((wd) => (
                 <div
                   key={wd}
@@ -1062,7 +1068,7 @@ export default function Agenda() {
                   return view === 'daily' ? (
                     <div
                       key={d.toISOString()}
-                      className="text-center p-12 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500"
+                      className="text-center p-12 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500 max-w-4xl mx-auto w-full"
                     >
                       Nenhum agendamento ou bloqueio.
                     </div>
@@ -1075,7 +1081,9 @@ export default function Agenda() {
                         {format(d, 'EEEE, dd/MM/yyyy', { locale: ptBR })}
                       </h3>
                     )}
-                    {allDayItems.map((item) => renderAppointmentCard(item, item.type as any))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-fr">
+                      {allDayItems.map((item) => renderAppointmentCard(item, item.type as any))}
+                    </div>
                   </div>
                 )
               })}

@@ -734,6 +734,7 @@ export type Database = {
           foto_url: string | null
           frequencia_pagamento: string | null
           hash_anamnese: string | null
+          horario_fixo: string | null
           id: string
           nome: string
           numero: string | null
@@ -741,6 +742,7 @@ export type Database = {
           recorrencia: string | null
           rua: string | null
           telefone: string | null
+          tipo_horario: string | null
           usuario_id: string
           valor_sessao: number | null
         }
@@ -768,6 +770,7 @@ export type Database = {
           foto_url?: string | null
           frequencia_pagamento?: string | null
           hash_anamnese?: string | null
+          horario_fixo?: string | null
           id?: string
           nome: string
           numero?: string | null
@@ -775,6 +778,7 @@ export type Database = {
           recorrencia?: string | null
           rua?: string | null
           telefone?: string | null
+          tipo_horario?: string | null
           usuario_id: string
           valor_sessao?: number | null
         }
@@ -802,6 +806,7 @@ export type Database = {
           foto_url?: string | null
           frequencia_pagamento?: string | null
           hash_anamnese?: string | null
+          horario_fixo?: string | null
           id?: string
           nome?: string
           numero?: string | null
@@ -809,6 +814,7 @@ export type Database = {
           recorrencia?: string | null
           rua?: string | null
           telefone?: string | null
+          tipo_horario?: string | null
           usuario_id?: string
           valor_sessao?: number | null
         }
@@ -1476,6 +1482,8 @@ export const Constants = {
 //   foto_url: text (nullable)
 //   consentimento_lgpd: boolean (nullable, default: false)
 //   data_consentimento_lgpd: timestamp with time zone (nullable)
+//   tipo_horario: text (nullable, default: 'avulso'::text)
+//   horario_fixo: text (nullable)
 // Table: prescricoes
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)

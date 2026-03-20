@@ -24,6 +24,8 @@ import {
   QrCode,
   Trophy,
   TrendingUp,
+  Receipt,
+  Download,
 } from 'lucide-react'
 import { formatGoogleCalendarLink } from '@/lib/calendar'
 import { Textarea } from '@/components/ui/textarea'
@@ -37,6 +39,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
+import ReceiptDialog from '@/components/ReceiptDialog'
 
 export default function PublicPortal() {
   const { hash } = useParams()
@@ -58,6 +61,10 @@ export default function PublicPortal() {
 
   const [activeTest, setActiveTest] = useState<any>(null)
   const [testAnswers, setTestAnswers] = useState<Record<string, string>>({})
+
+  const [viewNote, setViewNote] = useState<any>(null)
+
+  const [receiptData, setReceiptData] = useState<any>(null)
 
   const fetchPortalData = async () => {
     if (!hash) return
@@ -190,6 +197,7 @@ export default function PublicPortal() {
     show_appointments: true,
     show_prescriptions: true,
     show_tests: true,
+    show_receipts: true,
   }
 
   const pendingPayments = data.agendamentos
@@ -197,6 +205,7 @@ export default function PublicPortal() {
     : []
   const pendingTests = (data.testes || []).filter((t: any) => t.status === 'pendente')
   const hasAchievements = data.conquistas && data.conquistas.length > 0
+  const hasReceipts = data.recibos && data.recibos.length > 0
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4 animate-fade-in">
@@ -269,6 +278,11 @@ export default function PublicPortal() {
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               )}
             </TabsTrigger>
+            {portalSettings.show_receipts !== false && hasReceipts && (
+              <TabsTrigger value="recibos" className="gap-2 py-2 whitespace-nowrap">
+                <Receipt className="w-4 h-4" /> Recibos
+              </TabsTrigger>
+            )}
             {hasAchievements && (
               <TabsTrigger value="desafios" className="gap-2 py-2 whitespace-nowrap">
                 <Trophy className="w-4 h-4 text-amber-500" /> Meus Desafios
@@ -285,7 +299,7 @@ export default function PublicPortal() {
               )}
             {portalSettings.show_prescriptions !== false && data.documentos?.length > 0 && (
               <TabsTrigger value="documentos" className="gap-2 py-2 whitespace-nowrap">
-                <FileText className="w-4 h-4" /> Laudos / Prescrições
+                <FileText className="w-4 h-4" /> Documentos Clínicos
               </TabsTrigger>
             )}
             {showLegalTab && (
@@ -456,6 +470,51 @@ export default function PublicPortal() {
             )}
           </TabsContent>
 
+          {portalSettings.show_receipts !== false && hasReceipts && (
+            <TabsContent value="recibos" className="space-y-4">
+              {data.recibos.map((recibo: any) => (
+                <Card key={recibo.id} className="shadow-sm border-slate-200">
+                  <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
+                    <div>
+                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                        Recibo - {String(recibo.mes).padStart(2, '0')}/{recibo.ano}
+                        <Badge
+                          variant="outline"
+                          className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                        >
+                          Pago
+                        </Badge>
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-1">
+                        Valor:{' '}
+                        <strong className="text-slate-700">
+                          {Number(recibo.valor_recebido).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </strong>
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="gap-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                      onClick={() =>
+                        setReceiptData({
+                          patientName: data.paciente_nome,
+                          amount: recibo.valor_recebido,
+                          dateStr: new Date(recibo.data_atualizacao).toLocaleDateString('pt-BR'),
+                          referencia: `${String(recibo.mes).padStart(2, '0')}/${recibo.ano}`,
+                        })
+                      }
+                    >
+                      <Download className="w-4 h-4" /> Visualizar Recibo
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+          )}
+
           {hasAchievements && (
             <TabsContent value="desafios" className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -555,14 +614,20 @@ export default function PublicPortal() {
                 <Card key={doc.id} className="shadow-sm border-slate-200">
                   <CardContent className="p-5 flex flex-col sm:flex-row justify-between gap-4 sm:items-center">
                     <div className="flex items-center gap-4">
-                      <div className="p-3 bg-emerald-50 text-emerald-600 rounded-full">
-                        <ShieldCheck className="w-6 h-6" />
+                      <div className="p-3 bg-blue-50 text-blue-600 rounded-full">
+                        {doc.tipo === 'prescricao' || doc.conteudo_json?.[0]?.tipo === 'receita' ? (
+                          <ShieldCheck className="w-6 h-6" />
+                        ) : (
+                          <FileText className="w-6 h-6" />
+                        )}
                       </div>
                       <div>
-                        <h3 className="font-bold text-slate-900">
-                          {doc.conteudo_json[0]?.tipo === 'laudo'
-                            ? 'Laudo / Relatório Clínico'
-                            : 'Prescrição / Receita'}
+                        <h3 className="font-bold text-slate-900 capitalize">
+                          {doc.tipo === 'prescricao'
+                            ? doc.conteudo_json?.[0]?.tipo === 'laudo'
+                              ? 'Laudo / Relatório Clínico'
+                              : 'Prescrição / Receita'
+                            : doc.tipo || 'Nota / Documento Clínico'}
                         </h3>
                         <p className="text-sm text-slate-500 font-medium mt-0.5">
                           Emitido em {new Date(doc.data_emissao).toLocaleDateString('pt-BR')}
@@ -572,12 +637,16 @@ export default function PublicPortal() {
                     <Button
                       variant="outline"
                       className="gap-2"
-                      onClick={() =>
-                        window.open(
-                          `${window.location.origin}/validar-prescricao/${doc.hash_verificacao}`,
-                          '_blank',
-                        )
-                      }
+                      onClick={() => {
+                        if (doc.hash_verificacao) {
+                          window.open(
+                            `${window.location.origin}/validar-prescricao/${doc.hash_verificacao}`,
+                            '_blank',
+                          )
+                        } else {
+                          setViewNote(doc)
+                        }
+                      }}
                     >
                       <ExternalLink className="w-4 h-4" /> Visualizar Documento
                     </Button>
@@ -803,6 +872,38 @@ export default function PublicPortal() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!viewNote} onOpenChange={(v) => !v && setViewNote(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="capitalize">{viewNote?.tipo || 'Documento'}</DialogTitle>
+            <DialogDescription>
+              Emitido em {viewNote && new Date(viewNote.data_emissao).toLocaleDateString('pt-BR')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-slate-50 p-6 rounded-md text-slate-800 whitespace-pre-wrap border border-slate-200 leading-relaxed">
+              {viewNote?.conteudo}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewNote(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {receiptData && (
+        <ReceiptDialog
+          open={!!receiptData}
+          onOpenChange={(v: boolean) => !v && setReceiptData(null)}
+          patientName={receiptData.patientName}
+          amount={receiptData.amount}
+          dateStr={receiptData.dateStr}
+          referencia={receiptData.referencia}
+        />
+      )}
     </div>
   )
 }

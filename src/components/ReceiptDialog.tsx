@@ -17,6 +17,7 @@ export default function ReceiptDialog({
   const [clinic, setClinic] = useState<any>(null)
 
   useEffect(() => {
+    // If not authenticated (accessed via public portal), try to fetch basic info based on context or rely on defaults
     if (user && open) {
       supabase
         .from('usuarios')
@@ -88,8 +89,7 @@ export default function ReceiptDialog({
             <strong>
               {Number(amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </strong>
-            referente a serviços de psicologia clínica prestados no período de{' '}
-            <strong>{referencia}</strong>.
+            referente a serviços de prestados no período de <strong>{referencia}</strong>.
           </p>
           <p className="text-justify text-slate-800">
             Por ser verdade, firmo(amos) o presente recibo.
