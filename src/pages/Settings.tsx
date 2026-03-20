@@ -29,12 +29,14 @@ import {
   Users,
   ShieldAlert,
   BrainCircuit,
+  X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { TemplatesManager } from '@/components/TemplatesManager'
 import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 const predefinedApproaches = [
   'Terapia Cognitivo-Comportamental (TCC)',
@@ -222,6 +224,25 @@ export default function Settings() {
     if (error)
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     else toast({ title: 'Configurações salvas!' })
+  }
+
+  const handleTriggerReminders = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('enviar_lembrete_consulta', {
+        body: {},
+      })
+      if (error) throw error
+      toast({
+        title: 'Lembretes disparados',
+        description: `Foram processados ${data.processed || 0} lembretes.`,
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao disparar lembretes',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
   }
 
   const updateHorario = (index: number, field: string, value: any) => {
@@ -472,6 +493,63 @@ export default function Settings() {
                   }
                   placeholder="(00) 00000-0000"
                   className="bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+              <div className="space-y-2">
+                <Label>Especialidades Disponíveis</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={novaEspecialidade}
+                    onChange={(e) => setNovaEspecialidade(e.target.value)}
+                    placeholder="Adicionar especialidade"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (novaEspecialidade) {
+                          setEspecialidades([...especialidades, novaEspecialidade])
+                          setNovaEspecialidade('')
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (novaEspecialidade) {
+                        setEspecialidades([...especialidades, novaEspecialidade])
+                        setNovaEspecialidade('')
+                      }
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {especialidades.map((esp, i) => (
+                    <Badge key={i} variant="secondary" className="gap-1 items-center">
+                      {esp}
+                      <X
+                        className="w-3 h-3 cursor-pointer hover:text-red-500"
+                        onClick={() =>
+                          setEspecialidades(especialidades.filter((_, idx) => idx !== i))
+                        }
+                      />
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Meta Mensal de Consultas</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={metaConsultas}
+                  onChange={(e) => setMetaConsultas(Number(e.target.value))}
                 />
               </div>
             </div>
@@ -733,6 +811,21 @@ export default function Settings() {
                     <p className="text-xs text-slate-500">Variáveis: [Nome], [data], [hora]</p>
                   </div>
                 )}
+
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <Button
+                    type="button"
+                    onClick={handleTriggerReminders}
+                    variant="outline"
+                    className="gap-2 text-primary"
+                  >
+                    <MessageCircle className="w-4 h-4" /> Disparar Lembretes Agora
+                  </Button>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Aciona o sistema manualmente para enviar os lembretes agendados para o próximo
+                    dia.
+                  </p>
+                </div>
               </div>
 
               <div className="bg-slate-50 p-5 rounded-lg border border-slate-100 space-y-4">

@@ -55,6 +55,13 @@ export default function Index() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
+  const [kpis, setKpis] = useState({
+    atendimentosHoje: 0,
+    pacientesNovos: 0,
+    pacientesAtivos: 0,
+    alertasFinanceiros: 0,
+  })
+
   const [widgets, setWidgets] = useState(DEFAULT_WIDGETS)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
 
@@ -133,7 +140,6 @@ export default function Index() {
         if (u?.preferencias_dashboard?.widgets) {
           setWidgets(u.preferencias_dashboard.widgets)
         } else if (u?.preferencias_dashboard) {
-          // Backward compatibility mapping
           const mapped = DEFAULT_WIDGETS.map((w) => {
             if (w.id === 'agenda' && u.preferencias_dashboard.show_agenda === false)
               return { ...w, visible: false }
@@ -149,35 +155,87 @@ export default function Index() {
         const endOfDay = new Date(startOfDay)
         endOfDay.setDate(endOfDay.getDate() + 1)
 
-        const apptsRes = await supabase
-          .from('agendamentos')
-          .select(
-            'id, data_hora, status, is_online, paciente_id, pacientes(id, nome, valor_sessao)',
-          )
-          .eq('usuario_id', user.id)
-          .gte('data_hora', startOfDay.toISOString())
-          .lt('data_hora', endOfDay.toISOString())
-          .order('data_hora', { ascending: true })
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+        const [
+          apptsRes,
+          wlRes,
+          stockRes,
+          { count: atendimentosHoje },
+          { count: pacientesNovos },
+          { count: pacientesAtivos },
+          { data: agendamentosFinanceiros },
+        ] = await Promise.all([
+          supabase
+            .from('agendamentos')
+            .select(
+              'id, data_hora, status, is_online, paciente_id, pacientes(id, nome, valor_sessao)',
+            )
+            .eq('usuario_id', user.id)
+            .gte('data_hora', startOfDay.toISOString())
+            .lt('data_hora', endOfDay.toISOString())
+            .order('data_hora', { ascending: true }),
+
+          supabase
+            .from('lista_espera' as any)
+            .select('id, dias_semana, periodos, pacientes(nome, telefone)')
+            .eq('usuario_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(5),
+
+          supabase
+            .from('estoque')
+            .select('id, nome_item, quantidade, quantidade_minima')
+            .eq('usuario_id', user.id),
+
+          supabase
+            .from('agendamentos')
+            .select('id', { count: 'exact', head: true })
+            .eq('usuario_id', user.id)
+            .gte('data_hora', startOfDay.toISOString())
+            .lt('data_hora', endOfDay.toISOString())
+            .neq('status', 'desmarcou'),
+
+          supabase
+            .from('pacientes')
+            .select('id', { count: 'exact', head: true })
+            .eq('usuario_id', user.id)
+            .gte('data_criacao', thirtyDaysAgo.toISOString()),
+
+          supabase
+            .from('pacientes')
+            .select('id', { count: 'exact', head: true })
+            .eq('usuario_id', user.id),
+
+          supabase
+            .from('agendamentos')
+            .select('valor_sinal')
+            .eq('usuario_id', user.id)
+            .gte('data_hora', new Date().toISOString())
+            .eq('sinal_pago', false),
+        ])
 
         if (apptsRes.data) setAppointments(apptsRes.data)
-
-        const { data: wlData } = await supabase
-          .from('lista_espera' as any)
-          .select('id, dias_semana, periodos, pacientes(nome, telefone)')
-          .eq('usuario_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5)
-
-        if (wlData) setWaitlist(wlData)
-
-        const { data: stockData } = await supabase
-          .from('estoque')
-          .select('id, nome_item, quantidade, quantidade_minima')
-          .eq('usuario_id', user.id)
-
-        if (stockData) {
-          setLowStockItems(stockData.filter((item) => item.quantidade <= item.quantidade_minima))
+        if (wlRes.data) setWaitlist(wlRes.data)
+        if (stockRes.data) {
+          setLowStockItems(
+            stockRes.data.filter((item) => item.quantidade <= item.quantidade_minima),
+          )
         }
+
+        const alertasFinanceiros =
+          agendamentosFinanceiros?.reduce(
+            (acc, curr) => acc + (Number(curr.valor_sinal) || 0),
+            0,
+          ) || 0
+
+        setKpis({
+          atendimentosHoje: atendimentosHoje || 0,
+          pacientesNovos: pacientesNovos || 0,
+          pacientesAtivos: pacientesAtivos || 0,
+          alertasFinanceiros,
+        })
       })
     } catch (err) {
       setError(true)
@@ -439,7 +497,7 @@ export default function Index() {
             <Card className="shadow-sm border-slate-200">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
                 <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
-                  <Bell className="w-4 h-4 text-primary" /> Notificações
+                  <Bell className="w-4 h-4 text-primary" /> Notificações Recentes
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -477,7 +535,7 @@ export default function Index() {
     <div className="space-y-8 animate-fade-in pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Bem-vindo(a)!</h1>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Visão Geral</h1>
           <p className="text-slate-500 capitalize">{todayStr}</p>
         </div>
         <div className="flex gap-2">
@@ -536,6 +594,57 @@ export default function Index() {
             <LogOut className="w-4 h-4" /> Sair da Conta
           </Button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Atendimentos do Dia
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">{kpis.atendimentosHoje}</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Pacientes Novos (30d)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">{kpis.pacientesNovos}</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Pacientes Ativos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">{kpis.pacientesAtivos}</div>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-red-200 bg-red-50/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold text-red-600 uppercase tracking-wide">
+              Alertas Financeiros
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-700">
+              {kpis.alertasFinanceiros.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              })}
+            </div>
+            <p className="text-[10px] text-red-500 mt-1 font-medium uppercase tracking-wide">
+              Sinais pendentes (futuro)
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex flex-wrap gap-6 items-start">
