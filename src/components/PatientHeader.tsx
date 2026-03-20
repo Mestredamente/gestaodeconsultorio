@@ -12,12 +12,29 @@ import {
   Gift,
   AlertCircle,
   Calendar,
+  Settings2,
 } from 'lucide-react'
 import SendContractDialog from '@/components/SendContractDialog'
 import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
 import { useToast } from '@/hooks/use-toast'
 import { useNavigate } from 'react-router-dom'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 
 export default function PatientHeader({
   patient,
@@ -30,6 +47,13 @@ export default function PatientHeader({
   const navigate = useNavigate()
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [isConfigOpen, setIsConfigOpen] = useState(false)
+  const [configData, setConfigData] = useState({
+    recorrencia: patient?.recorrencia || 'único',
+    dia_fixo: patient?.dia_fixo || '',
+  })
+  const [savingConfig, setSavingConfig] = useState(false)
 
   const copyLink = (path: string, msg: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/${path}/${patient.hash_anamnese}`)
@@ -87,6 +111,26 @@ export default function PatientHeader({
     } finally {
       setUploadingImage(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleSaveConfig = async () => {
+    setSavingConfig(true)
+    const { error } = await supabase
+      .from('pacientes')
+      .update({
+        recorrencia: configData.recorrencia,
+        dia_fixo: configData.dia_fixo,
+      })
+      .eq('id', patient.id)
+
+    setSavingConfig(false)
+    if (!error) {
+      toast({ title: 'Configuração de sessão salva!' })
+      onUpdate({ ...patient, ...configData })
+      setIsConfigOpen(false)
+    } else {
+      toast({ title: 'Erro ao salvar', variant: 'destructive' })
     }
   }
 
@@ -174,6 +218,25 @@ export default function PatientHeader({
                     Contrato Pendente
                   </Badge>
                 )}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant="outline"
+                        className="bg-slate-50 border-slate-200 text-slate-700 cursor-pointer hover:bg-slate-100 flex items-center gap-1.5 transition-colors"
+                        onClick={() => setIsConfigOpen(true)}
+                      >
+                        <Settings2 className="w-3 h-3 text-slate-400" />
+                        {patient.recorrencia && patient.recorrencia !== 'único'
+                          ? `Sessão: ${patient.recorrencia} ${patient.dia_fixo ? `(${patient.dia_fixo})` : ''}`
+                          : 'Sessões Avulsas'}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Configurar grade de horários do paciente</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <p className="text-sm text-slate-500 flex items-center gap-2">
                 <Phone className="w-4 h-4" /> {patient.telefone || 'Sem telefone'}
@@ -225,6 +288,56 @@ export default function PatientHeader({
           </div>
         </div>
       </div>
+
+      <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configurar Frequência de Sessões</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Frequência (Recorrência)</Label>
+              <Select
+                value={configData.recorrencia}
+                onValueChange={(v) => setConfigData({ ...configData, recorrencia: v })}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="único">Avulso / Único</SelectItem>
+                  <SelectItem value="semanal">Semanal</SelectItem>
+                  <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                  <SelectItem value="mensal">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {configData.recorrencia !== 'único' && (
+              <div className="space-y-2">
+                <Label>Dia e Horário Fixo (Ex: Toda Terça às 14:00)</Label>
+                <Input
+                  value={configData.dia_fixo}
+                  onChange={(e) => setConfigData({ ...configData, dia_fixo: e.target.value })}
+                  placeholder="Ex: Segundas, 10:00"
+                  className="bg-white"
+                />
+                <p className="text-xs text-slate-500">
+                  Apenas para fins informativos na ficha do paciente. Para gerar a grade, utilize a
+                  agenda.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfigOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveConfig} disabled={savingConfig}>
+              {savingConfig ? 'Salvando...' : 'Salvar Preferências'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

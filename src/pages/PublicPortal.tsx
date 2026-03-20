@@ -108,12 +108,18 @@ export default function PublicPortal() {
       p_justificativa: cancelJustification,
     })
     if (!error) {
-      toast({ title: 'Consulta desmarcada.' })
+      toast({ title: 'Consulta desmarcada com sucesso.' })
       setIsCancelDialogOpen(false)
       setCancelAptId(null)
       setCancelJustification('')
       fetchPortalData()
-    } else toast({ title: 'Erro ao desmarcar consulta.', variant: 'destructive' })
+    } else {
+      toast({
+        title: 'Erro ao desmarcar',
+        description: 'Ocorreu um erro, verifique se está dentro do prazo de 24h.',
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleSimulatePayment = async () => {
@@ -247,26 +253,26 @@ export default function PublicPortal() {
           defaultValue={portalSettings.show_appointments !== false ? 'agenda' : 'financeiro'}
           className="w-full"
         >
-          <TabsList className="mb-4 flex-wrap h-auto">
+          <TabsList className="mb-4 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1 rounded-lg [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {portalSettings.show_appointments !== false && (
-              <TabsTrigger value="agenda" className="gap-2 py-2">
+              <TabsTrigger value="agenda" className="gap-2 py-2 whitespace-nowrap">
                 <Calendar className="w-4 h-4" /> Meus Agendamentos
               </TabsTrigger>
             )}
-            <TabsTrigger value="financeiro" className="gap-2 py-2 relative">
+            <TabsTrigger value="financeiro" className="gap-2 py-2 relative whitespace-nowrap">
               <DollarSign className="w-4 h-4" /> Financeiro
               {pendingPayments.length > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               )}
             </TabsTrigger>
             {hasAchievements && (
-              <TabsTrigger value="desafios" className="gap-2 py-2">
+              <TabsTrigger value="desafios" className="gap-2 py-2 whitespace-nowrap">
                 <Trophy className="w-4 h-4 text-amber-500" /> Meus Desafios
               </TabsTrigger>
             )}
             {portalSettings.show_tests !== false &&
               (data.testes?.length > 0 || pendingTests.length > 0) && (
-                <TabsTrigger value="testes" className="gap-2 py-2 relative">
+                <TabsTrigger value="testes" className="gap-2 py-2 relative whitespace-nowrap">
                   <BrainCircuit className="w-4 h-4" /> Testes / Avaliações
                   {pendingTests.length > 0 && (
                     <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
@@ -274,12 +280,12 @@ export default function PublicPortal() {
                 </TabsTrigger>
               )}
             {portalSettings.show_prescriptions !== false && data.documentos?.length > 0 && (
-              <TabsTrigger value="documentos" className="gap-2 py-2">
+              <TabsTrigger value="documentos" className="gap-2 py-2 whitespace-nowrap">
                 <FileText className="w-4 h-4" /> Laudos / Prescrições
               </TabsTrigger>
             )}
             {showLegalTab && (
-              <TabsTrigger value="juridico" className="gap-2 py-2 relative">
+              <TabsTrigger value="juridico" className="gap-2 py-2 relative whitespace-nowrap">
                 <Scale className="w-4 h-4" /> Contratos e Políticas
                 {!data.contrato_aceito && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
@@ -299,6 +305,9 @@ export default function PublicPortal() {
                   const dateObj = new Date(apt.data_hora)
                   const title = `Consulta: ${data.paciente_nome} - ${apt.especialidade || 'Geral'}`
                   const today = isToday(dateObj)
+                  const isCancelable =
+                    dateObj.getTime() - new Date().getTime() > 24 * 60 * 60 * 1000
+
                   return (
                     <Card
                       key={apt.id}
@@ -376,13 +385,21 @@ export default function PublicPortal() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 justify-start"
+                            className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 justify-start disabled:opacity-50"
                             onClick={() => {
+                              if (!isCancelable) return
                               setCancelAptId(apt.id)
                               setIsCancelDialogOpen(true)
                             }}
+                            disabled={!isCancelable}
+                            title={
+                              !isCancelable
+                                ? 'Cancelamentos devem ser feitos com 24h de antecedência'
+                                : ''
+                            }
                           >
-                            <Ban className="w-4 h-4 shrink-0" /> Solicitar Cancelamento
+                            <Ban className="w-4 h-4 shrink-0" />{' '}
+                            {isCancelable ? 'Solicitar Cancelamento' : 'Cancelamento (< 24h)'}
                           </Button>
                         </div>
                       </CardContent>
@@ -644,8 +661,8 @@ export default function PublicPortal() {
           <DialogHeader>
             <DialogTitle>Solicitar Cancelamento</DialogTitle>
             <DialogDescription>
-              Informe o motivo do cancelamento. Esta ação não poderá ser desfeita e está sujeita às
-              políticas da clínica.
+              Informe o motivo do cancelamento. Esta ação deve ser realizada com pelo menos 24 horas
+              de antecedência.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">

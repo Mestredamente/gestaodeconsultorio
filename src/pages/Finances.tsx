@@ -591,23 +591,24 @@ export default function Finances() {
       )}
 
       <Tabs defaultValue="fluxo" className="w-full">
-        <TabsList className="mb-4 h-auto flex-wrap bg-slate-100/50 p-1 rounded-lg">
-          <TabsTrigger value="fluxo" className="px-4 py-2">
+        <TabsList className="mb-4 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1 rounded-lg [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <TabsTrigger value="fluxo" className="px-4 py-2 whitespace-nowrap">
             Fluxo Anual
           </TabsTrigger>
-          <TabsTrigger value="receitas" className="px-4 py-2">
+          <TabsTrigger value="receitas" className="px-4 py-2 whitespace-nowrap">
             Faturamento
           </TabsTrigger>
-          <TabsTrigger value="despesas" className="px-4 py-2">
+          <TabsTrigger value="despesas" className="px-4 py-2 whitespace-nowrap">
             Despesas
           </TabsTrigger>
-          <TabsTrigger value="reembolsos" className="px-4 py-2">
+          <TabsTrigger value="reembolsos" className="px-4 py-2 whitespace-nowrap">
             Pendências de Convênio
           </TabsTrigger>
-          <TabsTrigger value="fiscal" className="px-4 py-2 gap-2">
+          <TabsTrigger value="fiscal" className="px-4 py-2 gap-2 whitespace-nowrap">
             <Landmark className="w-4 h-4" /> Fiscal e Contábil
           </TabsTrigger>
         </TabsList>
+
         <TabsContent value="fluxo">
           <Card className="shadow-sm">
             <CardContent className="p-6 h-[400px]">
@@ -659,60 +660,65 @@ export default function Finances() {
             </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="receitas">
           <Card className="shadow-sm overflow-hidden">
-            <Table>
-              <TableHeader className="bg-slate-50">
-                <TableRow>
-                  <TableHead>Paciente</TableHead>
-                  <TableHead>Ciclo de Cobrança</TableHead>
-                  <TableHead className="text-right">Recebido</TableHead>
-                  <TableHead className="text-right">A Receber</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {patientsSummary.length === 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50">
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-6">
-                      Nenhum registro.
-                    </TableCell>
+                    <TableHead>Paciente</TableHead>
+                    <TableHead>Ciclo de Cobrança</TableHead>
+                    <TableHead className="text-right">Recebido</TableHead>
+                    <TableHead className="text-right">A Receber</TableHead>
                   </TableRow>
-                ) : (
-                  patientsSummary.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">
-                        {p.nome}
-                        {p.valor_a_receber > 0 && (
-                          <Badge variant="destructive" className="ml-2 text-[10px]">
-                            Pendente
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-slate-500 capitalize text-sm">
-                        {p.frequencia_pagamento} {p.dia_pagamento ? `(Dia ${p.dia_pagamento})` : ''}
-                      </TableCell>
-                      <TableCell className="text-right text-emerald-600 font-medium">
-                        {formatBRL(p.valor_recebido)}
-                      </TableCell>
-                      <TableCell className="text-right text-red-600 font-medium">
-                        {formatBRL(p.valor_a_receber)}
+                </TableHeader>
+                <TableBody>
+                  {patientsSummary.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-6">
+                        Nenhum registro.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    patientsSummary.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium whitespace-nowrap">
+                          {p.nome}
+                          {p.valor_a_receber > 0 && (
+                            <Badge variant="destructive" className="ml-2 text-[10px]">
+                              Pendente
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-slate-500 capitalize text-sm whitespace-nowrap">
+                          {p.frequencia_pagamento}{' '}
+                          {p.dia_pagamento ? `(Dia ${p.dia_pagamento})` : ''}
+                        </TableCell>
+                        <TableCell className="text-right text-emerald-600 font-medium whitespace-nowrap">
+                          {formatBRL(p.valor_recebido)}
+                        </TableCell>
+                        <TableCell className="text-right text-red-600 font-medium whitespace-nowrap">
+                          {formatBRL(p.valor_a_receber)}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </Card>
         </TabsContent>
+
         <TabsContent value="despesas">
           <Card className="shadow-sm mb-4">
-            <CardContent className="p-4 flex justify-between items-center bg-slate-50/50">
+            <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-slate-50/50">
               <h3 className="font-semibold text-slate-800">
                 Despesas do Mês ({month}/{year})
               </h3>
               <Dialog open={isDespesaModalOpen} onOpenChange={setIsDespesaModalOpen}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2">
+                  <Button className="gap-2 w-full sm:w-auto">
                     <Plus className="w-4 h-4" /> Nova Despesa
                   </Button>
                 </DialogTrigger>
@@ -768,41 +774,46 @@ export default function Finances() {
             </CardContent>
           </Card>
           <Card className="shadow-sm overflow-hidden">
-            <Table>
-              <TableHeader className="bg-slate-50">
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {despesas.filter((d) => new Date(d.data).getMonth() + 1 === parseInt(month))
-                  .length === 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50">
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-6">
-                      Nenhuma despesa registrada no mês.
-                    </TableCell>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
                   </TableRow>
-                ) : (
-                  despesas
-                    .filter((d) => new Date(d.data).getMonth() + 1 === parseInt(month))
-                    .map((d) => (
-                      <TableRow key={d.id}>
-                        <TableCell>{new Date(d.data).toLocaleDateString('pt-BR')}</TableCell>
-                        <TableCell className="font-medium">{d.descricao}</TableCell>
-                        <TableCell>{d.categoria}</TableCell>
-                        <TableCell className="text-right text-rose-600 font-bold">
-                          {formatBRL(Number(d.valor))}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {despesas.filter((d) => new Date(d.data).getMonth() + 1 === parseInt(month))
+                    .length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-6">
+                        Nenhuma despesa registrada no mês.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    despesas
+                      .filter((d) => new Date(d.data).getMonth() + 1 === parseInt(month))
+                      .map((d) => (
+                        <TableRow key={d.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {new Date(d.data).toLocaleDateString('pt-BR')}
+                          </TableCell>
+                          <TableCell className="font-medium min-w-[200px]">{d.descricao}</TableCell>
+                          <TableCell>{d.categoria}</TableCell>
+                          <TableCell className="text-right text-rose-600 font-bold whitespace-nowrap">
+                            {formatBRL(Number(d.valor))}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </Card>
         </TabsContent>
+
         <TabsContent value="reembolsos" className="space-y-4">
           {pendenciasReembolso.length === 0 ? (
             <Card className="p-10 text-center border-dashed text-slate-500 shadow-none">
@@ -811,82 +822,85 @@ export default function Finances() {
           ) : (
             pendenciasReembolso.map((grupo: any, i: number) => (
               <Card key={i} className="shadow-sm overflow-hidden border-slate-200">
-                <div className="bg-slate-50/50 p-4 border-b border-slate-100 flex justify-between items-center">
+                <div className="bg-slate-50/50 p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                   <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-primary" /> {grupo.operadora}
                   </h3>
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">
                       A Receber
                     </p>
                     <p className="text-lg font-bold text-amber-600">{formatBRL(grupo.total)}</p>
                   </div>
                 </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data da Sessão</TableHead>
-                      <TableHead>Paciente</TableHead>
-                      <TableHead>Cód. Autorização</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead className="text-right">Status e Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {grupo.items.map((item: any) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          {new Date(item.data_hora).toLocaleDateString('pt-BR')}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {
-                            (Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes)
-                              ?.nome
-                          }
-                        </TableCell>
-                        <TableCell className="text-slate-500 font-mono text-xs">
-                          {item.codigo_autorizacao || '-'}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatBRL(Number(item.valor_total))}
-                        </TableCell>
-                        <TableCell className="text-right space-x-2">
-                          {item.status_reembolso === 'pendente' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleUpdateReembolso(item.id, 'solicitado')}
-                            >
-                              Marcar como Solicitado
-                            </Button>
-                          )}
-                          {item.status_reembolso === 'solicitado' && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="bg-amber-100 text-amber-700 hover:bg-amber-200"
-                              onClick={() => handleUpdateReembolso(item.id, 'recebido')}
-                            >
-                              <CheckCircle className="w-3 h-3 mr-1" /> Recebido
-                            </Button>
-                          )}
-                          <Badge
-                            variant={
-                              item.status_reembolso === 'pendente' ? 'destructive' : 'outline'
-                            }
-                            className="capitalize ml-2"
-                          >
-                            {item.status_reembolso}
-                          </Badge>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="whitespace-nowrap">Data da Sessão</TableHead>
+                        <TableHead>Paciente</TableHead>
+                        <TableHead>Cód. Autorização</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-right">Status e Ações</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {grupo.items.map((item: any) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {new Date(item.data_hora).toLocaleDateString('pt-BR')}
+                          </TableCell>
+                          <TableCell className="font-medium whitespace-nowrap">
+                            {
+                              (Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes)
+                                ?.nome
+                            }
+                          </TableCell>
+                          <TableCell className="text-slate-500 font-mono text-xs whitespace-nowrap">
+                            {item.codigo_autorizacao || '-'}
+                          </TableCell>
+                          <TableCell className="text-right font-medium whitespace-nowrap">
+                            {formatBRL(Number(item.valor_total))}
+                          </TableCell>
+                          <TableCell className="text-right space-x-2 whitespace-nowrap">
+                            {item.status_reembolso === 'pendente' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleUpdateReembolso(item.id, 'solicitado')}
+                              >
+                                Marcar Solicitado
+                              </Button>
+                            )}
+                            {item.status_reembolso === 'solicitado' && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                onClick={() => handleUpdateReembolso(item.id, 'recebido')}
+                              >
+                                <CheckCircle className="w-3 h-3 mr-1" /> Recebido
+                              </Button>
+                            )}
+                            <Badge
+                              variant={
+                                item.status_reembolso === 'pendente' ? 'destructive' : 'outline'
+                              }
+                              className="capitalize ml-2"
+                            >
+                              {item.status_reembolso}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </Card>
             ))
           )}
         </TabsContent>
+
         <TabsContent value="fiscal">
           <AccountingTab finances={finances} despesas={despesas} year={year} />
         </TabsContent>

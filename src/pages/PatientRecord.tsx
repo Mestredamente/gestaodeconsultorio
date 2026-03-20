@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   ArrowLeft,
   Save,
@@ -70,11 +71,17 @@ export default function PatientRecord() {
   const [mensagens, setMensagens] = useState<MensagemEntry[]>([])
   const [laudos, setLaudos] = useState<any[]>([])
   const [laudoTemplates, setLaudoTemplates] = useState<any[]>([])
+  const [patientApts, setPatientApts] = useState<any[]>([])
 
   const [isEvolModalOpen, setIsEvolModalOpen] = useState(false)
   const [isLaudoModalOpen, setIsLaudoModalOpen] = useState(false)
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false)
+
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
   const [newContent, setNewContent] = useState('')
+  const [rescheduleApt, setRescheduleApt] = useState<any>(null)
+  const [newAptDate, setNewAptDate] = useState('')
+  const [rescheduling, setRescheduling] = useState(false)
 
   const [isRecording, setIsRecording] = useState(false)
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
@@ -152,6 +159,14 @@ export default function PatientRecord() {
         .order('data_emissao', { ascending: false })
 
       if (laudosData) setLaudos(laudosData)
+
+      const { data: aptsData } = await supabase
+        .from('agendamentos')
+        .select('*')
+        .eq('paciente_id', id)
+        .order('data_hora', { ascending: false })
+
+      if (aptsData) setPatientApts(aptsData)
 
       const { data: tData } = await supabase
         .from('templates_documentos')
@@ -241,6 +256,69 @@ export default function PatientRecord() {
     } else {
       toast({ title: 'Erro ao salvar anamnese', variant: 'destructive' })
     }
+  }
+
+  const handleRemarcarClick = (apt: any) => {
+    setRescheduleApt(apt)
+    const d = new Date(apt.data_hora)
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    setNewAptDate(formatted)
+    setIsRescheduleOpen(true)
+  }
+
+  const handleReschedule = async () => {
+    if (!newAptDate || !rescheduleApt) return
+    setRescheduling(true)
+
+    const baseDate = new Date(newAptDate)
+
+    if (baseDate < new Date()) {
+      toast({
+        title: 'Atenção',
+        description: 'Não é possível agendar no passado.',
+        variant: 'destructive',
+      })
+      setRescheduling(false)
+      return
+    }
+
+    const { data: conflicts } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .eq('usuario_id', user!.id)
+      .eq('data_hora', baseDate.toISOString())
+      .neq('status', 'desmarcou')
+      .neq('status', 'faltou')
+      .neq('id', rescheduleApt.id)
+
+    if (conflicts && conflicts.length > 0) {
+      toast({
+        title: 'Conflito de Horário',
+        description: 'Você já tem um agendamento neste horário.',
+        variant: 'destructive',
+      })
+      setRescheduling(false)
+      return
+    }
+
+    const { error } = await supabase
+      .from('agendamentos')
+      .update({ data_hora: baseDate.toISOString() })
+      .eq('id', rescheduleApt.id)
+
+    if (!error) {
+      toast({ title: 'Sessão remarcada com sucesso!' })
+      setIsRescheduleOpen(false)
+      setPatientApts((prev) =>
+        prev
+          .map((a) => (a.id === rescheduleApt.id ? { ...a, data_hora: baseDate.toISOString() } : a))
+          .sort((a, b) => new Date(b.data_hora).getTime() - new Date(a.data_hora).getTime()),
+      )
+    } else {
+      toast({ title: 'Erro ao remarcar', description: error.message, variant: 'destructive' })
+    }
+    setRescheduling(false)
   }
 
   const startRecording = async () => {
@@ -424,7 +502,7 @@ export default function PatientRecord() {
               Paciente: <span className="font-semibold text-slate-700">{patient.nome}</span>
             </p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <QuickMessageDialog patient={patient} />
             <Button
               variant="outline"
@@ -481,20 +559,23 @@ export default function PatientRecord() {
         </Card>
 
         <Tabs defaultValue="historico" className="w-full">
-          <TabsList className="mb-6 h-auto p-1 flex-wrap bg-slate-100/50 border border-slate-200">
-            <TabsTrigger value="historico" className="gap-2 py-2.5 px-4">
+          <TabsList className="mb-6 h-auto p-1 flex w-full justify-start overflow-x-auto bg-slate-100/50 border border-slate-200 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <TabsTrigger value="historico" className="gap-2 py-2.5 px-4 whitespace-nowrap">
               <Clock className="w-4 h-4" /> Evolução Clínica
             </TabsTrigger>
-            <TabsTrigger value="anamnese" className="gap-2 py-2.5 px-4">
+            <TabsTrigger value="anamnese" className="gap-2 py-2.5 px-4 whitespace-nowrap">
               <BrainCircuit className="w-4 h-4" /> Anamnese
             </TabsTrigger>
-            <TabsTrigger value="prescricoes" className="gap-2 py-2.5 px-4">
+            <TabsTrigger value="prescricoes" className="gap-2 py-2.5 px-4 whitespace-nowrap">
               <FileText className="w-4 h-4" /> Documentos
             </TabsTrigger>
-            <TabsTrigger value="laudos" className="gap-2 py-2.5 px-4">
+            <TabsTrigger value="laudos" className="gap-2 py-2.5 px-4 whitespace-nowrap">
               <FileCheck2 className="w-4 h-4" /> Laudos
             </TabsTrigger>
-            <TabsTrigger value="mensagens" className="gap-2 py-2.5 px-4">
+            <TabsTrigger value="sessoes" className="gap-2 py-2.5 px-4 whitespace-nowrap">
+              <Calendar className="w-4 h-4" /> Sessões
+            </TabsTrigger>
+            <TabsTrigger value="mensagens" className="gap-2 py-2.5 px-4 whitespace-nowrap">
               <MessageSquare className="w-4 h-4" /> Mensagens
             </TabsTrigger>
           </TabsList>
@@ -660,6 +741,74 @@ export default function PatientRecord() {
             )}
           </TabsContent>
 
+          <TabsContent value="sessoes" className="space-y-4">
+            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+              <div>
+                <h3 className="font-semibold text-slate-800">Sessões do Paciente</h3>
+                <p className="text-sm text-slate-500">Acompanhe e remarque agendamentos.</p>
+              </div>
+              <Button onClick={() => navigate(`/agenda?paciente=${id}`)} className="gap-2">
+                <Plus className="w-4 h-4" /> Agendar
+              </Button>
+            </div>
+
+            {patientApts.length === 0 ? (
+              <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
+                Nenhum agendamento registrado.
+              </Card>
+            ) : (
+              <div className="grid gap-3">
+                {patientApts.map((apt) => (
+                  <Card key={apt.id} className="shadow-sm border-slate-200">
+                    <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge
+                            variant={
+                              apt.status === 'agendado'
+                                ? 'default'
+                                : apt.status === 'compareceu'
+                                  ? 'secondary'
+                                  : 'outline'
+                            }
+                            className="capitalize"
+                          >
+                            {apt.status}
+                          </Badge>
+                          {apt.is_online && (
+                            <Badge
+                              variant="outline"
+                              className="bg-indigo-50 text-indigo-700 border-indigo-200"
+                            >
+                              Online
+                            </Badge>
+                          )}
+                        </div>
+                        <h4 className="font-semibold text-slate-800">
+                          {new Date(apt.data_hora).toLocaleDateString('pt-BR')} às{' '}
+                          {new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </h4>
+                      </div>
+                      {apt.status === 'agendado' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRemarcarClick(apt)}
+                          className="gap-2"
+                        >
+                          <Calendar className="w-4 h-4" /> Remarcar
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="mensagens" className="space-y-4">
             {mensagens.length === 0 ? (
               <Card className="p-12 text-center text-slate-500 border-dashed shadow-none bg-transparent">
@@ -810,6 +959,33 @@ export default function PatientRecord() {
             </Button>
             <Button onClick={handleSaveLaudo} disabled={!laudoContent.trim()}>
               Salvar Documento Oficial
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRescheduleOpen} onOpenChange={setIsRescheduleOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remarcar Sessão</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>Nova Data e Hora</Label>
+              <Input
+                type="datetime-local"
+                value={newAptDate}
+                onChange={(e) => setNewAptDate(e.target.value)}
+                className="bg-white"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRescheduleOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleReschedule} disabled={rescheduling}>
+              {rescheduling ? 'Verificando...' : 'Confirmar'}
             </Button>
           </DialogFooter>
         </DialogContent>
