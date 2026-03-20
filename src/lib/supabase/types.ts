@@ -835,6 +835,39 @@ export type Database = {
           },
         ]
       }
+      pontos_eletronicos: {
+        Row: {
+          created_at: string | null
+          data: string
+          entrada: string | null
+          id: string
+          retorno_almoco: string | null
+          saida: string | null
+          saida_almoco: string | null
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          data: string
+          entrada?: string | null
+          id?: string
+          retorno_almoco?: string | null
+          saida?: string | null
+          saida_almoco?: string | null
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string | null
+          data?: string
+          entrada?: string | null
+          id?: string
+          retorno_almoco?: string | null
+          saida?: string | null
+          saida_almoco?: string | null
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       prescricoes: {
         Row: {
           conteudo_json: Json
@@ -908,6 +941,39 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      solicitacoes_rh: {
+        Row: {
+          anexo_url: string | null
+          created_at: string | null
+          data_fim: string
+          data_inicio: string
+          id: string
+          status: string
+          tipo: string
+          usuario_id: string
+        }
+        Insert: {
+          anexo_url?: string | null
+          created_at?: string | null
+          data_fim: string
+          data_inicio: string
+          id?: string
+          status?: string
+          tipo: string
+          usuario_id: string
+        }
+        Update: {
+          anexo_url?: string | null
+          created_at?: string | null
+          data_fim?: string
+          data_inicio?: string
+          id?: string
+          status?: string
+          tipo?: string
+          usuario_id?: string
+        }
+        Relationships: []
       }
       templates_documentos: {
         Row: {
@@ -1484,6 +1550,15 @@ export const Constants = {
 //   data_consentimento_lgpd: timestamp with time zone (nullable)
 //   tipo_horario: text (nullable, default: 'avulso'::text)
 //   horario_fixo: text (nullable)
+// Table: pontos_eletronicos
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   data: date (not null)
+//   entrada: time without time zone (nullable)
+//   saida_almoco: time without time zone (nullable)
+//   retorno_almoco: time without time zone (nullable)
+//   saida: time without time zone (nullable)
+//   created_at: timestamp with time zone (nullable, default: now())
 // Table: prescricoes
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)
@@ -1497,6 +1572,15 @@ export const Constants = {
 //   usuario_id: uuid (not null)
 //   queixa_principal: text (nullable)
 //   historico_sessoes: jsonb (not null, default: '[]'::jsonb)
+// Table: solicitacoes_rh
+//   id: uuid (not null, default: gen_random_uuid())
+//   usuario_id: uuid (not null)
+//   tipo: text (not null)
+//   data_inicio: date (not null)
+//   data_fim: date (not null)
+//   anexo_url: text (nullable)
+//   status: text (not null, default: 'pendente'::text)
+//   created_at: timestamp with time zone (nullable, default: now())
 // Table: templates_documentos
 //   id: uuid (not null, default: gen_random_uuid())
 //   usuario_id: uuid (not null)
@@ -1622,6 +1706,9 @@ export const Constants = {
 //   FOREIGN KEY pacientes_convenio_id_fkey: FOREIGN KEY (convenio_id) REFERENCES convenios(id) ON DELETE SET NULL
 //   PRIMARY KEY pacientes_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY pacientes_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: pontos_eletronicos
+//   PRIMARY KEY pontos_eletronicos_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY pontos_eletronicos_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES auth.users(id) ON DELETE CASCADE
 // Table: prescricoes
 //   FOREIGN KEY prescricoes_paciente_id_fkey: FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE
 //   PRIMARY KEY prescricoes_pkey: PRIMARY KEY (id)
@@ -1631,6 +1718,11 @@ export const Constants = {
 //   UNIQUE prontuarios_paciente_id_key: UNIQUE (paciente_id)
 //   PRIMARY KEY prontuarios_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY prontuarios_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+// Table: solicitacoes_rh
+//   PRIMARY KEY solicitacoes_rh_pkey: PRIMARY KEY (id)
+//   CHECK solicitacoes_rh_status_check: CHECK ((status = ANY (ARRAY['pendente'::text, 'aprovado'::text, 'rejeitado'::text])))
+//   CHECK solicitacoes_rh_tipo_check: CHECK ((tipo = ANY (ARRAY['atestado'::text, 'ferias'::text])))
+//   FOREIGN KEY solicitacoes_rh_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES auth.users(id) ON DELETE CASCADE
 // Table: templates_documentos
 //   PRIMARY KEY templates_documentos_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY templates_documentos_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES auth.users(id) ON DELETE CASCADE
@@ -1736,6 +1828,10 @@ export const Constants = {
 //   Policy "pacientes_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
+// Table: pontos_eletronicos
+//   Policy "pontos_eletronicos_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
 // Table: prescricoes
 //   Policy "anon_read_prescricao" (SELECT, PERMISSIVE) roles={anon}
 //     USING: true
@@ -1748,6 +1844,10 @@ export const Constants = {
 //   Policy "prontuarios_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())
 //     WITH CHECK: (usuario_id = auth.uid())
+// Table: solicitacoes_rh
+//   Policy "solicitacoes_rh_policy" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
 // Table: templates_documentos
 //   Policy "templates_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (usuario_id = auth.uid())

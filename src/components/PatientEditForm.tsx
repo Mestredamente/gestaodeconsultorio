@@ -1,392 +1,158 @@
-import { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import * as z from 'zod'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
-import { useToast } from '@/hooks/use-toast'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
-import { maskCPF, maskPhone, maskCEP, fetchAddressByCEP } from '@/lib/utils'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
+import { useToast } from '@/hooks/use-toast'
+import { Card, CardContent } from '@/components/ui/card'
+import { maskCPF, maskPhone } from '@/lib/utils'
+import { Loader2 } from 'lucide-react'
 
-const formSchema = z.object({
-  nome: z.string().min(1, 'Nome é obrigatório'),
-  data_nascimento: z.string().optional().nullable(),
-  cpf: z.string().optional().nullable(),
-  telefone: z.string().optional().nullable(),
-  email: z.string().email('E-mail inválido').optional().or(z.literal('')).nullable(),
-  cep: z.string().optional().nullable(),
-  rua: z.string().optional().nullable(),
-  numero: z.string().optional().nullable(),
-  complemento: z.string().optional().nullable(),
-  bairro: z.string().optional().nullable(),
-  cidade: z.string().optional().nullable(),
-  estado: z.string().optional().nullable(),
-  contato_emergencia_nome: z.string().min(1, 'Nome do contato é obrigatório').nullable(),
-  contato_emergencia_telefone: z.string().min(1, 'Telefone de emergência é obrigatório').nullable(),
-  valor_sessao: z
-    .string()
-    .optional()
-    .nullable()
-    .transform((v) => (v ? Number(v) : null)),
-  frequencia_pagamento: z.string().default('sessão'),
-  dia_pagamento: z
-    .string()
-    .optional()
-    .nullable()
-    .transform((v) => (v ? Number(v) : null)),
-  convenio_id: z.string().optional().nullable(),
-  numero_carteira: z.string().optional().nullable(),
-  consentimento_lgpd: z.boolean().default(false),
-  tipo_horario: z.string().optional().nullable(),
-  dia_fixo: z.string().optional().nullable(),
-  horario_fixo: z.string().optional().nullable(),
-})
-
-export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
+export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
-  const [convenios, setConvenios] = useState<any[]>([])
-
-  useEffect(() => {
-    if (user) {
-      supabase
-        .from('convenios' as any)
-        .select('*')
-        .eq('usuario_id', user.id)
-        .then(({ data }) => {
-          if (data) setConvenios(data)
-        })
-    }
-  }, [user])
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      nome: patient?.nome || '',
-      data_nascimento: patient?.data_nascimento || '',
-      cpf: patient?.cpf || '',
-      telefone: patient?.telefone || '',
-      email: patient?.email || '',
-      cep: patient?.cep || '',
-      rua: patient?.rua || '',
-      numero: patient?.numero || '',
-      complemento: patient?.complemento || '',
-      bairro: patient?.bairro || '',
-      cidade: patient?.cidade || '',
-      estado: patient?.estado || '',
-      contato_emergencia_nome: patient?.contato_emergencia_nome || '',
-      contato_emergencia_telefone: patient?.contato_emergencia_telefone || '',
-      valor_sessao: patient?.valor_sessao ? String(patient.valor_sessao) : '',
-      frequencia_pagamento: patient?.frequencia_pagamento || 'sessão',
-      dia_pagamento: patient?.dia_pagamento ? String(patient.dia_pagamento) : '',
-      convenio_id: patient?.convenio_id || '',
-      numero_carteira: patient?.numero_carteira || '',
-      consentimento_lgpd: patient?.consentimento_lgpd || false,
-      tipo_horario: patient?.tipo_horario || 'avulso',
-      dia_fixo: patient?.dia_fixo || '',
-      horario_fixo: patient?.horario_fixo || '',
-    },
+  const [formData, setFormData] = useState({
+    nome: patient?.nome || '',
+    email: patient?.email || '',
+    telefone: patient?.telefone || '',
+    cpf: patient?.cpf || '',
+    data_nascimento: patient?.data_nascimento || '',
+    contato_emergencia_nome: patient?.contato_emergencia_nome || '',
+    contato_emergencia_telefone: patient?.contato_emergencia_telefone || '',
   })
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+
+    if (!formData.contato_emergencia_nome || !formData.contato_emergencia_telefone) {
+      toast({
+        title: 'Atenção',
+        description: 'O contato de emergência é obrigatório.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setLoading(true)
-    try {
-      const payload: any = {
-        ...values,
-        endereco: `${values.rua}, ${values.numero} - ${values.bairro}, ${values.cidade}/${values.estado}`,
-      }
+    const payload = {
+      usuario_id: user.id,
+      ...formData,
+    }
 
-      if (values.consentimento_lgpd && !patient?.consentimento_lgpd) {
-        payload.data_consentimento_lgpd = new Date().toISOString()
-      }
+    let error
+    if (patient?.id) {
+      const { error: updateError } = await supabase
+        .from('pacientes')
+        .update(payload)
+        .eq('id', patient.id)
+      error = updateError
+    } else {
+      const { error: insertError } = await supabase.from('pacientes').insert(payload)
+      error = insertError
+    }
 
-      if (patient?.id) {
-        const { error: updateError } = await supabase
-          .from('pacientes')
-          .update(payload)
-          .eq('id', patient.id)
-        if (updateError) throw updateError
-      } else {
-        const { error: insertError } = await supabase
-          .from('pacientes')
-          .insert([{ ...payload, usuario_id: user?.id }])
-        if (insertError) throw insertError
-      }
+    setLoading(false)
 
-      toast({ title: patient?.id ? 'Paciente atualizado!' : 'Paciente cadastrado com sucesso!' })
-      onSuccess()
-    } catch (error: any) {
+    if (error) {
       toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
-    } finally {
-      setLoading(false)
+    } else {
+      toast({ title: 'Paciente salvo com sucesso!' })
+      onSuccess()
     }
   }
 
-  const Field = ({ id, label, type = 'text', onChange, ...props }: any) => (
-    <div className="space-y-1.5">
-      <Label htmlFor={id} className="text-slate-600">
-        {label}
-      </Label>
-      <Input
-        id={id}
-        type={type}
-        className="bg-slate-50"
-        {...register(id)}
-        onChange={(e) => {
-          register(id).onChange(e)
-          if (onChange) onChange(e)
-        }}
-        {...props}
-      />
-      {errors[id as keyof typeof errors] && (
-        <p className="text-xs font-medium text-red-500">
-          {(errors[id as keyof typeof errors] as any)?.message}
-        </p>
-      )}
-    </div>
-  )
-
-  const freqPagamento = watch('frequencia_pagamento')
-  const convId = watch('convenio_id')
-  const lgpdVal = watch('consentimento_lgpd')
-  const tipoHorario = watch('tipo_horario')
-
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6 bg-white p-6 rounded-xl border border-slate-200 shadow-sm animate-fade-in"
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Field id="nome" label="Nome Completo *" />
-        <Field id="data_nascimento" label="Data de Nascimento" type="date" />
-        <Field
-          id="cpf"
-          label="CPF"
-          onChange={(e: any) => setValue('cpf', maskCPF(e.target.value))}
-          placeholder="000.000.000-00"
-        />
-        <Field
-          id="telefone"
-          label="Telefone"
-          onChange={(e: any) => setValue('telefone', maskPhone(e.target.value))}
-          placeholder="(00) 00000-0000"
-        />
-        <Field id="email" label="E-mail" type="email" />
-      </div>
-
-      <div className="pt-2 border-t border-slate-100">
-        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
-          Contato de Emergência
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <Field id="contato_emergencia_nome" label="Nome do Contato *" />
-          <Field
-            id="contato_emergencia_telefone"
-            label="Telefone do Contato *"
-            onChange={(e: any) =>
-              setValue('contato_emergencia_telefone', maskPhone(e.target.value))
-            }
-            placeholder="(00) 00000-0000"
-          />
-        </div>
-      </div>
-
-      <div className="pt-2 border-t border-slate-100">
-        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
-          Agenda Padrão
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div className="space-y-1.5">
-            <Label className="text-slate-600">Tipo de Horário</Label>
-            <Select
-              value={tipoHorario || 'avulso'}
-              onValueChange={(val) => setValue('tipo_horario', val)}
-            >
-              <SelectTrigger className="bg-slate-50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="avulso">Avulso</SelectItem>
-                <SelectItem value="fixo">Fixo</SelectItem>
-              </SelectContent>
-            </Select>
+    <Card className="shadow-sm border-slate-200">
+      <CardContent className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Nome Completo *</Label>
+              <Input
+                required
+                value={formData.nome}
+                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>E-mail</Label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefone</Label>
+              <Input
+                value={formData.telefone}
+                onChange={(e) => setFormData({ ...formData, telefone: maskPhone(e.target.value) })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>CPF</Label>
+              <Input
+                value={formData.cpf}
+                onChange={(e) => setFormData({ ...formData, cpf: maskCPF(e.target.value) })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Data de Nascimento</Label>
+              <Input
+                type="date"
+                value={formData.data_nascimento}
+                onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
+              />
+            </div>
           </div>
-          {tipoHorario === 'fixo' && (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-slate-600">Dia da Semana</Label>
-                <Select
-                  value={watch('dia_fixo') || ''}
-                  onValueChange={(val) => setValue('dia_fixo', val)}
-                >
-                  <SelectTrigger className="bg-slate-50">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="segunda">Segunda-feira</SelectItem>
-                    <SelectItem value="terca">Terça-feira</SelectItem>
-                    <SelectItem value="quarta">Quarta-feira</SelectItem>
-                    <SelectItem value="quinta">Quinta-feira</SelectItem>
-                    <SelectItem value="sexta">Sexta-feira</SelectItem>
-                    <SelectItem value="sabado">Sábado</SelectItem>
-                    <SelectItem value="domingo">Domingo</SelectItem>
-                  </SelectContent>
-                </Select>
+
+          <div className="pt-4 border-t border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">
+              Contato de Emergência (Obrigatório)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50 p-4 rounded-md border border-amber-100">
+              <div className="space-y-2">
+                <Label className="text-amber-900">Nome do Contato *</Label>
+                <Input
+                  className="bg-white"
+                  required
+                  value={formData.contato_emergencia_nome}
+                  onChange={(e) =>
+                    setFormData({ ...formData, contato_emergencia_nome: e.target.value })
+                  }
+                />
               </div>
-              <Field id="horario_fixo" label="Horário" type="time" />
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="pt-2 border-t border-slate-100">
-        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
-          Pagamento e Convênio
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <Field id="valor_sessao" label="Valor Base Sessão (R$)" type="number" step="0.01" />
-          <div className="space-y-1.5">
-            <Label className="text-slate-600">Frequência</Label>
-            <Select
-              value={freqPagamento}
-              onValueChange={(val) => setValue('frequencia_pagamento', val)}
-            >
-              <SelectTrigger className="bg-slate-50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sessão">Por Sessão</SelectItem>
-                <SelectItem value="quinzenal">Quinzenal</SelectItem>
-                <SelectItem value="mensal">Mensal</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Field id="dia_pagamento" label="Dia de Vencimento" type="number" min="1" max="31" />
-          {convenios.length > 0 && (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-slate-600">Convênio</Label>
-                <Select value={convId || ''} onValueChange={(val) => setValue('convenio_id', val)}>
-                  <SelectTrigger className="bg-slate-50">
-                    <SelectValue placeholder="Opcional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Nenhum (Particular)</SelectItem>
-                    {convenios.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2">
+                <Label className="text-amber-900">Telefone do Contato *</Label>
+                <Input
+                  className="bg-white"
+                  required
+                  value={formData.contato_emergencia_telefone}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      contato_emergencia_telefone: maskPhone(e.target.value),
+                    })
+                  }
+                />
               </div>
-              <Field id="numero_carteira" label="Nº da Carteirinha" />
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
 
-      <div className="pt-2 border-t border-slate-100">
-        <h3 className="text-sm font-bold text-slate-800 pb-2 mb-4 uppercase tracking-wider">
-          Endereço
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="space-y-1.5">
-            <Label className="text-slate-600">CEP</Label>
-            <Input
-              className="bg-slate-50"
-              placeholder="00000-000"
-              {...register('cep')}
-              onChange={(e: any) => {
-                const masked = maskCEP(e.target.value)
-                setValue('cep', masked)
-                if (masked.length === 9) {
-                  fetchAddressByCEP(masked).then((addr) => {
-                    if (addr) {
-                      setValue('rua', addr.rua)
-                      setValue('bairro', addr.bairro)
-                      setValue('cidade', addr.cidade)
-                      setValue('estado', addr.estado)
-                    }
-                  })
-                }
-              }}
-            />
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-4">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Salvar Paciente
+            </Button>
           </div>
-          <div className="md:col-span-3 space-y-1.5">
-            <Label className="text-slate-600">Rua / Logradouro</Label>
-            <Input className="bg-slate-50" {...register('rua')} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-slate-600">Número</Label>
-            <Input className="bg-slate-50" {...register('numero')} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-slate-600">Complemento</Label>
-            <Input className="bg-slate-50" {...register('complemento')} />
-          </div>
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-slate-600">Bairro</Label>
-            <Input className="bg-slate-50" {...register('bairro')} />
-          </div>
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-slate-600">Cidade</Label>
-            <Input className="bg-slate-50" {...register('cidade')} />
-          </div>
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-slate-600">Estado</Label>
-            <Input className="bg-slate-50" {...register('estado')} />
-          </div>
-        </div>
-      </div>
-
-      <div className="pt-2 border-t border-slate-100">
-        <div className="flex items-start space-x-3 p-4 bg-slate-50 rounded-md border border-slate-100">
-          <Checkbox
-            id="lgpd"
-            checked={lgpdVal}
-            onCheckedChange={(v) => setValue('consentimento_lgpd', !!v)}
-          />
-          <div className="space-y-1 leading-none">
-            <Label htmlFor="lgpd" className="text-slate-800 font-medium">
-              Consentimento LGPD
-            </Label>
-            <p className="text-xs text-slate-500 pt-1">
-              Confirmo que o paciente autorizou o tratamento de seus dados em conformidade com a
-              LGPD.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
-          Cancelar
-        </Button>
-        <Button type="submit" disabled={loading} className="gap-2">
-          {loading && (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          )}
-          {loading ? 'Salvando...' : 'Salvar Alterações'}
-        </Button>
-      </div>
-    </form>
+        </form>
+      </CardContent>
+    </Card>
   )
 }

@@ -4,8 +4,10 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Video,
   Mic,
@@ -21,12 +23,18 @@ import {
   ChevronRight,
   Wallet,
   Sparkles,
+  Calendar,
+  Link as LinkIcon,
+  Plus,
 } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
+import { Badge } from '@/components/ui/badge'
 
 export default function TelehealthSession() {
   const { agendamentoId } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { user } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [apt, setApt] = useState<any>(null)
@@ -44,8 +52,12 @@ export default function TelehealthSession() {
   const [inWaitingRoom, setInWaitingRoom] = useState(true)
   const [generatingAI, setGeneratingAI] = useState(false)
 
+  const [todayApts, setTodayApts] = useState<any[]>([])
+  const [clinicConfig, setClinicConfig] = useState<any>(null)
+
   const [avulsaName, setAvulsaName] = useState('')
   const [avulsaValue, setAvulsaValue] = useState('')
+  const [creatingAvulsa, setCreatingAvulsa] = useState(false)
 
   const isAvulsa = agendamentoId === 'nova'
 
@@ -62,9 +74,11 @@ export default function TelehealthSession() {
         toast({
           title: 'Atenção (Permissão Negada)',
           description:
-            'Não foi possível acessar a câmera ou microfone. O paciente não conseguirá ver ou ouvir você.',
+            'Não foi possível acessar a câmera ou microfone. Verifique as permissões do seu navegador.',
           variant: 'destructive',
         })
+        setCamOn(false)
+        setMicOn(false)
       }
     }
     initMedia()
@@ -111,6 +125,7 @@ export default function TelehealthSession() {
         .select('*, pacientes(nome, id, hash_anamnese)')
         .eq('id', agendamentoId)
         .single()
+
       if (data) {
         setApt(data)
         const patient = Array.isArray(data.pacientes) ? data.pacientes[0] : data.pacientes
@@ -130,6 +145,38 @@ export default function TelehealthSession() {
     }
     fetchApt()
   }, [agendamentoId, isAvulsa])
+
+  useEffect(() => {
+    if (!user) return
+    supabase
+      .from('usuarios')
+      .select('chave_pix')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setClinicConfig(data)
+      })
+
+    if (isAvulsa) {
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+      const end = new Date()
+      end.setHours(23, 59, 59, 999)
+
+      supabase
+        .from('agendamentos')
+        .select('id, data_hora, is_online, pacientes(nome, hash_anamnese)')
+        .eq('usuario_id', user.id)
+        .gte('data_hora', start.toISOString())
+        .lte('data_hora', end.toISOString())
+        .neq('status', 'desmarcou')
+        .neq('status', 'faltou')
+        .order('data_hora')
+        .then(({ data }) => {
+          if (data) setTodayApts(data)
+        })
+    }
+  }, [user, isAvulsa])
 
   const handleSaveNotes = async () => {
     if (!notes.trim() || (!prontuarioId && !isAvulsa)) return
@@ -167,6 +214,67 @@ export default function TelehealthSession() {
     }
   }
 
+  const handleCreateAvulsa = async () => {
+    if (!avulsaName || !avulsaValue) {
+      toast({
+        title: 'Atenção',
+        description: 'Preencha o nome e o valor da sessão.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setCreatingAvulsa(true)
+
+    const { data: pData, error: pErr } = await supabase
+      .from('pacientes')
+      .insert({
+        usuario_id: user?.id,
+        nome: avulsaName,
+        tipo_horario: 'avulso',
+        telefone: '',
+      })
+      .select('id, hash_anamnese')
+      .single()
+
+    if (pErr || !pData) {
+      toast({ title: 'Erro ao registrar paciente', variant: 'destructive' })
+      setCreatingAvulsa(false)
+      return
+    }
+
+    const { data: aData, error: aErr } = await supabase
+      .from('agendamentos')
+      .insert({
+        usuario_id: user?.id,
+        paciente_id: pData.id,
+        data_hora: new Date().toISOString(),
+        status: 'agendado',
+        valor_total: Number(avulsaValue),
+        is_online: true,
+      })
+      .select('id')
+      .single()
+
+    setCreatingAvulsa(false)
+
+    if (aErr || !aData) {
+      toast({ title: 'Erro ao registrar sessão', variant: 'destructive' })
+      return
+    }
+
+    const pix = clinicConfig?.chave_pix || 'Chave PIX não configurada'
+    const link = `${window.location.origin}/sessao/${pData.hash_anamnese}`
+    const msg = `Olá ${avulsaName},\n\nSua sessão online está pronta.\nValor: R$ ${Number(avulsaValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\nPIX: ${pix}\n\nAcesse a sala de vídeo pelo link abaixo:\n${link}`
+    navigator.clipboard.writeText(msg)
+
+    toast({
+      title: 'Sessão Avulsa Registrada!',
+      description: 'O link de pagamento e acesso foi copiado para a área de transferência.',
+    })
+
+    navigate(`/atendimento/${aData.id}`)
+  }
+
   const formatTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
@@ -187,23 +295,11 @@ export default function TelehealthSession() {
     }
   }
 
-  const handleGerarLinkAvulsa = () => {
-    if (!avulsaName) {
-      toast({
-        title: 'Atenção',
-        description: 'Preencha o nome do paciente',
-        variant: 'destructive',
-      })
-      return
-    }
-    const fakePix = `00020126...${avulsaName.replace(/\s+/g, '')}`
-    navigator.clipboard.writeText(
-      `Olá ${avulsaName}, segue o link para pagamento da sessão avulsa (R$ ${avulsaValue || '0'}): \n\n${fakePix}\n\nAcesse a sala de vídeo: ${window.location.href}`,
-    )
-    toast({
-      title: 'Sessão Avulsa Registrada',
-      description: 'Link de pagamento e acesso copiado para a área de transferência.',
-    })
+  const copySessionLink = (hash: string) => {
+    if (!hash) return
+    const link = `${window.location.origin}/sessao/${hash}`
+    navigator.clipboard.writeText(link)
+    toast({ title: 'Link copiado!', description: 'Envie para o paciente acessar a sala.' })
   }
 
   if (loading)
@@ -215,93 +311,233 @@ export default function TelehealthSession() {
 
   if (inWaitingRoom) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-lg shadow-xl border-slate-200">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl flex justify-center items-center gap-2 text-slate-800">
-              <Video className="w-6 h-6 text-primary" /> Sala de Espera
-            </CardTitle>
-            <CardDescription>
-              Prepare sua câmera e microfone antes de iniciar o atendimento.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center border border-slate-200 shadow-inner">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
-              />
-              {!camOn && <VideoOff className="w-12 h-12 text-slate-600" />}
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 px-4 animate-fade-in overflow-y-auto">
+        <div className="w-full max-w-6xl mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/agenda')}
+            className="gap-2 text-slate-500 hover:text-slate-800 -ml-2 mb-2"
+          >
+            <ArrowLeft className="w-4 h-4" /> Voltar para Agenda
+          </Button>
+          <h1 className="text-3xl font-bold text-slate-900 mt-2 flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-xl text-primary">
+              <Video className="w-6 h-6" />
             </div>
-            <div className="flex justify-center gap-4">
-              <Button
-                variant={micOn ? 'default' : 'destructive'}
-                onClick={() => setMicOn(!micOn)}
-                className="w-40"
-              >
-                {micOn ? <Mic className="w-4 h-4 mr-2" /> : <MicOff className="w-4 h-4 mr-2" />}
-                {micOn ? 'Microfone Ativo' : 'Mudo'}
-              </Button>
-              <Button
-                variant={camOn ? 'default' : 'destructive'}
-                onClick={() => setCamOn(!camOn)}
-                className="w-40"
-              >
-                {camOn ? <Video className="w-4 h-4 mr-2" /> : <VideoOff className="w-4 h-4 mr-2" />}
-                {camOn ? 'Câmera Ativa' : 'Desligada'}
-              </Button>
-            </div>
+            Ambiente de Pré-Sessão
+          </h1>
+          <p className="text-slate-500 mt-2 text-lg">
+            Prepare seu equipamento e gerencie seus links de acesso.
+          </p>
+        </div>
 
-            <div className="pt-4 border-t border-slate-100 flex flex-col gap-3">
-              {patient?.hash_anamnese ? (
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Card className="shadow-sm border-slate-200 h-fit bg-white">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+              <CardTitle className="text-lg">Teste de Câmera e Microfone</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center border border-slate-200 shadow-inner">
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
+                />
+                {!camOn && <VideoOff className="w-12 h-12 text-slate-600" />}
+              </div>
+              <div className="flex justify-center gap-4 flex-wrap">
                 <Button
-                  variant="outline"
-                  className="w-full gap-2 text-primary border-primary hover:bg-primary/5"
-                  onClick={copyPatientLink}
+                  variant={micOn ? 'outline' : 'destructive'}
+                  onClick={() => setMicOn(!micOn)}
+                  className={`w-40 ${micOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
                 >
-                  <Copy className="w-4 h-4" /> Copiar Link do Paciente
+                  {micOn ? <Mic className="w-4 h-4 mr-2" /> : <MicOff className="w-4 h-4 mr-2" />}
+                  {micOn ? 'Microfone OK' : 'Mudo'}
                 </Button>
-              ) : isAvulsa ? (
-                <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <p className="text-sm font-semibold text-slate-700">Registro de Sessão Avulsa</p>
-                  <Input
-                    placeholder="Nome do Paciente"
-                    value={avulsaName}
-                    onChange={(e) => setAvulsaName(e.target.value)}
-                    className="bg-white"
-                  />
-                  <Input
-                    placeholder="Valor da Sessão (R$)"
-                    type="number"
-                    value={avulsaValue}
-                    onChange={(e) => setAvulsaValue(e.target.value)}
-                    className="bg-white"
-                  />
+                <Button
+                  variant={camOn ? 'outline' : 'destructive'}
+                  onClick={() => setCamOn(!camOn)}
+                  className={`w-40 ${camOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
+                >
+                  {camOn ? (
+                    <Video className="w-4 h-4 mr-2" />
+                  ) : (
+                    <VideoOff className="w-4 h-4 mr-2" />
+                  )}
+                  {camOn ? 'Câmera OK' : 'Desligada'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {isAvulsa ? (
+            <Card className="shadow-sm border-slate-200 bg-white">
+              <Tabs defaultValue="agendados" className="w-full">
+                <CardHeader className="p-0 border-b border-slate-100 bg-slate-50/50 rounded-t-lg">
+                  <TabsList className="w-full justify-start rounded-none h-auto p-0 bg-transparent flex-wrap">
+                    <TabsTrigger
+                      value="agendados"
+                      className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-4 px-6 text-base shadow-none flex-1"
+                    >
+                      <Calendar className="w-4 h-4 mr-2" /> Sessões de Hoje
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="avulsa"
+                      className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none py-4 px-6 text-base shadow-none flex-1"
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Avulsa Rápida
+                    </TabsTrigger>
+                  </TabsList>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <TabsContent value="agendados" className="m-0">
+                    {todayApts.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500">
+                        Nenhuma sessão agendada para hoje.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100 max-h-[450px] overflow-y-auto">
+                        {todayApts.map((apt) => {
+                          const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+                          const time = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                          return (
+                            <div
+                              key={apt.id}
+                              className="p-5 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                            >
+                              <div>
+                                <p className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                  {time}{' '}
+                                  <span className="font-medium text-slate-600">{p?.nome}</span>
+                                </p>
+                                {!apt.is_online && (
+                                  <Badge variant="secondary" className="mt-1.5">
+                                    Presencial
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => copySessionLink(p?.hash_anamnese)}
+                                  className="gap-2 shrink-0"
+                                >
+                                  <LinkIcon className="w-3 h-3" /> Link
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => navigate(`/atendimento/${apt.id}`)}
+                                  className="gap-2 shrink-0 bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                  Iniciar <ChevronRight className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="avulsa" className="m-0 p-6 space-y-6 animate-fade-in">
+                    <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-lg text-indigo-800 text-sm">
+                      <p>
+                        <strong>Registro Rápido:</strong> Gere um link de acesso imediato para um
+                        paciente não agendado, incluindo instruções de pagamento via PIX.
+                      </p>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Nome do Paciente</Label>
+                        <Input
+                          placeholder="Ex: Maria Oliveira"
+                          value={avulsaName}
+                          onChange={(e) => setAvulsaName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Valor Cobrado (R$)</Label>
+                        <Input
+                          type="number"
+                          placeholder="150"
+                          value={avulsaValue}
+                          onChange={(e) => setAvulsaValue(e.target.value)}
+                        />
+                      </div>
+                      <Button
+                        onClick={handleCreateAvulsa}
+                        disabled={creatingAvulsa}
+                        className="w-full gap-2 h-12 text-base mt-2"
+                      >
+                        {creatingAvulsa ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Wallet className="w-5 h-5" />
+                        )}
+                        {creatingAvulsa ? 'Gerando...' : 'Gerar Link PIX e Iniciar'}
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </CardContent>
+              </Tabs>
+            </Card>
+          ) : (
+            <Card className="shadow-sm border-slate-200 h-fit bg-white">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+                <CardTitle className="text-lg">Próximo Atendimento</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div>
+                  <p className="text-sm text-slate-500 font-semibold uppercase tracking-wider mb-1">
+                    Paciente
+                  </p>
+                  <p className="text-2xl font-bold text-slate-800">{patientName}</p>
+                </div>
+
+                {patient?.hash_anamnese && (
+                  <div className="space-y-3 pt-4 border-t border-slate-100">
+                    <p className="text-sm font-medium text-slate-700">Link da Sala Segura</p>
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={`${window.location.origin}/sessao/${patient.hash_anamnese}`}
+                        className="bg-slate-50 font-mono text-sm"
+                      />
+                      <Button
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                        onClick={() => copySessionLink(patient.hash_anamnese)}
+                      >
+                        <Copy className="w-4 h-4" /> Copiar Link
+                      </Button>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Envie este link para o paciente acessar a vídeo-chamada.
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-6 border-t border-slate-100">
                   <Button
-                    variant="outline"
-                    className="w-full gap-2 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                    onClick={handleGerarLinkAvulsa}
+                    className="w-full gap-2 text-lg h-14"
+                    onClick={() => {
+                      if (localVideoRef.current) localVideoRef.current.srcObject = null
+                      setInWaitingRoom(false)
+                    }}
                   >
-                    <Wallet className="w-4 h-4" /> Gerar Link PIX + Sala
+                    Entrar na Sessão <ChevronRight className="w-5 h-5" />
                   </Button>
                 </div>
-              ) : null}
-
-              <Button
-                className="w-full gap-2 text-lg h-12 mt-2"
-                onClick={() => {
-                  if (localVideoRef.current) localVideoRef.current.srcObject = null
-                  setInWaitingRoom(false)
-                }}
-              >
-                Entrar na Sessão <ChevronRight className="w-5 h-5" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     )
   }
@@ -325,7 +561,7 @@ export default function TelehealthSession() {
                 className="bg-black/50 text-white border-white/20 hover:bg-white/20 gap-2 backdrop-blur-sm"
                 onClick={copyPatientLink}
               >
-                <Copy className="w-4 h-4" /> Copiar Link
+                <Copy className="w-4 h-4" /> Link do Paciente
               </Button>
             )}
             <div className="bg-black/50 px-4 py-1.5 rounded-full flex items-center gap-2 font-mono text-sm tracking-widest border border-white/10 shadow-sm backdrop-blur-sm">
