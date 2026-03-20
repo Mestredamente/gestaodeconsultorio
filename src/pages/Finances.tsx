@@ -13,6 +13,7 @@ import {
   Printer,
   AlertCircle,
   Download,
+  Landmark,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -46,6 +47,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { measurePerformance } from '@/lib/performance'
 import { cn } from '@/lib/utils'
+import { AccountingTab } from '@/components/AccountingTab'
 
 const monthNames = [
   'Jan',
@@ -137,7 +139,11 @@ export default function Finances() {
               .from('pacientes')
               .select('id, nome, valor_sessao, frequencia_pagamento, dia_pagamento')
               .eq('usuario_id', user.id),
-            supabase.from('financeiro').select('*').eq('usuario_id', user.id).eq('ano', yearNum),
+            supabase
+              .from('financeiro')
+              .select('*, pacientes(nome, cpf)')
+              .eq('usuario_id', user.id)
+              .eq('ano', yearNum),
             supabase
               .from('despesas')
               .select('*')
@@ -585,11 +591,22 @@ export default function Finances() {
       )}
 
       <Tabs defaultValue="fluxo" className="w-full">
-        <TabsList className="mb-4 h-auto flex-wrap">
-          <TabsTrigger value="fluxo">Fluxo Anual</TabsTrigger>
-          <TabsTrigger value="receitas">Faturamento</TabsTrigger>
-          <TabsTrigger value="despesas">Despesas</TabsTrigger>
-          <TabsTrigger value="reembolsos">Pendências de Convênio</TabsTrigger>
+        <TabsList className="mb-4 h-auto flex-wrap bg-slate-100/50 p-1 rounded-lg">
+          <TabsTrigger value="fluxo" className="px-4 py-2">
+            Fluxo Anual
+          </TabsTrigger>
+          <TabsTrigger value="receitas" className="px-4 py-2">
+            Faturamento
+          </TabsTrigger>
+          <TabsTrigger value="despesas" className="px-4 py-2">
+            Despesas
+          </TabsTrigger>
+          <TabsTrigger value="reembolsos" className="px-4 py-2">
+            Pendências de Convênio
+          </TabsTrigger>
+          <TabsTrigger value="fiscal" className="px-4 py-2 gap-2">
+            <Landmark className="w-4 h-4" /> Fiscal e Contábil
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="fluxo">
           <Card className="shadow-sm">
@@ -869,6 +886,9 @@ export default function Finances() {
               </Card>
             ))
           )}
+        </TabsContent>
+        <TabsContent value="fiscal">
+          <AccountingTab finances={finances} despesas={despesas} year={year} />
         </TabsContent>
       </Tabs>
     </div>

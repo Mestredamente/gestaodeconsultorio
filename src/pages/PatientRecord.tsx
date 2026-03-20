@@ -43,6 +43,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { PrescriptionsList } from '@/components/PrescriptionsList'
 import { QuickMessageDialog } from '@/components/QuickMessageDialog'
+import { PatientInsights } from '@/components/PatientInsights'
 
 type HistoricoEntry = { id: string; date: string; content: string }
 type MensagemEntry = {
@@ -499,6 +500,8 @@ export default function PatientRecord() {
           </TabsList>
 
           <TabsContent value="historico" className="space-y-6">
+            <PatientInsights historico={historico} pacienteId={id!} />
+
             <div className="flex justify-end mb-4">
               <Button
                 onClick={() => setIsEvolModalOpen(true)}

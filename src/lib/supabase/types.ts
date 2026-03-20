@@ -716,12 +716,14 @@ export type Database = {
           cep: string | null
           cidade: string | null
           complemento: string | null
+          consentimento_lgpd: boolean | null
           contato_emergencia_nome: string | null
           contato_emergencia_telefone: string | null
           contrato_aceito: boolean | null
           convenio_id: string | null
           cpf: string | null
           data_aceite_contrato: string | null
+          data_consentimento_lgpd: string | null
           data_criacao: string | null
           data_nascimento: string | null
           dia_fixo: string | null
@@ -748,12 +750,14 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          consentimento_lgpd?: boolean | null
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
           contrato_aceito?: boolean | null
           convenio_id?: string | null
           cpf?: string | null
           data_aceite_contrato?: string | null
+          data_consentimento_lgpd?: string | null
           data_criacao?: string | null
           data_nascimento?: string | null
           dia_fixo?: string | null
@@ -780,12 +784,14 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          consentimento_lgpd?: boolean | null
           contato_emergencia_nome?: string | null
           contato_emergencia_telefone?: string | null
           contrato_aceito?: boolean | null
           convenio_id?: string | null
           cpf?: string | null
           data_aceite_contrato?: string | null
+          data_consentimento_lgpd?: string | null
           data_criacao?: string | null
           data_nascimento?: string | null
           dia_fixo?: string | null
@@ -1468,6 +1474,8 @@ export const Constants = {
 //   convenio_id: uuid (nullable)
 //   numero_carteira: text (nullable)
 //   foto_url: text (nullable)
+//   consentimento_lgpd: boolean (nullable, default: false)
+//   data_consentimento_lgpd: timestamp with time zone (nullable)
 // Table: prescricoes
 //   id: uuid (not null, default: gen_random_uuid())
 //   paciente_id: uuid (not null)
@@ -1902,7 +1910,8 @@ export const Constants = {
 //   AS $function$
 //   DECLARE
 //       v_ativo boolean;
-//       v_occupied jsonb;
+//       v_agendamentos jsonb;
+//       v_bloqueios jsonb;
 //       v_start timestamptz;
 //       v_end timestamptz;
 //   BEGIN
@@ -1914,24 +1923,25 @@ export const Constants = {
 //           RETURN jsonb_build_object('ativo', false);
 //       END IF;
 //
+//       -- p_date is expected as YYYY-MM-DD
 //       v_start := (p_date || ' 00:00:00-03')::timestamptz;
 //       v_end := (p_date || ' 23:59:59-03')::timestamptz;
 //
-//       SELECT COALESCE(jsonb_agg(to_char(data_hora AT TIME ZONE 'America/Sao_Paulo', 'HH24:MI')), '[]'::jsonb) INTO v_occupied
-//       FROM (
-//           SELECT data_hora FROM public.agendamentos
-//           WHERE usuario_id = p_clinic_id
-//             AND data_hora >= v_start
-//             AND data_hora <= v_end
-//             AND status != 'desmarcou'
-//           UNION ALL
-//           SELECT data_inicio as data_hora FROM public.bloqueios_agenda
-//           WHERE usuario_id = p_clinic_id
-//             AND data_inicio >= v_start
-//             AND data_inicio <= v_end
-//       ) as combined_slots;
+//       SELECT COALESCE(jsonb_agg(jsonb_build_object('data_hora', data_hora)), '[]'::jsonb) INTO v_agendamentos
+//       FROM public.agendamentos
+//       WHERE usuario_id = p_clinic_id
+//         AND data_hora >= v_start
+//         AND data_hora <= v_end
+//         AND status != 'desmarcou'
+//         AND status != 'faltou';
 //
-//       RETURN jsonb_build_object('ativo', true, 'occupied', v_occupied);
+//       SELECT COALESCE(jsonb_agg(jsonb_build_object('data_inicio', data_inicio, 'data_fim', data_fim)), '[]'::jsonb) INTO v_bloqueios
+//       FROM public.bloqueios_agenda
+//       WHERE usuario_id = p_clinic_id
+//         AND data_inicio >= v_start
+//         AND data_inicio <= v_end;
+//
+//       RETURN jsonb_build_object('ativo', true, 'agendamentos', v_agendamentos, 'bloqueios', v_bloqueios);
 //   END;
 //   $function$
 //
