@@ -8,14 +8,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Processamento de cobranças recorrentes executado com sucesso.',
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
+      JSON.stringify({ message: 'Processamento de cobranças recorrentes concluído' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {

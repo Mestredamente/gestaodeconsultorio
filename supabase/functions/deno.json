@@ -5,10 +5,10 @@
     "emitir_nota_fiscal": 3,
     "enviar_comunicado_massa": 4,
     "transcrever_audio": 2,
-    "processar_cobrancas_recorrentes": 3,
+    "processar_cobrancas_recorrentes": 4,
     "functions": 5,
     "lembrete_sessao": 4,
-    "criar_assinatura": 1,
-    "gerar_insights_paciente": 1
+    "criar_assinatura": 2,
+    "gerar_insights_paciente": 2
   }
 }
