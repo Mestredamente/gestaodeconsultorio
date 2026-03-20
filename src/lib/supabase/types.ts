@@ -1886,7 +1886,6 @@ export const Constants = {
 //       v_result jsonb;
 //       v_paciente record;
 //       v_agendamentos jsonb := '[]'::jsonb;
-//       v_historico jsonb := '[]'::jsonb;
 //       v_documentos jsonb := '[]'::jsonb;
 //       v_testes jsonb := '[]'::jsonb;
 //       v_clinica record;
@@ -1906,7 +1905,7 @@ export const Constants = {
 //       FROM public.usuarios
 //       WHERE id = v_paciente.usuario_id LIMIT 1;
 //
-//       v_portal_settings := COALESCE(v_clinica.portal_settings, '{"show_medical_records": true, "show_prescriptions": true, "show_appointments": true, "show_tests": true}'::jsonb);
+//       v_portal_settings := COALESCE(v_clinica.portal_settings, '{"show_tests": true, "show_appointments": true, "show_prescriptions": true}'::jsonb);
 //
 //       IF COALESCE((v_portal_settings->>'show_appointments')::boolean, true) THEN
 //           SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -1946,12 +1945,6 @@ export const Constants = {
 //           WHERE a.paciente_id = v_paciente.id AND a.status = 'compareceu' AND a.data_hora < NOW();
 //       END IF;
 //
-//       IF COALESCE((v_portal_settings->>'show_medical_records')::boolean, true) THEN
-//           SELECT historico_sessoes INTO v_historico
-//           FROM public.prontuarios
-//           WHERE paciente_id = v_paciente.id LIMIT 1;
-//       END IF;
-//
 //       IF COALESCE((v_portal_settings->>'show_prescriptions')::boolean, true) THEN
 //           SELECT COALESCE(jsonb_agg(jsonb_build_object(
 //               'id', pr.id,
@@ -1989,7 +1982,6 @@ export const Constants = {
 //           'politica_cancelamento', v_clinica.politica_cancelamento,
 //           'portal_settings', v_portal_settings,
 //           'agendamentos', v_agendamentos,
-//           'historico', COALESCE(v_historico, '[]'::jsonb),
 //           'documentos', v_documentos,
 //           'pending_survey', v_past_appointments,
 //           'past_sessions', v_all_past,
