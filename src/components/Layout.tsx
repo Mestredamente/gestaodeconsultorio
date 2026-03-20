@@ -1,15 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './layout/Sidebar'
 import MobileNav from './layout/MobileNav'
 import Header from './layout/Header'
 import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
-import { OnboardingFlow } from './OnboardingFlow'
 
 export default function Layout() {
   const { user } = useAuth()
-  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -28,11 +26,9 @@ export default function Layout() {
     const fetchUserSettings = async () => {
       const { data } = await supabase
         .from('usuarios')
-        .select('preferencias_dashboard, onboarding_concluido')
+        .select('preferencias_dashboard')
         .eq('id', user.id)
         .single()
-
-      setOnboardingCompleted(data?.onboarding_concluido ?? true)
 
       const theme = data?.preferencias_dashboard?.theme_color || 'indigo'
       applyTheme(theme)
@@ -55,14 +51,6 @@ export default function Layout() {
       supabase.removeChannel(channel)
     }
   }, [user])
-
-  if (onboardingCompleted === false) {
-    return (
-      <div className="flex min-h-screen bg-slate-50 items-center justify-center p-4">
-        <OnboardingFlow onComplete={() => setOnboardingCompleted(true)} />
-      </div>
-    )
-  }
 
   return (
     <div className="flex min-h-screen bg-slate-50/50 selection:bg-primary/20 selection:text-primary">

@@ -999,13 +999,17 @@ export type Database = {
           meta_mensal_consultas: number | null
           nome_consultorio: string | null
           numero: string | null
+          onboarding_concluido: boolean | null
           parent_id: string | null
+          plano: string | null
           politica_cancelamento: string | null
           portal_settings: Json | null
           pre_consulta_ativa: boolean | null
           preferencias_dashboard: Json | null
           role: string | null
           rua: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           sync_calendarios: Json | null
           telefone_consultorio: string | null
           template_cobranca: string | null
@@ -1035,13 +1039,17 @@ export type Database = {
           meta_mensal_consultas?: number | null
           nome_consultorio?: string | null
           numero?: string | null
+          onboarding_concluido?: boolean | null
           parent_id?: string | null
+          plano?: string | null
           politica_cancelamento?: string | null
           portal_settings?: Json | null
           pre_consulta_ativa?: boolean | null
           preferencias_dashboard?: Json | null
           role?: string | null
           rua?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           sync_calendarios?: Json | null
           telefone_consultorio?: string | null
           template_cobranca?: string | null
@@ -1071,13 +1079,17 @@ export type Database = {
           meta_mensal_consultas?: number | null
           nome_consultorio?: string | null
           numero?: string | null
+          onboarding_concluido?: boolean | null
           parent_id?: string | null
+          plano?: string | null
           politica_cancelamento?: string | null
           portal_settings?: Json | null
           pre_consulta_ativa?: boolean | null
           preferencias_dashboard?: Json | null
           role?: string | null
           rua?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           sync_calendarios?: Json | null
           telefone_consultorio?: string | null
           template_cobranca?: string | null
@@ -1116,6 +1128,7 @@ export type Database = {
         Args: { p_agendamento_id: string; p_hash: string }
         Returns: Json
       }
+      confirm_plan_upgrade: { Args: { p_plano: string }; Returns: undefined }
       create_public_booking: {
         Args: {
           p_clinic_id: string
@@ -1519,6 +1532,10 @@ export const Constants = {
 //   bairro: text (nullable)
 //   cidade: text (nullable)
 //   estado: text (nullable)
+//   plano: text (nullable, default: 'gratuito'::text)
+//   onboarding_concluido: boolean (nullable, default: false)
+//   stripe_customer_id: text (nullable)
+//   stripe_subscription_id: text (nullable)
 
 // --- CONSTRAINTS ---
 // Table: agendamentos
@@ -1813,6 +1830,17 @@ export const Constants = {
 //       ELSE
 //           RETURN jsonb_build_object('success', false, 'error', 'Agendamento não encontrado, já foi atualizado ou já ocorreu.', 'consultorio', v_clinica);
 //       END IF;
+//   END;
+//   $function$
+//
+// FUNCTION confirm_plan_upgrade(text)
+//   CREATE OR REPLACE FUNCTION public.confirm_plan_upgrade(p_plano text)
+//    RETURNS void
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//     UPDATE public.usuarios SET plano = p_plano WHERE id = auth.uid();
 //   END;
 //   $function$
 //
