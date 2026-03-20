@@ -99,16 +99,31 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true)
-    const { error } = await supabase
-      .from('pacientes')
-      .update(values as any)
-      .eq('id', patient.id)
+    let error = null
+
+    if (patient?.id) {
+      const { error: updateError } = await supabase
+        .from('pacientes')
+        .update(values as any)
+        .eq('id', patient.id)
+      error = updateError
+    } else {
+      const { error: insertError } = await supabase
+        .from('pacientes')
+        .insert([{ ...values, usuario_id: user?.id }] as any)
+      error = insertError
+    }
+
     setLoading(false)
 
     if (error)
-      toast({ title: 'Erro ao atualizar', description: error.message, variant: 'destructive' })
+      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
     else {
-      toast({ title: 'Paciente atualizado com sucesso!' })
+      toast({
+        title: patient?.id
+          ? 'Paciente atualizado com sucesso!'
+          : 'Paciente cadastrado com sucesso!',
+      })
       onSuccess()
     }
   }

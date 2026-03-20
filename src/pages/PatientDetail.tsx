@@ -35,6 +35,19 @@ export default function PatientDetail() {
 
   const fetchPatientData = async () => {
     if (!id) return
+
+    // Validação de UUID para evitar erro 400 no Supabase caso seja "novo" ou ID inválido
+    const isUUID =
+      /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id)
+    if (!isUUID) {
+      if (id === 'novo') {
+        setPatient({})
+        setIsEditing(true)
+      }
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     const { data: pData } = await supabase.from('pacientes').select('*').eq('id', id).single()
     if (pData) setPatient(pData)
@@ -61,14 +74,16 @@ export default function PatientDetail() {
     )
   }
 
-  if (!patient) {
+  if (!patient && id !== 'novo') {
     return <div className="text-center py-20 text-slate-500">Paciente não encontrado.</div>
   }
 
   const proximaSessao = agendamentos.find(
     (a) => new Date(a.data_hora) >= new Date() && a.status === 'agendado',
   )
-  const portalLink = `${window.location.origin}/portal/${patient.hash_anamnese}`
+  const portalLink = patient?.hash_anamnese
+    ? `${window.location.origin}/portal/${patient.hash_anamnese}`
+    : ''
 
   return (
     <>
@@ -105,7 +120,7 @@ export default function PatientDetail() {
             </h2>
             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
               <div>
-                <strong className="text-slate-500 mr-2">Nome:</strong> {patient.nome}
+                <strong className="text-slate-500 mr-2">Nome:</strong> {patient.nome || 'N/A'}
               </div>
               <div>
                 <strong className="text-slate-500 mr-2">CPF:</strong>{' '}
@@ -167,7 +182,7 @@ export default function PatientDetail() {
               </div>
               <div>
                 <strong className="text-slate-500 mr-2">Frequência de Pagamento:</strong>{' '}
-                <span className="capitalize">{patient.frequencia_pagamento}</span>
+                <span className="capitalize">{patient.frequencia_pagamento || 'N/A'}</span>
               </div>
               {patient.dia_pagamento && (
                 <div>
@@ -208,7 +223,7 @@ export default function PatientDetail() {
           </Button>
           <div className="flex-1">
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex flex-wrap items-center gap-3">
-              {patient.nome}
+              {patient.nome || 'Novo Paciente'}
               {patient.convenio_id && (
                 <Badge variant="secondary" className="bg-amber-100 text-amber-800">
                   Convênio
@@ -229,27 +244,37 @@ export default function PatientDetail() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => window.print()} className="gap-2">
-              <Printer className="w-4 h-4" /> Imprimir Ficha
-            </Button>
-            {!isEditing && (
-              <Button variant="outline" onClick={() => setIsEditing(true)} className="gap-2">
-                <Edit className="w-4 h-4" /> Editar
-              </Button>
+            {id !== 'novo' && (
+              <>
+                <Button variant="outline" onClick={() => window.print()} className="gap-2">
+                  <Printer className="w-4 h-4" /> Imprimir Ficha
+                </Button>
+                {!isEditing && (
+                  <Button variant="outline" onClick={() => setIsEditing(true)} className="gap-2">
+                    <Edit className="w-4 h-4" /> Editar
+                  </Button>
+                )}
+                <Button onClick={() => navigate(`/pacientes/${id}/prontuario`)} className="gap-2">
+                  <Activity className="w-4 h-4" /> Abrir Prontuário
+                </Button>
+              </>
             )}
-            <Button onClick={() => navigate(`/pacientes/${id}/prontuario`)} className="gap-2">
-              <Activity className="w-4 h-4" /> Abrir Prontuário
-            </Button>
           </div>
         </div>
 
         {isEditing ? (
           <PatientEditForm
             patient={patient}
-            onCancel={() => setIsEditing(false)}
+            onCancel={() => {
+              if (id === 'novo') navigate('/pacientes')
+              else setIsEditing(false)
+            }}
             onSuccess={() => {
-              setIsEditing(false)
-              fetchPatientData()
+              if (id === 'novo') navigate('/pacientes')
+              else {
+                setIsEditing(false)
+                fetchPatientData()
+              }
             }}
           />
         ) : (
@@ -384,8 +409,10 @@ export default function PatientDetail() {
                         />
                         <Button
                           onClick={() => {
-                            navigator.clipboard.writeText(portalLink)
-                            toast({ title: 'Link copiado!' })
+                            if (portalLink) {
+                              navigator.clipboard.writeText(portalLink)
+                              toast({ title: 'Link copiado!' })
+                            }
                           }}
                           className="shrink-0 bg-indigo-600 hover:bg-indigo-700"
                         >
