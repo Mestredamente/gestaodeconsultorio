@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { maskCPF, maskPhone, maskCEP, fetchAddressByCEP } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -106,37 +107,60 @@ export default function NewPatientForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) return
     setLoading(true)
-    const payload = {
-      usuario_id: user.id,
-      nome: values.nome,
-      data_nascimento: values.data_nascimento || null,
-      cpf: values.cpf || null,
-      telefone: values.telefone || null,
-      email: values.email || null,
-      endereco: values.endereco || null,
-      cep: values.cep || null,
-      rua: values.rua || null,
-      numero: values.numero || null,
-      complemento: values.complemento || null,
-      bairro: values.bairro || null,
-      cidade: values.cidade || null,
-      estado: values.estado || null,
-      contato_emergencia_nome: values.contato_emergencia_nome || null,
-      contato_emergencia_telefone: values.contato_emergencia_telefone || null,
-      valor_sessao: values.valor_sessao,
-      frequencia_pagamento: values.frequencia_pagamento,
-      dia_pagamento: values.dia_pagamento,
-      convenio_id: values.convenio_id || null,
-      numero_carteira: values.numero_carteira || null,
-    }
-    const { error } = await supabase.from('pacientes').insert(payload as any)
-    setLoading(false)
 
-    if (error)
-      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
-    else {
+    try {
+      const payload = {
+        usuario_id: user.id,
+        nome: values.nome,
+        data_nascimento: values.data_nascimento || null,
+        cpf: values.cpf || null,
+        telefone: values.telefone || null,
+        email: values.email || null,
+        endereco: values.endereco || null,
+        cep: values.cep || null,
+        rua: values.rua || null,
+        numero: values.numero || null,
+        complemento: values.complemento || null,
+        bairro: values.bairro || null,
+        cidade: values.cidade || null,
+        estado: values.estado || null,
+        contato_emergencia_nome: values.contato_emergencia_nome || null,
+        contato_emergencia_telefone: values.contato_emergencia_telefone || null,
+        valor_sessao: values.valor_sessao,
+        frequencia_pagamento: values.frequencia_pagamento,
+        dia_pagamento: values.dia_pagamento,
+        convenio_id: values.convenio_id || null,
+        numero_carteira: values.numero_carteira || null,
+      }
+      const { error } = await supabase.from('pacientes').insert(payload as any)
+
+      if (error) throw error
+
       toast({ title: 'Paciente cadastrado com sucesso!' })
       form.reset()
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao salvar',
+        description: error.message || 'Verifique sua conexão e tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
+    const masked = maskCEP(e.target.value)
+    field.onChange(masked)
+
+    if (masked.length === 9) {
+      const address = await fetchAddressByCEP(masked)
+      if (address) {
+        form.setValue('rua', address.rua)
+        form.setValue('bairro', address.bairro)
+        form.setValue('cidade', address.cidade)
+        form.setValue('estado', address.estado)
+      }
     }
   }
 
@@ -179,7 +203,12 @@ export default function NewPatientForm() {
                   <FormItem>
                     <FormLabel>CPF</FormLabel>
                     <FormControl>
-                      <Input placeholder="000.000.000-00" {...field} value={field.value || ''} />
+                      <Input
+                        placeholder="000.000.000-00"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(maskCPF(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -192,7 +221,12 @@ export default function NewPatientForm() {
                   <FormItem>
                     <FormLabel>Telefone</FormLabel>
                     <FormControl>
-                      <Input placeholder="(00) 00000-0000" {...field} value={field.value || ''} />
+                      <Input
+                        placeholder="(00) 00000-0000"
+                        {...field}
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -336,7 +370,12 @@ export default function NewPatientForm() {
                     <FormItem>
                       <FormLabel>CEP</FormLabel>
                       <FormControl>
-                        <Input {...field} value={field.value || ''} />
+                        <Input
+                          placeholder="00000-000"
+                          {...field}
+                          value={field.value || ''}
+                          onChange={(e) => handleCepChange(e, field)}
+                        />
                       </FormControl>
                     </FormItem>
                   )}
@@ -419,7 +458,10 @@ export default function NewPatientForm() {
             </div>
 
             <div className="flex justify-end gap-4 pt-4 border-t border-slate-100">
-              <Button type="submit" disabled={loading} className="w-full sm:w-auto px-8">
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto px-8 gap-2">
+                {loading && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
                 {loading ? 'Salvando...' : 'Salvar Paciente'}
               </Button>
             </div>

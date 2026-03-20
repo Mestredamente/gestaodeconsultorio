@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { maskCPF, maskPhone, maskCEP, fetchAddressByCEP } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -99,41 +100,54 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setLoading(true)
-    let error = null
 
-    if (patient?.id) {
-      const { error: updateError } = await supabase
-        .from('pacientes')
-        .update(values as any)
-        .eq('id', patient.id)
-      error = updateError
-    } else {
-      const { error: insertError } = await supabase
-        .from('pacientes')
-        .insert([{ ...values, usuario_id: user?.id }] as any)
-      error = insertError
-    }
+    try {
+      if (patient?.id) {
+        const { error: updateError } = await supabase
+          .from('pacientes')
+          .update(values as any)
+          .eq('id', patient.id)
+        if (updateError) throw updateError
+      } else {
+        const { error: insertError } = await supabase
+          .from('pacientes')
+          .insert([{ ...values, usuario_id: user?.id }] as any)
+        if (insertError) throw insertError
+      }
 
-    setLoading(false)
-
-    if (error)
-      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
-    else {
       toast({
         title: patient?.id
           ? 'Paciente atualizado com sucesso!'
           : 'Paciente cadastrado com sucesso!',
       })
       onSuccess()
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao salvar',
+        description: error.message || 'Tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const Field = ({ id, label, type = 'text', ...props }: any) => (
+  const Field = ({ id, label, type = 'text', onChange, ...props }: any) => (
     <div className="space-y-1.5">
       <Label htmlFor={id} className="text-slate-600">
         {label}
       </Label>
-      <Input id={id} type={type} className="bg-slate-50" {...register(id)} {...props} />
+      <Input
+        id={id}
+        type={type}
+        className="bg-slate-50"
+        {...register(id)}
+        onChange={(e) => {
+          register(id).onChange(e)
+          if (onChange) onChange(e)
+        }}
+        {...props}
+      />
       {errors[id as keyof typeof errors] && (
         <p className="text-xs font-medium text-red-500">
           {(errors[id as keyof typeof errors] as any)?.message}
@@ -153,8 +167,18 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <Field id="nome" label="Nome Completo *" />
         <Field id="data_nascimento" label="Data de Nascimento" type="date" />
-        <Field id="cpf" label="CPF" />
-        <Field id="telefone" label="Telefone" />
+        <Field
+          id="cpf"
+          label="CPF"
+          onChange={(e: any) => setValue('cpf', maskCPF(e.target.value))}
+          placeholder="000.000.000-00"
+        />
+        <Field
+          id="telefone"
+          label="Telefone"
+          onChange={(e: any) => setValue('telefone', maskPhone(e.target.value))}
+          placeholder="(00) 00000-0000"
+        />
         <Field id="email" label="E-mail" type="email" />
       </div>
 
@@ -210,7 +234,25 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
           Endereço
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-          <Field id="cep" label="CEP" />
+          <Field
+            id="cep"
+            label="CEP"
+            placeholder="00000-000"
+            onChange={(e: any) => {
+              const masked = maskCEP(e.target.value)
+              setValue('cep', masked)
+              if (masked.length === 9) {
+                fetchAddressByCEP(masked).then((addr) => {
+                  if (addr) {
+                    setValue('rua', addr.rua)
+                    setValue('bairro', addr.bairro)
+                    setValue('cidade', addr.cidade)
+                    setValue('estado', addr.estado)
+                  }
+                })
+              }
+            }}
+          />
           <div className="md:col-span-3">
             <Field id="rua" label="Rua" />
           </div>
@@ -226,7 +268,10 @@ export default function PatientEditForm({ patient, onSuccess, onCancel }: any) {
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading} className="gap-2">
+          {loading && (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          )}
           {loading ? 'Salvando...' : 'Salvar Alterações'}
         </Button>
       </div>

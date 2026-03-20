@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
+import { maskCEP, fetchAddressByCEP, maskPhone } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -47,6 +48,9 @@ const predefinedApproaches = [
   'Abordagem Centrada na Pessoa (ACP)',
   'Terapia Sistêmica',
   'Terapia Infantil',
+  'Terapia de Casal',
+  'Neuropsicologia',
+  'Psiquiatria',
 ]
 
 const themeOptions = [
@@ -82,6 +86,13 @@ export default function Settings() {
     template_pre_consulta: 'Olá [Nome]...',
     endereco_consultorio: '',
     telefone_consultorio: '',
+    cep: '',
+    rua: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
   })
 
   const [portalSettings, setPortalSettings] = useState({
@@ -140,6 +151,13 @@ export default function Settings() {
                 (data as any).template_pre_consulta || 'Olá [Nome], sua consulta...',
               endereco_consultorio: (data as any).endereco_consultorio || '',
               telefone_consultorio: (data as any).telefone_consultorio || '',
+              cep: (data as any).cep || '',
+              rua: (data as any).rua || '',
+              numero: (data as any).numero || '',
+              complemento: (data as any).complemento || '',
+              bairro: (data as any).bairro || '',
+              cidade: (data as any).cidade || '',
+              estado: (data as any).estado || '',
             })
 
             if ((data as any).portal_settings) {
@@ -203,27 +221,35 @@ export default function Settings() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const payload = {
-      ...formData,
-      id: user?.id,
-      anamnese_template: anamneseTemplates,
-      lembrete_whatsapp_ativo: lembreteAtivo,
-      template_lembrete: templateLembrete,
-      especialidades_disponiveis: especialidades,
-      meta_mensal_consultas: metaConsultas,
-      sync_calendarios: syncCals,
-      horario_funcionamento: horarios,
-      portal_settings: portalSettings,
-      preferencias_dashboard: {
-        ...preferenciasOriginal,
-        theme_color: themeColor,
-      },
+    try {
+      const payload = {
+        ...formData,
+        id: user?.id,
+        anamnese_template: anamneseTemplates,
+        lembrete_whatsapp_ativo: lembreteAtivo,
+        template_lembrete: templateLembrete,
+        especialidades_disponiveis: especialidades,
+        meta_mensal_consultas: metaConsultas,
+        sync_calendarios: syncCals,
+        horario_funcionamento: horarios,
+        portal_settings: portalSettings,
+        preferencias_dashboard: {
+          ...preferenciasOriginal,
+          theme_color: themeColor,
+        },
+      }
+      const { error } = await supabase.from('usuarios').upsert(payload as any)
+      if (error) throw error
+      toast({ title: 'Configurações salvas!' })
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao salvar',
+        description: error.message || 'Verifique sua conexão',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
     }
-    const { error } = await supabase.from('usuarios').upsert(payload as any)
-    setLoading(false)
-    if (error)
-      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
-    else toast({ title: 'Configurações salvas!' })
   }
 
   const handleTriggerReminders = async () => {
@@ -472,28 +498,102 @@ export default function Settings() {
                 prescrições.
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-5 rounded-lg border border-slate-100">
-              <div className="space-y-2 md:col-span-2">
-                <Label>Endereço Completo</Label>
-                <Input
-                  value={formData.endereco_consultorio}
-                  onChange={(e) =>
-                    setFormData({ ...formData, endereco_consultorio: e.target.value })
-                  }
-                  placeholder="Ex: Rua das Flores, 123, Bairro Centro, Cidade - UF"
-                  className="bg-white"
-                />
+
+            <div className="bg-slate-50/50 p-5 rounded-lg border border-slate-100">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>CEP</Label>
+                  <Input
+                    value={formData.cep}
+                    onChange={(e) => {
+                      const masked = maskCEP(e.target.value)
+                      setFormData((prev) => ({ ...prev, cep: masked }))
+                      if (masked.length === 9) {
+                        fetchAddressByCEP(masked).then((addr) => {
+                          if (addr) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              rua: addr.rua,
+                              bairro: addr.bairro,
+                              cidade: addr.cidade,
+                              estado: addr.estado,
+                            }))
+                          }
+                        })
+                      }
+                    }}
+                    placeholder="00000-000"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-3">
+                  <Label>Rua / Logradouro</Label>
+                  <Input
+                    value={formData.rua}
+                    onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
+                    placeholder="Nome da rua"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Número</Label>
+                  <Input
+                    value={formData.numero}
+                    onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                    placeholder="123"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Complemento</Label>
+                  <Input
+                    value={formData.complemento}
+                    onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
+                    placeholder="Sala 402"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Bairro</Label>
+                  <Input
+                    value={formData.bairro}
+                    onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                    placeholder="Centro"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Cidade</Label>
+                  <Input
+                    value={formData.cidade}
+                    onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                    placeholder="São Paulo"
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Estado</Label>
+                  <Input
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    placeholder="SP"
+                    className="bg-white"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Telefone / WhatsApp da Clínica</Label>
-                <Input
-                  value={formData.telefone_consultorio}
-                  onChange={(e) =>
-                    setFormData({ ...formData, telefone_consultorio: e.target.value })
-                  }
-                  placeholder="(00) 00000-0000"
-                  className="bg-white"
-                />
+
+              <div className="mt-4 pt-4 border-t border-slate-200">
+                <div className="space-y-2 max-w-sm">
+                  <Label>Telefone / WhatsApp da Clínica</Label>
+                  <Input
+                    value={formData.telefone_consultorio}
+                    onChange={(e) =>
+                      setFormData({ ...formData, telefone_consultorio: maskPhone(e.target.value) })
+                    }
+                    placeholder="(00) 00000-0000"
+                    className="bg-white"
+                  />
+                </div>
               </div>
             </div>
 
@@ -502,24 +602,31 @@ export default function Settings() {
                 <Label>Especialidades Disponíveis</Label>
                 <div className="flex gap-2">
                   <Input
+                    list="especialidades-list"
                     value={novaEspecialidade}
                     onChange={(e) => setNovaEspecialidade(e.target.value)}
-                    placeholder="Adicionar especialidade"
+                    placeholder="Selecione ou digite..."
+                    className="bg-white"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
-                        if (novaEspecialidade) {
+                        if (novaEspecialidade && !especialidades.includes(novaEspecialidade)) {
                           setEspecialidades([...especialidades, novaEspecialidade])
                           setNovaEspecialidade('')
                         }
                       }
                     }}
                   />
+                  <datalist id="especialidades-list">
+                    {predefinedApproaches.map((app) => (
+                      <option key={app} value={app} />
+                    ))}
+                  </datalist>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      if (novaEspecialidade) {
+                      if (novaEspecialidade && !especialidades.includes(novaEspecialidade)) {
                         setEspecialidades([...especialidades, novaEspecialidade])
                         setNovaEspecialidade('')
                       }
@@ -1042,7 +1149,12 @@ export default function Settings() {
 
           <div className="p-6 pt-0 flex flex-col sm:flex-row gap-4 mt-4">
             <Button type="submit" className="gap-2 flex-1 sm:flex-none" disabled={loading}>
-              <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar Alterações'}
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save className="w-4 h-4" />
+              )}
+              {loading ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </div>
         </Tabs>
