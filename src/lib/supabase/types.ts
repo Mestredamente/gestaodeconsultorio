@@ -1701,6 +1701,9 @@ export const Constants = {
 //   Policy "usuarios_policy" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: (id = auth.uid())
 //     WITH CHECK: (id = auth.uid())
+//   Policy "usuarios_update" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: (id = auth.uid())
+//     WITH CHECK: (id = auth.uid())
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION accept_patient_contract(uuid)

@@ -1,11 +1,14 @@
 {
   "_versions": {
-    "enviar_cobranca_whatsapp": 8,
-    "enviar_lembrete_consulta": 12,
+    "enviar_cobranca_whatsapp": 6,
+    "enviar_lembrete_consulta": 10,
     "emitir_nota_fiscal": 2,
-    "enviar_comunicado_massa": 3,
-    "transcrever_audio": 1,
-    "processar_cobrancas_recorrentes": 2,
+    "enviar_comunicado_massa": 1,
+    "functions": 1,
+    "transcrever_audio": 1
+  }
+}
+recorrentes": 2,
     "functions": 4,
     "lembrete_sessao": 3
   }
