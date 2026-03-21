@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Shield, Landmark, User, Key, CheckCircle2, RefreshCw, ExternalLink } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
 
 const SECRETS_LIST = [
   {
