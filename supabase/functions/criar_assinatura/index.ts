@@ -7,10 +7,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    return new Response(
-      JSON.stringify({ message: 'Assinatura criada com sucesso' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    return new Response(JSON.stringify({ message: 'Assinatura criada com sucesso' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

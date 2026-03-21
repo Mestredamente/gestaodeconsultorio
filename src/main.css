@@ -56,6 +56,24 @@
     --primary-foreground: 210 40% 98%;
     --ring: 215.4 16.3% 46.9%;
   }
+
+  .theme-pink {
+    --primary: 330 81% 60%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 330 81% 60%;
+  }
+
+  .theme-diamond {
+    --primary: 190 90% 50%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 190 90% 50%;
+  }
+
+  .theme-ruby {
+    --primary: 348 83% 47%;
+    --primary-foreground: 210 40% 98%;
+    --ring: 348 83% 47%;
+  }
 }
 
 @layer base {

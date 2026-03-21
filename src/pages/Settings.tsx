@@ -60,8 +60,11 @@ const THEMES = [
   { id: 'theme-indigo', name: 'Roxo (Padrão)', color: 'bg-[#8b5cf6]' },
   { id: 'theme-blue', name: 'Azul', color: 'bg-[#3b82f6]' },
   { id: 'theme-emerald', name: 'Esmeralda', color: 'bg-[#10b981]' },
-  { id: 'theme-rose', name: 'Rosa', color: 'bg-[#f43f5e]' },
+  { id: 'theme-rose', name: 'Rosé', color: 'bg-[#f43f5e]' },
   { id: 'theme-slate', name: 'Grafite', color: 'bg-[#64748b]' },
+  { id: 'theme-pink', name: 'Rosa', color: 'bg-[#ec4899]' },
+  { id: 'theme-diamond', name: 'Diamante', color: 'bg-[#06b6d4]' },
+  { id: 'theme-ruby', name: 'Rubi', color: 'bg-[#e11d48]' },
 ]
 
 export default function Settings() {
@@ -335,6 +338,9 @@ export default function Settings() {
                             'theme-emerald',
                             'theme-rose',
                             'theme-slate',
+                            'theme-pink',
+                            'theme-diamond',
+                            'theme-ruby',
                           )
                           document.documentElement.classList.add(theme.id)
                         }}

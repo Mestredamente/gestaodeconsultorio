@@ -20,6 +20,19 @@ import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 
+const removeThemes = () => {
+  document.documentElement.classList.remove(
+    'theme-indigo',
+    'theme-blue',
+    'theme-emerald',
+    'theme-rose',
+    'theme-slate',
+    'theme-pink',
+    'theme-diamond',
+    'theme-ruby',
+  )
+}
+
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -38,13 +51,7 @@ export default function Layout() {
           if (data) {
             setClinic({ name: data.nome_consultorio || 'PsicManager', logo: data.logo_url || '' })
             if (data.preferencias_dashboard?.theme) {
-              document.documentElement.classList.remove(
-                'theme-indigo',
-                'theme-blue',
-                'theme-emerald',
-                'theme-rose',
-                'theme-slate',
-              )
+              removeThemes()
               document.documentElement.classList.add(data.preferencias_dashboard.theme)
             }
           }
@@ -60,13 +67,7 @@ export default function Layout() {
             const newLogo = payload.new.logo_url || ''
             setClinic({ name: newName, logo: newLogo })
             if (payload.new.preferencias_dashboard?.theme) {
-              document.documentElement.classList.remove(
-                'theme-indigo',
-                'theme-blue',
-                'theme-emerald',
-                'theme-rose',
-                'theme-slate',
-              )
+              removeThemes()
               document.documentElement.classList.add(payload.new.preferencias_dashboard.theme)
             }
           },

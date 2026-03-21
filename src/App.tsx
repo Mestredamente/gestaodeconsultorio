@@ -68,6 +68,17 @@ const AppRoutes = () => (
     />
 
     <Route
+      path="/planos"
+      element={
+        <ProtectedRoute>
+          <div className="min-h-screen bg-slate-50/50">
+            <Plans />
+          </div>
+        </ProtectedRoute>
+      }
+    />
+
+    <Route
       path="/atendimento/:agendamentoId"
       element={
         <ProtectedRoute>
@@ -107,7 +118,6 @@ const AppRoutes = () => (
       <Route path="/notificacoes" element={<Notifications />} />
       <Route path="/configuracoes" element={<Settings />} />
       <Route path="/perfil" element={<Navigate to="/configuracoes" replace />} />
-      <Route path="/planos" element={<Plans />} />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>
