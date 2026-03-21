@@ -597,16 +597,6 @@ export default function Index() {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
-          <Button
-            variant="ghost"
-            onClick={resetLayout}
-            className="hidden lg:flex items-center gap-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl font-medium"
-            title="Restaurar layout original"
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            <span className="text-sm">Layout</span>
-          </Button>
-
           <Sheet>
             <SheetTrigger asChild>
               <Button
