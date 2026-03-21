@@ -35,7 +35,7 @@ import {
   Landmark,
   KeyRound,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -152,8 +152,20 @@ export default function Settings() {
   const [newMemberRole, setNewMemberRole] = useState('profissional')
 
   const [rolePermissions, setRolePermissions] = useState({
-    profissional: { agenda: true, pacientes: true, prontuarios: true, financeiro: false, relatorios: false },
-    recepcao: { agenda: true, pacientes: true, prontuarios: false, financeiro: false, relatorios: false },
+    profissional: {
+      agenda: true,
+      pacientes: true,
+      prontuarios: true,
+      financeiro: false,
+      relatorios: false,
+    },
+    recepcao: {
+      agenda: true,
+      pacientes: true,
+      prontuarios: false,
+      financeiro: false,
+      relatorios: false,
+    },
   })
 
   useEffect(() => {
@@ -175,10 +187,13 @@ export default function Settings() {
               politica_cancelamento: data.politica_cancelamento || '',
               agendamento_publico_ativo: data.agendamento_publico_ativo || false,
               whatsapp_confirmacao_ativa: (data as any).whatsapp_confirmacao_ativa || false,
-              template_confirmacao: (data as any).template_confirmacao || 'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
+              template_confirmacao:
+                (data as any).template_confirmacao ||
+                'Olá [Nome], sua consulta foi agendada para [data] às [hora].',
               whatsapp_tipo: (data as any).whatsapp_tipo || 'business',
               pre_consulta_ativa: (data as any).pre_consulta_ativa || false,
-              template_pre_consulta: (data as any).template_pre_consulta || 'Olá [Nome], sua consulta...',
+              template_pre_consulta:
+                (data as any).template_pre_consulta || 'Olá [Nome], sua consulta...',
               endereco_consultorio: (data as any).endereco_consultorio || '',
               telefone_consultorio: (data as any).telefone_consultorio || '',
               cep: (data as any).cep || '',
@@ -422,14 +437,21 @@ export default function Settings() {
   }
 
   const renderSecretChecklistItem = (label: string, value: string) => {
-    const isConfigured = value && value.trim() !== '';
+    const isConfigured = value && value.trim() !== ''
     return (
       <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
         <span className="font-medium text-slate-700">{label}</span>
         {isConfigured ? (
-          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1"><CheckCircle2 className="w-3 h-3"/> Configurado</Badge>
+          <Badge
+            variant="outline"
+            className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1"
+          >
+            <CheckCircle2 className="w-3 h-3" /> Configurado
+          </Badge>
         ) : (
-          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 gap-1"><AlertCircle className="w-3 h-3"/> Pendente</Badge>
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 gap-1">
+            <AlertCircle className="w-3 h-3" /> Pendente
+          </Badge>
         )}
       </div>
     )
@@ -496,7 +518,7 @@ export default function Settings() {
               value="integracoes"
               className="rounded-lg py-2.5 px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary flex items-center gap-2"
             >
-               <KeyRound className="w-4 h-4" /> Integrações & APIs
+              <KeyRound className="w-4 h-4" /> Integrações & APIs
             </TabsTrigger>
           </TabsList>
 
@@ -571,7 +593,8 @@ export default function Settings() {
                 <Landmark className="w-5 h-5 text-primary" /> Dados Bancários e Recebimentos
               </h3>
               <p className="text-sm text-slate-500 mb-6">
-                Estas informações serão usadas para gerar links de cobrança e PIX automáticos para seus pacientes.
+                Estas informações serão usadas para gerar links de cobrança e PIX automáticos para
+                seus pacientes.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-blue-50/30 p-6 rounded-2xl border border-blue-100">
                 <div className="space-y-2">
@@ -702,7 +725,10 @@ export default function Settings() {
                 <Label>Especialidades (Aparecem no Agendamento)</Label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between bg-white h-12 rounded-xl">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between bg-white h-12 rounded-xl"
+                    >
                       {especialidades.length > 0
                         ? `${especialidades.length} selecionadas`
                         : 'Selecionar Especialidades'}
@@ -727,7 +753,11 @@ export default function Settings() {
                 </DropdownMenu>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {especialidades.map((esp, i) => (
-                    <Badge key={i} variant="secondary" className="gap-1 items-center px-3 py-1 rounded-full text-sm">
+                    <Badge
+                      key={i}
+                      variant="secondary"
+                      className="gap-1 items-center px-3 py-1 rounded-full text-sm"
+                    >
                       {esp}
                       <X
                         className="w-3 h-3 cursor-pointer hover:text-red-500"
@@ -853,7 +883,11 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="button" onClick={handleInviteMember} className="w-full sm:w-auto h-11 rounded-xl px-6">
+              <Button
+                type="button"
+                onClick={handleInviteMember}
+                className="w-full sm:w-auto h-11 rounded-xl px-6"
+              >
                 <Plus className="w-4 h-4 mr-2" /> Convidar
               </Button>
             </div>
@@ -897,7 +931,9 @@ export default function Settings() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
                 <div className="space-y-5">
-                  <h5 className="font-bold text-slate-800 text-lg border-b border-slate-200 pb-3">Perfil: Profissional</h5>
+                  <h5 className="font-bold text-slate-800 text-lg border-b border-slate-200 pb-3">
+                    Perfil: Profissional
+                  </h5>
                   {Object.keys(rolePermissions.profissional).map((module) => (
                     <div key={`prof-${module}`} className="flex items-center space-x-3">
                       <Switch
@@ -909,14 +945,14 @@ export default function Settings() {
                           }))
                         }
                       />
-                      <Label className="capitalize text-base font-medium">
-                        {module}
-                      </Label>
+                      <Label className="capitalize text-base font-medium">{module}</Label>
                     </div>
                   ))}
                 </div>
                 <div className="space-y-5">
-                  <h5 className="font-bold text-slate-800 text-lg border-b border-slate-200 pb-3">Perfil: Recepção</h5>
+                  <h5 className="font-bold text-slate-800 text-lg border-b border-slate-200 pb-3">
+                    Perfil: Recepção
+                  </h5>
                   {Object.keys(rolePermissions.recepcao).map((module) => (
                     <div key={`rec-${module}`} className="flex items-center space-x-3">
                       <Switch
@@ -928,9 +964,7 @@ export default function Settings() {
                           }))
                         }
                       />
-                      <Label className="capitalize text-base font-medium">
-                        {module}
-                      </Label>
+                      <Label className="capitalize text-base font-medium">{module}</Label>
                     </div>
                   ))}
                 </div>
@@ -951,9 +985,7 @@ export default function Settings() {
             <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-lg font-bold text-slate-800">
-                    Meus Agendamentos
-                  </Label>
+                  <Label className="text-lg font-bold text-slate-800">Meus Agendamentos</Label>
                   <p className="text-sm text-slate-500 mt-1">
                     Permite que o paciente visualize e solicite cancelamento de consultas.
                   </p>
@@ -967,9 +999,7 @@ export default function Settings() {
               </div>
               <div className="flex items-center justify-between border-t border-slate-200 pt-6">
                 <div>
-                  <Label className="text-lg font-bold text-slate-800">
-                    Laudos e Prescrições
-                  </Label>
+                  <Label className="text-lg font-bold text-slate-800">Laudos e Prescrições</Label>
                   <p className="text-sm text-slate-500 mt-1">
                     Permite visualizar e baixar documentos assinados digitalmente.
                   </p>
@@ -983,9 +1013,7 @@ export default function Settings() {
               </div>
               <div className="flex items-center justify-between border-t border-slate-200 pt-6">
                 <div>
-                  <Label className="text-lg font-bold text-slate-800">
-                    Testes e Avaliações
-                  </Label>
+                  <Label className="text-lg font-bold text-slate-800">Testes e Avaliações</Label>
                   <p className="text-sm text-slate-500 mt-1">
                     Permite que o paciente responda a escalas e formulários pelo portal.
                   </p>
@@ -1056,7 +1084,8 @@ export default function Settings() {
                   Tipo de Integração WhatsApp
                 </Label>
                 <p className="text-sm text-slate-500 mb-4 mt-1">
-                  Recomendamos o uso do WhatsApp Business API para maior compatibilidade com automações. A chave deve ser configurada na aba "Integrações & APIs".
+                  Recomendamos o uso do WhatsApp Business API para maior compatibilidade com
+                  automações. A chave deve ser configurada na aba "Integrações & APIs".
                 </p>
               </div>
               <Select
@@ -1081,7 +1110,8 @@ export default function Settings() {
                       Lembretes Automáticos de Consulta
                     </Label>
                     <p className="text-sm text-slate-500 mt-1">
-                      Envia um lembrete 24h antes da sessão (requer API configurada para modo automático).
+                      Envia um lembrete 24h antes da sessão (requer API configurada para modo
+                      automático).
                     </p>
                   </div>
                   <Switch checked={lembreteAtivo} onCheckedChange={setLembreteAtivo} />
@@ -1096,7 +1126,9 @@ export default function Settings() {
                       className="bg-white rounded-xl resize-none"
                       placeholder="Olá [Nome], lembramos que sua consulta está marcada para [data] às [hora]."
                     />
-                    <p className="text-xs text-slate-500 font-medium">Variáveis disponíveis: [Nome], [data], [hora], [link_confirmacao]</p>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Variáveis disponíveis: [Nome], [data], [hora], [link_confirmacao]
+                    </p>
                   </div>
                 )}
                 <div className="mt-5 pt-5 border-t border-slate-200">
@@ -1110,7 +1142,7 @@ export default function Settings() {
                   </Button>
                 </div>
               </div>
-              
+
               <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 space-y-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1235,7 +1267,9 @@ export default function Settings() {
             </div>
             <div className="space-y-6">
               <div className="space-y-3">
-                <Label className="text-base">Contrato de Prestação de Serviços (Aceite Eletrônico)</Label>
+                <Label className="text-base">
+                  Contrato de Prestação de Serviços (Aceite Eletrônico)
+                </Label>
                 <Textarea
                   value={formData.texto_contrato}
                   onChange={(e) => setFormData({ ...formData, texto_contrato: e.target.value })}
@@ -1261,60 +1295,121 @@ export default function Settings() {
                 <KeyRound className="w-5 h-5 text-primary" /> Gerenciamento de Integrações e APIs
               </h3>
               <p className="text-sm text-slate-500 mt-1">
-                Configure as chaves e tokens para ativar recursos avançados do sistema (Pagamentos, AI, WhatsApp e Videoconferência).
+                Configure as chaves e tokens para ativar recursos avançados do sistema (Pagamentos,
+                AI, WhatsApp e Videoconferência).
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-6">
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-5">
-                  <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3"><Landmark className="w-4 h-4 text-emerald-600"/> Gateways de Pagamento</h4>
-                  
+                  <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3">
+                    <Landmark className="w-4 h-4 text-emerald-600" /> Gateways de Pagamento
+                  </h4>
+
                   <div className="space-y-2">
                     <Label>Stripe Secret Key</Label>
-                    <Input type="password" value={formData.stripe_secret_key} onChange={e => setFormData({...formData, stripe_secret_key: e.target.value})} placeholder="sk_test_..." className="bg-white" />
+                    <Input
+                      type="password"
+                      value={formData.stripe_secret_key}
+                      onChange={(e) =>
+                        setFormData({ ...formData, stripe_secret_key: e.target.value })
+                      }
+                      placeholder="sk_test_..."
+                      className="bg-white"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Mercado Pago Access Token</Label>
-                    <Input type="password" value={formData.mercado_pago_token} onChange={e => setFormData({...formData, mercado_pago_token: e.target.value})} placeholder="APP_USR-..." className="bg-white" />
+                    <Input
+                      type="password"
+                      value={formData.mercado_pago_token}
+                      onChange={(e) =>
+                        setFormData({ ...formData, mercado_pago_token: e.target.value })
+                      }
+                      placeholder="APP_USR-..."
+                      className="bg-white"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>PagSeguro Token</Label>
-                    <Input type="password" value={formData.pagseguro_token} onChange={e => setFormData({...formData, pagseguro_token: e.target.value})} placeholder="Token..." className="bg-white" />
+                    <Input
+                      type="password"
+                      value={formData.pagseguro_token}
+                      onChange={(e) =>
+                        setFormData({ ...formData, pagseguro_token: e.target.value })
+                      }
+                      placeholder="Token..."
+                      className="bg-white"
+                    />
                   </div>
                 </div>
 
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-5">
-                  <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3"><MessageCircle className="w-4 h-4 text-emerald-500"/> Comunicação</h4>
-                  
+                  <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3">
+                    <MessageCircle className="w-4 h-4 text-emerald-500" /> Comunicação
+                  </h4>
+
                   <div className="space-y-2">
                     <Label>WhatsApp Business API Key</Label>
-                    <Input type="password" value={formData.whatsapp_api_key} onChange={e => setFormData({...formData, whatsapp_api_key: e.target.value})} placeholder="EAAG..." className="bg-white" />
+                    <Input
+                      type="password"
+                      value={formData.whatsapp_api_key}
+                      onChange={(e) =>
+                        setFormData({ ...formData, whatsapp_api_key: e.target.value })
+                      }
+                      placeholder="EAAG..."
+                      className="bg-white"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-6">
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-5">
-                  <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3"><BrainCircuit className="w-4 h-4 text-indigo-500"/> Inteligência Artificial</h4>
-                  
+                  <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3">
+                    <BrainCircuit className="w-4 h-4 text-indigo-500" /> Inteligência Artificial
+                  </h4>
+
                   <div className="space-y-2">
                     <Label>Google Gemini API Key</Label>
-                    <Input type="password" value={formData.gemini_api_key} onChange={e => setFormData({...formData, gemini_api_key: e.target.value})} placeholder="AIza..." className="bg-white" />
-                    <p className="text-xs text-slate-500">Usada para a funcionalidade de sugestão inteligente de horários.</p>
+                    <Input
+                      type="password"
+                      value={formData.gemini_api_key}
+                      onChange={(e) => setFormData({ ...formData, gemini_api_key: e.target.value })}
+                      placeholder="AIza..."
+                      className="bg-white"
+                    />
+                    <p className="text-xs text-slate-500">
+                      Usada para a funcionalidade de sugestão inteligente de horários.
+                    </p>
                   </div>
                 </div>
 
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-5">
-                  <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3"><KeyRound className="w-4 h-4 text-blue-500"/> Videoconferência (Zoom)</h4>
-                  
+                  <h4 className="font-bold text-slate-800 text-lg flex items-center gap-2 border-b pb-3">
+                    <KeyRound className="w-4 h-4 text-blue-500" /> Videoconferência (Zoom)
+                  </h4>
+
                   <div className="space-y-2">
                     <Label>Zoom Client ID</Label>
-                    <Input type="password" value={formData.zoom_client_id} onChange={e => setFormData({...formData, zoom_client_id: e.target.value})} className="bg-white" />
+                    <Input
+                      type="password"
+                      value={formData.zoom_client_id}
+                      onChange={(e) => setFormData({ ...formData, zoom_client_id: e.target.value })}
+                      className="bg-white"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Zoom Client Secret</Label>
-                    <Input type="password" value={formData.zoom_client_secret} onChange={e => setFormData({...formData, zoom_client_secret: e.target.value})} className="bg-white" />
+                    <Input
+                      type="password"
+                      value={formData.zoom_client_secret}
+                      onChange={(e) =>
+                        setFormData({ ...formData, zoom_client_secret: e.target.value })
+                      }
+                      className="bg-white"
+                    />
                   </div>
                 </div>
 
@@ -1335,8 +1430,12 @@ export default function Settings() {
             <div className="pt-8 border-t border-slate-100 mt-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 bg-slate-50 rounded-2xl border border-slate-100 gap-4">
                 <div className="flex-1">
-                  <h4 className="font-bold text-lg text-slate-800 mb-1">Agendamento Público Online</h4>
-                  <p className="text-sm text-slate-500 mb-3">Permita que os pacientes agendem diretamente pelo seu link exclusivo.</p>
+                  <h4 className="font-bold text-lg text-slate-800 mb-1">
+                    Agendamento Público Online
+                  </h4>
+                  <p className="text-sm text-slate-500 mb-3">
+                    Permita que os pacientes agendem diretamente pelo seu link exclusivo.
+                  </p>
                   {formData.agendamento_publico_ativo && (
                     <div className="flex items-center gap-2 bg-white border border-slate-200 p-2.5 rounded-xl max-w-md w-full shadow-sm">
                       <code className="text-xs text-slate-700 flex-1 truncate font-mono">
@@ -1371,7 +1470,11 @@ export default function Settings() {
           </TabsContent>
 
           <div className="p-6 md:p-8 pt-0 flex flex-col sm:flex-row gap-4 justify-end mt-4">
-            <Button type="submit" className="gap-2 w-full sm:w-auto px-10 h-12 rounded-xl text-base" disabled={loading}>
+            <Button
+              type="submit"
+              className="gap-2 w-full sm:w-auto px-10 h-12 rounded-xl text-base"
+              disabled={loading}
+            >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
@@ -1385,4 +1488,3 @@ export default function Settings() {
     </div>
   )
 }
-

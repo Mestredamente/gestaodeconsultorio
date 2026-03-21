@@ -156,7 +156,9 @@ export default function NewPatientForm() {
         bairro: values.bairro || null,
         cidade: values.cidade || null,
         estado: values.estado || null,
-        endereco: values.rua ? `${values.rua}, ${values.numero} - ${values.bairro}, ${values.cidade}/${values.estado}` : null,
+        endereco: values.rua
+          ? `${values.rua}, ${values.numero} - ${values.bairro}, ${values.cidade}/${values.estado}`
+          : null,
         contato_emergencia_nome: values.contato_emergencia_nome || null,
         contato_emergencia_telefone: values.contato_emergencia_telefone || null,
         valor_sessao: values.valor_sessao,
@@ -183,7 +185,7 @@ export default function NewPatientForm() {
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
     const masked = maskCEP(e.target.value)
     field.onChange(masked)
-    
+
     if (masked.length === 9) {
       setFetchingCep(true)
       try {
@@ -211,7 +213,6 @@ export default function NewPatientForm() {
         <CardContent className="p-8">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              
               {/* Dados Pessoais */}
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Dados Pessoais</h3>
@@ -223,7 +224,12 @@ export default function NewPatientForm() {
                       <FormItem>
                         <FormLabel>Nome Completo *</FormLabel>
                         <FormControl>
-                          <Input placeholder="João da Silva" {...field} value={field.value || ''} className="bg-slate-50/50" />
+                          <Input
+                            placeholder="João da Silva"
+                            {...field}
+                            value={field.value || ''}
+                            className="bg-slate-50/50"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -236,7 +242,12 @@ export default function NewPatientForm() {
                       <FormItem>
                         <FormLabel>Data de Nascimento</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} value={field.value || ''} className="bg-slate-50/50" />
+                          <Input
+                            type="date"
+                            {...field}
+                            value={field.value || ''}
+                            className="bg-slate-50/50"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -416,7 +427,9 @@ export default function NewPatientForm() {
 
               {/* Contato de Emergência */}
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Contato de Emergência</h3>
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">
+                  Contato de Emergência
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-slate-50/50 rounded-xl border border-slate-100">
                   <FormField
                     control={form.control}
@@ -425,7 +438,12 @@ export default function NewPatientForm() {
                       <FormItem>
                         <FormLabel>Nome do Contato *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Ex: Maria da Silva" {...field} value={field.value || ''} className="bg-white" />
+                          <Input
+                            placeholder="Ex: Maria da Silva"
+                            {...field}
+                            value={field.value || ''}
+                            className="bg-white"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -455,7 +473,9 @@ export default function NewPatientForm() {
 
               {/* Pagamento e Convênio */}
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Pagamento e Convênio</h3>
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">
+                  Pagamento e Convênio
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-5 bg-indigo-50/30 rounded-xl border border-indigo-100/50">
                   <FormField
                     control={form.control}
@@ -464,7 +484,13 @@ export default function NewPatientForm() {
                       <FormItem>
                         <FormLabel>Valor Base Sessão (R$)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" {...field} value={field.value || ''} className="bg-white" />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...field}
+                            value={field.value || ''}
+                            className="bg-white"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -570,7 +596,11 @@ export default function NewPatientForm() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border p-5 bg-slate-50 shadow-sm">
                       <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" />
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          className="mt-1"
+                        />
                       </FormControl>
                       <div className="space-y-1.5 leading-none">
                         <FormLabel className="text-slate-800 font-semibold text-base">
@@ -588,7 +618,11 @@ export default function NewPatientForm() {
               </div>
 
               <div className="flex justify-end gap-4 pt-6 border-t border-slate-100">
-                <Button type="submit" disabled={loading} className="w-full sm:w-auto px-10 rounded-xl gap-2 h-12 text-base">
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full sm:w-auto px-10 rounded-xl gap-2 h-12 text-base"
+                >
                   {loading && (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   )}
@@ -619,7 +653,11 @@ export default function NewPatientForm() {
             </p>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowUpgradeModal(false)} className="rounded-xl">
+            <Button
+              variant="outline"
+              onClick={() => setShowUpgradeModal(false)}
+              className="rounded-xl"
+            >
               Agora não
             </Button>
             <Button
@@ -634,4 +672,3 @@ export default function NewPatientForm() {
     </>
   )
 }
-

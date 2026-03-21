@@ -556,9 +556,9 @@ export default function Index() {
                     </div>
                   </div>
                 ))}
-                <Button 
-                  variant="ghost" 
-                  onClick={() => savePrefs(DEFAULT_WIDGETS)} 
+                <Button
+                  variant="ghost"
+                  onClick={() => savePrefs(DEFAULT_WIDGETS)}
                   className="w-full mt-4 text-slate-500 hover:text-slate-800"
                 >
                   <RotateCcw className="w-4 h-4 mr-2" /> Restaurar Padrão
@@ -629,8 +629,8 @@ export default function Index() {
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, index)}
             className={cn(
-              "transition-all cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 rounded-2xl",
-              w.id === 'dashboard' ? 'lg:col-span-3' : 'lg:col-span-1'
+              'transition-all cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 rounded-2xl',
+              w.id === 'dashboard' ? 'lg:col-span-3' : 'lg:col-span-1',
             )}
           >
             {renderWidget(w.id)}
@@ -640,4 +640,3 @@ export default function Index() {
     </div>
   )
 }
-

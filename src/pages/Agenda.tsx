@@ -105,7 +105,7 @@ export default function Agenda() {
   const [clinicName, setClinicName] = useState('')
   const [usrSettings, setUsrSettings] = useState<any>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<any[]>([])
 
@@ -266,21 +266,25 @@ export default function Agenda() {
 
   const handleSuggestTime = async () => {
     if (!formData.paciente_id) {
-        toast({ title: 'Selecione um paciente primeiro', variant: 'destructive' })
-        return
+      toast({ title: 'Selecione um paciente primeiro', variant: 'destructive' })
+      return
     }
     setIsSuggesting(true)
     try {
-        const { data, error } = await supabase.functions.invoke('sugerir_horario_ia', {
-            body: { paciente_id: formData.paciente_id, usuario_id: user?.id }
-        })
-        if (error) throw error
-        setSuggestions(data.sugestoes || [])
-        toast({ title: 'Sugestões carregadas com sucesso!' })
+      const { data, error } = await supabase.functions.invoke('sugerir_horario_ia', {
+        body: { paciente_id: formData.paciente_id, usuario_id: user?.id },
+      })
+      if (error) throw error
+      setSuggestions(data.sugestoes || [])
+      toast({ title: 'Sugestões carregadas com sucesso!' })
     } catch (err) {
-        toast({ title: 'Erro ao gerar sugestões', description: 'Verifique se a Gemini API Key está configurada nas integrações.', variant: 'destructive' })
+      toast({
+        title: 'Erro ao gerar sugestões',
+        description: 'Verifique se a Gemini API Key está configurada nas integrações.',
+        variant: 'destructive',
+      })
     } finally {
-        setIsSuggesting(false)
+      setIsSuggesting(false)
     }
   }
 
@@ -402,7 +406,7 @@ export default function Agenda() {
           formData.tipo_pagamento === 'convenio' ? formData.codigo_autorizacao : null,
         status_reembolso: formData.tipo_pagamento === 'convenio' ? 'pendente' : 'n/a',
         is_online: formData.is_online,
-        room_id: formData.is_online ? `${formData.plataforma}-${crypto.randomUUID()}` : null
+        room_id: formData.is_online ? `${formData.plataforma}-${crypto.randomUUID()}` : null,
       })
     }
 
@@ -530,10 +534,12 @@ export default function Agenda() {
       toast({ title: 'Paciente sem telefone', variant: 'destructive' })
       return
     }
-    let template = usrSettings?.template_pre_consulta || 'Olá [Nome], sua consulta está confirmada para [data] às [hora].'
-    
+    let template =
+      usrSettings?.template_pre_consulta ||
+      'Olá [Nome], sua consulta está confirmada para [data] às [hora].'
+
     if (apt.is_online && apt.room_id) {
-        template += ` Link da videochamada: ${window.location.origin}/sessao/${pInfo.hash_anamnese}`
+      template += ` Link da videochamada: ${window.location.origin}/sessao/${pInfo.hash_anamnese}`
     }
 
     const msg = parseWhatsAppTemplate(template, {
@@ -832,7 +838,12 @@ export default function Agenda() {
       <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
           <div className="flex items-center justify-between gap-1 bg-slate-50 border rounded-xl p-1 w-full sm:w-auto shrink-0">
-            <Button variant="ghost" size="icon" onClick={prevPeriod} className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={prevPeriod}
+              className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm"
+            >
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <Popover>
@@ -855,7 +866,12 @@ export default function Agenda() {
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="ghost" size="icon" onClick={nextPeriod} className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={nextPeriod}
+              className="h-8 w-8 rounded-lg hover:bg-white hover:shadow-sm"
+            >
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
@@ -866,16 +882,28 @@ export default function Agenda() {
             className="bg-slate-50 border rounded-xl w-full sm:w-auto overflow-x-auto shrink-0"
           >
             <TabsList className="h-10 p-1 bg-transparent min-w-max flex gap-1">
-              <TabsTrigger value="daily" className="flex-1 rounded-lg data-[state=active]:shadow-sm">
+              <TabsTrigger
+                value="daily"
+                className="flex-1 rounded-lg data-[state=active]:shadow-sm"
+              >
                 Dia
               </TabsTrigger>
-              <TabsTrigger value="weekly" className="flex-1 rounded-lg data-[state=active]:shadow-sm">
+              <TabsTrigger
+                value="weekly"
+                className="flex-1 rounded-lg data-[state=active]:shadow-sm"
+              >
                 Semana
               </TabsTrigger>
-              <TabsTrigger value="monthly" className="flex-1 rounded-lg data-[state=active]:shadow-sm">
+              <TabsTrigger
+                value="monthly"
+                className="flex-1 rounded-lg data-[state=active]:shadow-sm"
+              >
                 Mês
               </TabsTrigger>
-              <TabsTrigger value="waitlist" className="flex-1 rounded-lg data-[state=active]:shadow-sm">
+              <TabsTrigger
+                value="waitlist"
+                className="flex-1 rounded-lg data-[state=active]:shadow-sm"
+              >
                 Espera
               </TabsTrigger>
             </TabsList>
@@ -977,7 +1005,11 @@ export default function Agenda() {
                           <h4 className="font-bold text-slate-800">{wl.pacientes?.nome}</h4>
                           <div className="flex gap-1 mt-3 flex-wrap">
                             {wl.dias_semana.map((d: string) => (
-                              <Badge key={d} variant="secondary" className="capitalize text-[10px] px-2 rounded-md">
+                              <Badge
+                                key={d}
+                                variant="secondary"
+                                className="capitalize text-[10px] px-2 rounded-md"
+                              >
                                 {d}
                               </Badge>
                             ))}
@@ -1044,7 +1076,8 @@ export default function Agenda() {
                     }}
                     className={cn(
                       'border border-slate-100 rounded-xl p-2 min-h-[80px] bg-slate-50/50 cursor-pointer hover:bg-slate-100 hover:border-primary/30 transition-all',
-                      isSameDay(d, new Date()) && 'ring-2 ring-primary ring-offset-2 bg-primary/5 border-primary/20',
+                      isSameDay(d, new Date()) &&
+                        'ring-2 ring-primary ring-offset-2 bg-primary/5 border-primary/20',
                     )}
                   >
                     <div
@@ -1121,7 +1154,8 @@ export default function Agenda() {
                   <div key={d.toISOString()} className="space-y-4">
                     {view === 'weekly' && (
                       <h3 className="font-bold text-slate-800 text-lg border-b border-slate-200 pb-2 capitalize flex items-center gap-2">
-                        <CalendarIcon className="w-5 h-5 text-primary" /> {format(d, 'EEEE, dd/MM/yyyy', { locale: ptBR })}
+                        <CalendarIcon className="w-5 h-5 text-primary" />{' '}
+                        {format(d, 'EEEE, dd/MM/yyyy', { locale: ptBR })}
                       </h3>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 auto-rows-fr">
@@ -1183,10 +1217,13 @@ export default function Agenda() {
       </Dialog>
 
       {/* Appointment Modal */}
-      <Dialog open={isNewModalOpen} onOpenChange={(open) => {
-          setIsNewModalOpen(open);
-          if(!open) setSuggestions([]);
-      }}>
+      <Dialog
+        open={isNewModalOpen}
+        onOpenChange={(open) => {
+          setIsNewModalOpen(open)
+          if (!open) setSuggestions([])
+        }}
+      >
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full p-6 rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Novo Agendamento</DialogTitle>
@@ -1224,41 +1261,58 @@ export default function Agenda() {
               </div>
 
               <div className="space-y-3 col-span-1 sm:col-span-2 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                  <div className="flex justify-between items-end mb-2">
-                    <Label className="text-base font-bold text-slate-800">Data e Hora</Label>
-                    <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-8 text-indigo-600 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 rounded-lg" 
-                        onClick={handleSuggestTime} 
-                        disabled={isSuggesting}
-                    >
-                        {isSuggesting ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <BrainCircuit className="w-3.5 h-3.5 mr-2" />}
-                        Sugestão Inteligente IA
-                    </Button>
-                  </div>
-                  <Input
-                    type="datetime-local"
-                    required
-                    value={formData.data_hora}
-                    onChange={(e) => setFormData({ ...formData, data_hora: e.target.value })}
-                    className="bg-white h-12 rounded-xl text-base"
-                  />
-                  {suggestions.length > 0 && (
-                    <div className="mt-4 space-y-2 animate-fade-in-up">
-                      <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider pl-1">Horários Sugeridos pela IA</p>
-                      {suggestions.map((sug, i) => (
-                        <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white border border-indigo-100 shadow-sm cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group" onClick={() => setFormData({...formData, data_hora: sug.data_hora})}>
-                          <div className="bg-indigo-50 text-indigo-700 font-bold text-xs px-3 py-2 rounded-lg border border-indigo-100 shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                            {new Date(sug.data_hora).toLocaleDateString('pt-BR')} <br/> 
-                            <span className="text-lg">{new Date(sug.data_hora).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}</span>
-                          </div>
-                          <p className="text-xs text-slate-600 leading-snug mt-1">{sug.justificativa}</p>
+                <div className="flex justify-between items-end mb-2">
+                  <Label className="text-base font-bold text-slate-800">Data e Hora</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-indigo-600 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 rounded-lg"
+                    onClick={handleSuggestTime}
+                    disabled={isSuggesting}
+                  >
+                    {isSuggesting ? (
+                      <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                    ) : (
+                      <BrainCircuit className="w-3.5 h-3.5 mr-2" />
+                    )}
+                    Sugestão Inteligente IA
+                  </Button>
+                </div>
+                <Input
+                  type="datetime-local"
+                  required
+                  value={formData.data_hora}
+                  onChange={(e) => setFormData({ ...formData, data_hora: e.target.value })}
+                  className="bg-white h-12 rounded-xl text-base"
+                />
+                {suggestions.length > 0 && (
+                  <div className="mt-4 space-y-2 animate-fade-in-up">
+                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider pl-1">
+                      Horários Sugeridos pela IA
+                    </p>
+                    {suggestions.map((sug, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-white border border-indigo-100 shadow-sm cursor-pointer hover:border-indigo-300 hover:shadow-md transition-all group"
+                        onClick={() => setFormData({ ...formData, data_hora: sug.data_hora })}
+                      >
+                        <div className="bg-indigo-50 text-indigo-700 font-bold text-xs px-3 py-2 rounded-lg border border-indigo-100 shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                          {new Date(sug.data_hora).toLocaleDateString('pt-BR')} <br />
+                          <span className="text-lg">
+                            {new Date(sug.data_hora).toLocaleTimeString('pt-BR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <p className="text-xs text-slate-600 leading-snug mt-1">
+                          {sug.justificativa}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4 col-span-1 sm:col-span-2 bg-blue-50/30 p-5 rounded-2xl border border-blue-100">
@@ -1266,16 +1320,23 @@ export default function Agenda() {
                   <Checkbox
                     id="is_online"
                     checked={formData.is_online}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_online: !!checked })}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, is_online: !!checked })
+                    }
                     className="w-5 h-5 rounded-md"
                   />
-                  <Label htmlFor="is_online" className="font-bold text-slate-800 text-base cursor-pointer">
+                  <Label
+                    htmlFor="is_online"
+                    className="font-bold text-slate-800 text-base cursor-pointer"
+                  >
                     Consulta Online (Videoconferência)
                   </Label>
                 </div>
                 {formData.is_online && (
                   <div className="space-y-2 mt-3 pt-3 border-t border-blue-200/50">
-                    <Label className="text-slate-700 font-medium">Plataforma de Videoconferência</Label>
+                    <Label className="text-slate-700 font-medium">
+                      Plataforma de Videoconferência
+                    </Label>
                     <Select
                       value={formData.plataforma}
                       onValueChange={(v) => setFormData({ ...formData, plataforma: v })}
@@ -1289,7 +1350,9 @@ export default function Agenda() {
                         <SelectItem value="portal">Portal Interno</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-[10px] text-slate-500 mt-1">Um link exclusivo será gerado e enviado automaticamente via WhatsApp.</p>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Um link exclusivo será gerado e enviado automaticamente via WhatsApp.
+                    </p>
                   </div>
                 )}
               </div>
@@ -1321,7 +1384,11 @@ export default function Agenda() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-12 px-8 rounded-xl text-base">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full sm:w-auto h-12 px-8 rounded-xl text-base"
+              >
                 {isSubmitting ? 'Salvando...' : 'Confirmar Agendamento'}
               </Button>
             </DialogFooter>
@@ -1417,7 +1484,10 @@ export default function Agenda() {
                       }}
                       className="rounded-md"
                     />
-                    <Label htmlFor={`dia-${dia}`} className="capitalize font-medium text-sm cursor-pointer">
+                    <Label
+                      htmlFor={`dia-${dia}`}
+                      className="capitalize font-medium text-sm cursor-pointer"
+                    >
                       {dia}
                     </Label>
                   </div>
@@ -1447,7 +1517,10 @@ export default function Agenda() {
                       }}
                       className="rounded-md"
                     />
-                    <Label htmlFor={`per-${per}`} className="capitalize font-medium text-sm cursor-pointer">
+                    <Label
+                      htmlFor={`per-${per}`}
+                      className="capitalize font-medium text-sm cursor-pointer"
+                    >
                       {per}
                     </Label>
                   </div>
@@ -1463,7 +1536,11 @@ export default function Agenda() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-11 px-8 rounded-xl">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full sm:w-auto h-11 px-8 rounded-xl"
+              >
                 {isSubmitting ? 'Salvando...' : 'Salvar'}
               </Button>
             </DialogFooter>
@@ -1473,5 +1550,3 @@ export default function Agenda() {
     </div>
   )
 }
-
-
