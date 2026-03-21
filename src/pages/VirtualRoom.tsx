@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
-import { Copy, Check, X, Video, Users, Loader2, Link2, Clock, LogOut } from 'lucide-react'
+import { Copy, Check, X, Video, Users, Loader2, Link2, Clock, LogOut, Camera } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 export default function VirtualRoom() {
   const { user } = useAuth()
@@ -16,6 +17,31 @@ export default function VirtualRoom() {
   const [loading, setLoading] = useState(true)
   const [activeSession, setActiveSession] = useState<any | null>(null)
   const [generatingLinkFor, setGeneratingLinkFor] = useState<string | null>(null)
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null)
+
+  const playAlertSound = useCallback(() => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioContext) return
+      const ctx = new AudioContext()
+      const playBeep = (time: number, freq: number) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, time)
+        gain.gain.setValueAtTime(0.1, time)
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1)
+        osc.start(time)
+        osc.stop(time + 0.1)
+      }
+      playBeep(ctx.currentTime, 880)
+      playBeep(ctx.currentTime + 0.15, 1046.5)
+    } catch (e) {
+      console.error('Audio Context falhou', e)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -72,10 +98,23 @@ export default function VirtualRoom() {
         if (payload.new && (payload.new as any).agendamento_id) {
           const agendamento_id = (payload.new as any).agendamento_id
           const status = (payload.new as any).status
-          setWaitingMap((prev) => ({
-            ...prev,
-            [agendamento_id]: status,
-          }))
+
+          setWaitingMap((prev) => {
+            const oldStatus = prev[agendamento_id]
+            if (status === 'aguardando' && oldStatus !== 'aguardando') {
+              playAlertSound()
+              toast({
+                title: '🚨 Paciente na Sala de Espera!',
+                description: 'Um novo paciente acabou de entrar na sala. Verifique a lista.',
+                className: 'bg-amber-500 text-white border-none shadow-xl',
+                duration: 6000,
+              })
+            }
+            return {
+              ...prev,
+              [agendamento_id]: status,
+            }
+          })
         }
       })
       .subscribe()
@@ -83,7 +122,45 @@ export default function VirtualRoom() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [playAlertSound, toast])
+
+  useEffect(() => {
+    let stream: MediaStream | null = null
+
+    const initMedia = async () => {
+      if (!activeSession) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+          setLocalStream(stream)
+        } catch (err) {
+          console.error('Erro ao acessar mídia:', err)
+          toast({
+            title: 'Aviso de Permissão',
+            description:
+              'Não foi possível acessar a câmera ou microfone. Verifique as permissões do navegador.',
+            variant: 'destructive',
+          })
+        }
+      }
+    }
+
+    initMedia()
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop())
+      }
+    }
+  }, [activeSession, toast])
+
+  const setupLocalVideo = useCallback(
+    (element: HTMLVideoElement | null) => {
+      if (element && localStream) {
+        element.srcObject = localStream
+      }
+    },
+    [localStream],
+  )
 
   const copyAccessLink = () => {
     const link = `${window.location.origin}/portal`
@@ -219,9 +296,21 @@ export default function VirtualRoom() {
                 return (
                   <Card
                     key={apt.id}
-                    className={`shadow-sm transition-all rounded-2xl overflow-hidden ${isSelected ? 'ring-2 ring-primary border-primary bg-primary/5' : isWaiting ? 'border-amber-300 bg-amber-50/30 ring-1 ring-amber-200' : 'border-slate-100 bg-white hover:border-primary/30'}`}
+                    className={cn(
+                      'shadow-sm transition-all rounded-2xl overflow-hidden relative',
+                      isSelected && 'ring-2 ring-primary border-primary bg-primary/5',
+                      isWaiting &&
+                        !isSelected &&
+                        'border-amber-400 bg-gradient-to-r from-amber-50 to-white ring-2 ring-amber-400/50 shadow-lg',
+                      !isSelected &&
+                        !isWaiting &&
+                        'border-slate-100 bg-white hover:border-primary/30',
+                    )}
                   >
-                    <CardContent className="p-5">
+                    {isWaiting && (
+                      <div className="absolute inset-0 ring-4 ring-amber-400/20 rounded-2xl animate-pulse pointer-events-none" />
+                    )}
+                    <CardContent className="p-5 relative z-10">
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <p className="font-bold text-slate-800 text-lg">{patientName}</p>
@@ -243,8 +332,12 @@ export default function VirtualRoom() {
                             </Badge>
                           )}
                           {isWaiting && (
-                            <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200 gap-1 animate-pulse shadow-sm">
-                              <Clock className="w-3 h-3" /> Na sala
+                            <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-transparent gap-1.5 shadow-md">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                              </span>
+                              Aguardando
                             </Badge>
                           )}
                         </div>
@@ -305,7 +398,7 @@ export default function VirtualRoom() {
 
         <div className="lg:col-span-2">
           <Card className="shadow-xl border-slate-200 h-[600px] lg:h-[800px] overflow-hidden flex flex-col rounded-2xl ring-1 ring-slate-900/5">
-            <CardHeader className="bg-slate-900 text-white p-5 flex flex-row items-center justify-between border-b border-slate-800">
+            <CardHeader className="bg-slate-900 text-white p-5 flex flex-row items-center justify-between border-b border-slate-800 z-20">
               <CardTitle className="text-xl font-bold flex items-center gap-3">
                 <div className="p-2 bg-emerald-500/20 rounded-lg ring-1 ring-emerald-500/30">
                   <Video className="w-5 h-5 text-emerald-400" />
@@ -322,18 +415,58 @@ export default function VirtualRoom() {
                 </Button>
               )}
             </CardHeader>
-            <div className="flex-1 bg-slate-950 relative flex items-center justify-center">
+            <div className="flex-1 bg-slate-950 relative flex items-center justify-center overflow-hidden z-10">
               {!activeSession ? (
-                <div className="text-center p-8 animate-fade-in-up">
-                  <div className="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-slate-700 shadow-xl">
-                    <Video className="w-10 h-10 text-slate-500" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">Nenhuma Sessão Ativa</h3>
-                  <p className="text-slate-400 max-w-md mx-auto text-lg">
-                    Acompanhe os pacientes na lista ao lado. O indicador{' '}
-                    <strong className="text-amber-400">Na sala</strong> aparecerá quando o paciente
-                    acessar o link. Clique em <strong>Permitir Entrada</strong> para iniciar.
-                  </p>
+                <div className="w-full h-full relative flex flex-col items-center justify-center animate-fade-in">
+                  {localStream ? (
+                    <>
+                      <video
+                        ref={setupLocalVideo}
+                        autoPlay
+                        muted
+                        playsInline
+                        className="absolute inset-0 w-full h-full object-cover opacity-20 blur-md"
+                      />
+                      <div className="relative z-10 w-full max-w-2xl flex flex-col items-center justify-center p-8 bg-slate-950/40 backdrop-blur-sm rounded-3xl border border-slate-800/50">
+                        <div className="w-72 h-72 sm:w-[480px] sm:h-[360px] bg-slate-800 rounded-2xl overflow-hidden shadow-2xl border-4 border-slate-700/50 mb-8 relative">
+                          <video
+                            autoPlay
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover transform -scale-x-100"
+                            ref={setupLocalVideo}
+                          />
+                          <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                            <div className="bg-emerald-500/90 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg backdrop-blur-md flex items-center gap-2">
+                              <span className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                              </span>
+                              Câmera e Microfone Prontos
+                            </div>
+                          </div>
+                        </div>
+                        <h3 className="text-3xl font-bold text-white mb-4 tracking-tight">
+                          Pré-visualização Ativa
+                        </h3>
+                        <p className="text-slate-300 max-w-md mx-auto text-center text-lg leading-relaxed">
+                          Tudo certo com seu áudio e vídeo. Acompanhe a lista ao lado e aguarde a
+                          chegada do paciente para iniciar a sessão.
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center p-8 animate-fade-in-up z-10">
+                      <div className="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-slate-700 shadow-xl">
+                        <Camera className="w-10 h-10 text-slate-500" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-white mb-3">Preparando Sala...</h3>
+                      <p className="text-slate-400 max-w-md mx-auto text-lg">
+                        Solicitando permissão de câmera e microfone para garantir que tudo esteja
+                        perfeito antes de iniciar.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <iframe
