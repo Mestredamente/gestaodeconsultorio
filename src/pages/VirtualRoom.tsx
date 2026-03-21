@@ -40,6 +40,7 @@ import {
   VideoOff,
   CheckCircle,
   CalendarPlus,
+  Clock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
