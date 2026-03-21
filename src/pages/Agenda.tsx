@@ -1,692 +1,443 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { useNavigate } from 'react-router-dom'
-import {
-  Check,
-  X,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Calendar as CalendarIcon,
-  Video,
-  Lock,
-  Send,
-  RefreshCw,
-  Trash2,
-  Filter,
-  Search,
-  MoreVertical,
-  CalendarSync,
-  FileText,
-  Link as LinkIcon,
-  BrainCircuit,
-  Loader2,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
-import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  format,
-  addDays,
-  subDays,
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  startOfDay,
-  endOfDay,
-} from 'date-fns'
+import { useToast } from '@/hooks/use-toast'
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, User, Plus, FileText, CheckCircle2, XCircle, AlertCircle, Video } from 'lucide-react'
+import { startOfWeek, addDays, format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Calendar } from '@/components/ui/calendar'
+import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { generateWhatsAppLink } from '@/lib/whatsapp'
+import { cn } from '@/lib/utils'
 
 export default function Agenda() {
-  const navigate = useNavigate()
-  const { toast } = useToast()
   const { user } = useAuth()
-
-  const [appointments, setAppointments] = useState<any[]>([])
-  const [blocks, setBlocks] = useState<any[]>([])
-  const [waitlist, setWaitlist] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
+  const { toast } = useToast()
+  
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [view, setView] = useState<'daily' | 'weekly' | 'monthly' | 'waitlist'>('daily')
-  const [convenioFilter, setConvenioFilter] = useState<string>('all')
-  const [searchTerm, setSearchTerm] = useState('')
-
-  const [isNewModalOpen, setIsNewModalOpen] = useState(false)
-  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
-
+  const [viewMode, setViewMode] = useState<'week' | 'month' | 'day'>('week')
+  
+  const [appointments, setAppointments] = useState<any[]>([])
   const [patients, setPatients] = useState<any[]>([])
-  const [convenios, setConvenios] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const [isSuggesting, setIsSuggesting] = useState(false)
-  const [suggestions, setSuggestions] = useState<any[]>([])
-
   const [formData, setFormData] = useState({
-    paciente_id: '',
-    data_hora: '',
-    especialidade: '',
-    valor_total: '0',
-    recorrencia: 'único',
-    tipo_pagamento: 'particular',
-    convenio_id: '',
-    codigo_autorizacao: '',
-    is_online: false,
-    plataforma: 'google_meet',
-  })
-
-  const [rescheduleData, setRescheduleData] = useState({
     id: '',
     paciente_id: '',
-    data_hora: '',
-    patientName: '',
+    data: format(new Date(), 'yyyy-MM-dd'),
+    hora: '09:00',
+    status: 'agendado',
+    is_online: false,
+    tipo_pagamento: 'particular',
+    valor_total: ''
   })
 
-  const fetchAppointments = useCallback(async () => {
+  const fetchAgenda = async () => {
     if (!user) return
     setLoading(true)
-
-    let s, e
-    if (view === 'monthly') {
-      s = startOfMonth(currentDate)
-      e = endOfMonth(currentDate)
-    } else if (view === 'weekly') {
-      s = startOfWeek(currentDate, { weekStartsOn: 0 })
-      e = endOfWeek(currentDate, { weekStartsOn: 0 })
+    
+    let start, end;
+    if (viewMode === 'month') {
+      start = startOfMonth(currentDate)
+      end = endOfMonth(currentDate)
+    } else if (viewMode === 'week') {
+      start = startOfWeek(currentDate, { weekStartsOn: 0 })
+      end = addDays(start, 6)
     } else {
-      s = startOfDay(currentDate)
-      e = endOfDay(currentDate)
+      start = new Date(currentDate)
+      start.setHours(0, 0, 0, 0)
+      end = new Date(currentDate)
+      end.setHours(23, 59, 59, 999)
     }
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('agendamentos')
-      .select(
-        `id, data_hora, status, especialidade, valor_total, tipo_pagamento, status_nota_fiscal, paciente_id, justificativa_falta, is_online, room_id, status_whatsapp_lembrete, convenio_id, pacientes (id, nome, valor_sessao, telefone, hash_anamnese)`,
-      )
+      .select('*, pacientes(nome, valor_sessao)')
       .eq('usuario_id', user.id)
-      .gte('data_hora', s.toISOString())
-      .lt('data_hora', e.toISOString())
-      .order('data_hora', { ascending: true })
+      .gte('data_hora', start.toISOString())
+      .lte('data_hora', end.toISOString())
+      .order('data_hora')
 
-    if (!error && data) setAppointments(data)
-
-    const { data: bData } = await supabase
-      .from('bloqueios_agenda')
-      .select('*')
-      .eq('usuario_id', user.id)
-      .gte('data_fim', s.toISOString())
-      .lt('data_inicio', e.toISOString())
-    if (bData) setBlocks(bData)
-
-    const { data: wlData } = await supabase
-      .from('lista_espera' as any)
-      .select('id, dias_semana, periodos, paciente_id, pacientes(nome)')
-      .eq('usuario_id', user.id)
-    if (wlData) setWaitlist(wlData)
-
+    const { data: pats } = await supabase.from('pacientes').select('id, nome, valor_sessao').eq('usuario_id', user.id)
+    
+    if (data) setAppointments(data)
+    if (pats) setPatients(pats)
     setLoading(false)
-  }, [user, view, currentDate])
-
-  const fetchInitialData = useCallback(async () => {
-    if (!user) return
-    const [pts, cvs] = await Promise.all([
-      supabase
-        .from('pacientes')
-        .select('id, nome, valor_sessao, convenio_id')
-        .eq('usuario_id', user.id)
-        .order('nome'),
-      supabase
-        .from('convenios' as any)
-        .select('*')
-        .eq('usuario_id', user.id),
-    ])
-    if (pts.data) setPatients(pts.data)
-    if (cvs.data) setConvenios(cvs.data)
-  }, [user])
+  }
 
   useEffect(() => {
-    fetchAppointments()
-    fetchInitialData()
-  }, [fetchAppointments, fetchInitialData])
+    fetchAgenda()
+  }, [user, currentDate, viewMode])
 
-  const handleSuggestTime = async () => {
-    if (!formData.paciente_id) {
-      toast({ title: 'Selecione um paciente primeiro', variant: 'destructive' })
-      return
-    }
-    setIsSuggesting(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('sugerir_horario_ia', {
-        body: { paciente_id: formData.paciente_id, usuario_id: user?.id },
-      })
-      if (error) throw error
-      setSuggestions(data.sugestoes || [])
-      toast({ title: 'Sugestões carregadas com sucesso!' })
-    } catch (err) {
-      toast({
-        title: 'Erro ao gerar sugestões',
-        description: 'Verifique se a Gemini API Key está configurada nas integrações.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsSuggesting(false)
-    }
+  const openNewAppointment = (dateStr?: string, timeStr?: string) => {
+    setFormData({
+      id: '',
+      paciente_id: '',
+      data: dateStr || format(currentDate, 'yyyy-MM-dd'),
+      hora: timeStr || '09:00',
+      status: 'agendado',
+      is_online: false,
+      tipo_pagamento: 'particular',
+      valor_total: ''
+    })
+    setIsModalOpen(true)
   }
 
-  const handleCreateAppointment = async (e: React.FormEvent) => {
+  const openEditAppointment = (apt: any) => {
+    const d = new Date(apt.data_hora)
+    setFormData({
+      id: apt.id,
+      paciente_id: apt.paciente_id,
+      data: format(d, 'yyyy-MM-dd'),
+      hora: format(d, 'HH:mm'),
+      status: apt.status,
+      is_online: apt.is_online || false,
+      tipo_pagamento: apt.tipo_pagamento || 'particular',
+      valor_total: apt.valor_total?.toString() || ''
+    })
+    setIsModalOpen(true)
+  }
+
+  const handlePatientSelect = (pid: string) => {
+    const p = patients.find(x => x.id === pid)
+    setFormData({ ...formData, paciente_id: pid, valor_total: p?.valor_sessao?.toString() || '' })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
-
-    const baseDate = new Date(formData.data_hora)
-    if (baseDate < new Date()) {
-      toast({
-        title: 'Atenção',
-        description: 'Não é possível agendar no passado.',
-        variant: 'destructive',
-      })
-      return
-    }
-
     setIsSubmitting(true)
 
-    const appointmentsToInsert = []
-    const count =
-      formData.recorrencia === 'semanal'
-        ? 12
-        : formData.recorrencia === 'quinzenal'
-          ? 6
-          : formData.recorrencia === 'mensal'
-            ? 3
-            : 1
+    const dateTime = new Date(`${formData.data}T${formData.hora}:00`)
 
-    for (let i = 0; i < count; i++) {
-      let nextDate = new Date(baseDate)
-      if (formData.recorrencia === 'semanal') nextDate.setDate(baseDate.getDate() + i * 7)
-      else if (formData.recorrencia === 'quinzenal') nextDate.setDate(baseDate.getDate() + i * 14)
-      else if (formData.recorrencia === 'mensal') nextDate.setMonth(baseDate.getMonth() + i)
-
-      appointmentsToInsert.push({
-        usuario_id: user.id,
-        paciente_id: formData.paciente_id,
-        data_hora: nextDate.toISOString(),
-        especialidade: formData.especialidade || null,
-        valor_total: Number(formData.valor_total),
-        status: 'agendado',
-        tipo_pagamento: formData.tipo_pagamento,
-        convenio_id: formData.tipo_pagamento === 'convenio' ? formData.convenio_id : null,
-        is_online: formData.is_online,
-        room_id: formData.is_online ? `${formData.plataforma}-${crypto.randomUUID()}` : null,
-      })
+    const payload = {
+      usuario_id: user.id,
+      paciente_id: formData.paciente_id,
+      data_hora: dateTime.toISOString(),
+      status: formData.status,
+      is_online: formData.is_online,
+      tipo_pagamento: formData.tipo_pagamento,
+      valor_total: formData.valor_total ? Number(formData.valor_total) : 0
     }
 
-    const { error } = await supabase.from('agendamentos').insert(appointmentsToInsert as any)
-
-    setIsSubmitting(false)
-    if (error) {
-      toast({ title: 'Erro ao agendar', description: error.message, variant: 'destructive' })
-    } else {
-      toast({
-        title:
-          count > 1 ? `${count} sessões agendadas com sucesso!` : 'Agendamento salvo com sucesso!',
-      })
-      setIsNewModalOpen(false)
-      fetchAppointments()
-    }
-  }
-
-  const updateStatus = async (id: string, status: string) => {
-    const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
-    if (error) {
-      toast({ title: 'Erro ao atualizar', variant: 'destructive' })
-    } else {
-      toast({ title: 'Status atualizado para ' + status })
-      fetchAppointments()
-    }
-  }
-
-  const handleStartVirtualSession = async (apt: any) => {
     try {
-      toast({ title: 'Gerando link seguro...', description: 'Aguarde um momento.' })
-
-      const { data, error } = await supabase.functions.invoke('gerar_link_sala_virtual', {
-        body: { agendamento_id: apt.id },
-      })
-
-      if (error) throw error
-
-      if (data?.link) {
-        const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-
-        if (pacienteInfo?.telefone) {
-          const message = `Olá ${pacienteInfo.nome || ''}, sua sessão virtual está pronta! Acesse aqui: ${data.link}. Você entrará em uma sala de espera até o psicólogo aprová-lo.`
-          const wpLink = generateWhatsAppLink(pacienteInfo.telefone, message)
-          window.open(wpLink, '_blank')
-        } else {
-          toast({
-            title: 'Sessão Iniciada',
-            description:
-              'Paciente sem telefone. O link foi gerado e você pode gerenciá-lo na Sala Virtual.',
-          })
-        }
-
-        navigate('/sala-virtual')
+      if (formData.id) {
+        await supabase.from('agendamentos').update(payload).eq('id', formData.id)
+        toast({ title: 'Agendamento atualizado!' })
+      } else {
+        await supabase.from('agendamentos').insert(payload)
+        toast({ title: 'Agendamento criado!' })
       }
+      setIsModalOpen(false)
+      fetchAgenda()
     } catch (err: any) {
-      toast({
-        title: 'Erro ao gerar link',
-        description: err.message || 'Tente novamente.',
-        variant: 'destructive',
-      })
+      toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
-  const renderAppointmentCard = (apt: any) => {
-    const timeStr = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-    const patientName = pacienteInfo?.nome || 'Desconhecido'
-    const statusColors: any = {
-      agendado: 'border-l-slate-200',
-      confirmado: 'border-l-indigo-400',
-      compareceu: 'border-l-emerald-500',
-      faltou: 'border-l-red-500',
-      desmarcou: 'border-l-amber-500',
+  const updateStatus = async (id: string, newStatus: string) => {
+    await supabase.from('agendamentos').update({ status: newStatus }).eq('id', id)
+    fetchAgenda()
+    toast({ title: `Status atualizado para ${newStatus}` })
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'agendado': return 'bg-blue-50 text-blue-700 border-blue-200'
+      case 'confirmado': return 'bg-indigo-50 text-indigo-700 border-indigo-200'
+      case 'compareceu': return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      case 'faltou': return 'bg-red-50 text-red-700 border-red-200'
+      case 'desmarcou': return 'bg-slate-100 text-slate-700 border-slate-200'
+      default: return 'bg-slate-50 text-slate-700'
     }
+  }
+
+  const renderDayView = () => {
+    const hours = Array.from({ length: 14 }, (_, i) => i + 8) // 8h to 21h
+    const dayAppointments = appointments.filter(a => isSameDay(new Date(a.data_hora), currentDate))
 
     return (
-      <Card
-        key={apt.id}
-        className={cn(
-          'bg-white shadow-sm border-l-4 border-t-0 border-r-0 border-b-0 h-full flex flex-col hover:shadow-md rounded-[1.5rem]',
-          statusColors[apt.status] || statusColors.agendado,
-        )}
-      >
-        <CardContent className="p-5 flex flex-col h-full gap-4">
-          <div className="flex items-start gap-4">
-            <div className="bg-slate-50 px-3 py-2 rounded-xl flex flex-col items-center justify-center border border-slate-100 shrink-0">
-              <span className="font-bold text-slate-700 text-sm leading-none">{timeStr}</span>
-            </div>
-            <div className="space-y-1 w-full min-w-0">
-              <h3 className="font-bold text-base text-slate-900 truncate" title={patientName}>
-                {patientName}
-              </h3>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {apt.is_online && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200 gap-1 rounded-md"
-                  >
-                    <Video className="w-3 h-3" /> Online
-                  </Badge>
-                )}
-                {apt.status === 'confirmado' && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 border-transparent rounded-md"
-                  >
-                    Confirmado
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-slate-100">
-            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
-              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100 w-full sm:w-auto justify-center sm:justify-start">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-emerald-600 hover:bg-emerald-100"
-                  title="Confirmar"
-                  onClick={() => updateStatus(apt.id, 'confirmado')}
-                >
-                  <Check className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-red-600 hover:bg-red-100"
-                  title="Faltou"
-                  onClick={() => updateStatus(apt.id, 'faltou')}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-amber-600 hover:bg-amber-100"
-                  title="Desmarcou"
-                  onClick={() => updateStatus(apt.id, 'desmarcou')}
-                >
-                  <span className="font-bold text-sm">D</span>
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-9 w-9 text-slate-600 hover:bg-slate-50 border-slate-200 rounded-lg"
-                  onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
-                  title="Prontuário"
-                >
-                  <FileText className="w-4 h-4" />
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-9 w-9 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40 rounded-xl">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setRescheduleData({
-                          id: apt.id,
-                          paciente_id: apt.paciente_id,
-                          data_hora: apt.data_hora.slice(0, 16),
-                          patientName,
-                        })
-                        setIsRescheduleModalOpen(true)
-                      }}
-                      className="rounded-lg"
-                    >
-                      <CalendarSync className="w-4 h-4 mr-2" /> Remarcar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-
-            {apt.is_online && (
-              <Button
-                size="sm"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 h-11 sm:h-9 shadow-sm"
-                onClick={() => handleStartVirtualSession(apt)}
-              >
-                <Video className="w-4 h-4" /> Iniciar Sessão Virtual
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
+          <h3 className="font-bold text-lg text-slate-800 capitalize">{format(currentDate, "EEEE, d 'de' MMMM", { locale: ptBR })}</h3>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {hours.map(hour => {
+             const timeStr = `${hour.toString().padStart(2, '0')}:00`
+             const aptsInHour = dayAppointments.filter(a => new Date(a.data_hora).getHours() === hour)
+             
+             return (
+               <div key={hour} className="flex gap-4 group">
+                 <div className="w-16 text-right text-slate-400 font-medium text-sm pt-2 shrink-0">{timeStr}</div>
+                 <div className="flex-1 min-h-[4rem] border-l-2 border-slate-100 pl-4 py-1 relative">
+                   {aptsInHour.length === 0 ? (
+                     <div 
+                       className="h-full w-full rounded-xl border-2 border-dashed border-transparent group-hover:border-slate-200 flex items-center justify-center cursor-pointer transition-colors opacity-0 group-hover:opacity-100"
+                       onClick={() => openNewAppointment(format(currentDate, 'yyyy-MM-dd'), timeStr)}
+                     >
+                       <span className="text-slate-400 text-sm font-medium flex items-center gap-1"><Plus className="w-4 h-4"/> Agendar</span>
+                     </div>
+                   ) : (
+                     <div className="flex flex-col gap-2">
+                       {aptsInHour.map(apt => {
+                         const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+                         return (
+                           <div key={apt.id} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow group/card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                             <div className="flex items-center gap-3 cursor-pointer flex-1" onClick={() => openEditAppointment(apt)}>
+                                <div className={cn("w-2 h-10 rounded-full shrink-0", getStatusColor(apt.status).split(' ')[0])}></div>
+                                <div>
+                                  <p className="font-bold text-slate-800">{p?.nome}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs text-slate-500 font-medium">{format(new Date(apt.data_hora), 'HH:mm')}</span>
+                                    <Badge variant="outline" className={cn("text-[10px] py-0 h-4 border", getStatusColor(apt.status))}>{apt.status}</Badge>
+                                    {apt.is_online && <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 py-0 h-4 gap-1"><Video className="w-3 h-3"/> Online</Badge>}
+                                  </div>
+                                </div>
+                             </div>
+                             <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700" onClick={() => updateStatus(apt.id, 'compareceu')} title="Compareceu"><CheckCircle2 className="w-4 h-4"/></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => updateStatus(apt.id, 'faltou')} title="Faltou"><XCircle className="w-4 h-4"/></Button>
+                             </div>
+                           </div>
+                         )
+                       })}
+                     </div>
+                   )}
+                 </div>
+               </div>
+             )
+          })}
+        </div>
+      </div>
     )
   }
 
-  const filteredAppointments = appointments.filter((a) => {
-    const matchConvenio =
-      convenioFilter === 'all' ||
-      (convenioFilter === 'particular' && a.tipo_pagamento !== 'convenio') ||
-      a.convenio_id === convenioFilter
-    const pInfo = Array.isArray(a.pacientes) ? a.pacientes[0] : a.pacientes
-    const s = searchTerm.toLowerCase()
-    const matchSearch =
-      !s || pInfo?.nome?.toLowerCase().includes(s) || pInfo?.telefone?.toLowerCase().includes(s)
-    return matchConvenio && matchSearch
-  })
+  const renderWeekView = () => {
+    const start = startOfWeek(currentDate, { weekStartsOn: 0 })
+    const days = Array.from({ length: 7 }, (_, i) => addDays(start, i))
+
+    return (
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-7 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+          {days.map((day, idx) => {
+            const dayApts = appointments.filter(a => isSameDay(new Date(a.data_hora), day))
+            const isTdy = isToday(day)
+            return (
+              <div key={idx} className={cn("min-h-[200px] sm:min-h-[600px] p-3 flex flex-col transition-colors", isTdy ? "bg-primary/5" : "hover:bg-slate-50/50")}>
+                <div className="text-center mb-4 pb-3 border-b border-slate-100">
+                  <p className={cn("text-xs font-bold uppercase tracking-wider mb-1", isTdy ? "text-primary" : "text-slate-500")}>
+                    {format(day, 'EEE', { locale: ptBR })}
+                  </p>
+                  <div className={cn("w-8 h-8 mx-auto rounded-full flex items-center justify-center text-sm font-bold", isTdy ? "bg-primary text-white shadow-md" : "text-slate-700")}>
+                    {format(day, 'd')}
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col gap-2">
+                  {dayApts.length === 0 ? (
+                    <div 
+                      className="flex-1 border-2 border-dashed border-transparent hover:border-slate-200 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                      onClick={() => openNewAppointment(format(day, 'yyyy-MM-dd'))}
+                    >
+                      <Plus className="w-4 h-4 text-slate-300" />
+                    </div>
+                  ) : (
+                    dayApts.map(apt => {
+                      const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+                      return (
+                        <div key={apt.id} onClick={() => openEditAppointment(apt)} className={cn("p-2.5 rounded-xl border text-left cursor-pointer hover:shadow-md transition-all", getStatusColor(apt.status))}>
+                          <p className="text-xs font-bold mb-1 opacity-70">{format(new Date(apt.data_hora), 'HH:mm')}</p>
+                          <p className="font-bold text-sm leading-tight line-clamp-2">{p?.nome}</p>
+                          {apt.is_online && <Video className="w-3 h-3 mt-1.5 opacity-60" />}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  const renderMonthView = () => {
+    const start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 0 })
+    const end = endOfMonth(currentDate)
+    const days = eachDayOfInterval({ start, end: addDays(end, 6 - end.getDay()) })
+
+    return (
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="grid grid-cols-7 bg-slate-50/80 border-b border-slate-100">
+          {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
+            <div key={d} className="py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 border-l border-slate-100">
+          {days.map((day, idx) => {
+            const dayApts = appointments.filter(a => isSameDay(new Date(a.data_hora), day))
+            const isCurrMonth = isSameMonth(day, currentDate)
+            const isTdy = isToday(day)
+
+            return (
+              <div key={idx} className={cn("min-h-[100px] sm:min-h-[120px] p-1.5 sm:p-2 flex flex-col cursor-pointer transition-colors", !isCurrMonth && "bg-slate-50/50 opacity-50", isTdy && "bg-primary/5")} onClick={() => { setViewMode('day'); setCurrentDate(day); }}>
+                <div className="flex justify-end mb-1">
+                  <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", isTdy ? "bg-primary text-white" : "text-slate-600")}>
+                    {format(day, 'd')}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1 overflow-y-auto max-h-[80px] no-scrollbar">
+                  {dayApts.slice(0, 3).map(apt => {
+                    const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+                    return (
+                      <div key={apt.id} className={cn("px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-medium truncate border", getStatusColor(apt.status))} title={p?.nome}>
+                        {format(new Date(apt.data_hora), 'HH:mm')} {p?.nome?.split(' ')[0]}
+                      </div>
+                    )
+                  })}
+                  {dayApts.length > 3 && (
+                    <div className="text-[10px] text-center text-slate-400 font-medium pt-0.5">+{dayApts.length - 3} mais</div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10">
-      <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
-          <div className="flex items-center justify-between gap-1 bg-slate-50 border border-slate-200 rounded-2xl p-1 shrink-0 w-full sm:w-auto">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setCurrentDate(subDays(currentDate, 1))}
-              className="h-10 w-10 sm:h-9 sm:w-9 rounded-xl"
-            >
-              <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4" />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Agenda</h1>
+          <p className="text-slate-500 mt-1 text-base">Gerencie seus horários e consultas.</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center w-full sm:w-auto">
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(viewMode === 'month' ? addDays(currentDate, -30) : addDays(currentDate, viewMode === 'week' ? -7 : -1))} className="h-10 w-10 rounded-xl">
+              <ChevronLeft className="w-5 h-5" />
             </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-10 sm:h-9 flex-1 sm:min-w-[140px] font-medium px-2 hover:bg-white rounded-xl text-base sm:text-sm"
-                >
-                  {format(currentDate, 'dd/MM/yyyy')}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 rounded-3xl border-slate-100 shadow-xl">
-                <Calendar
-                  mode="single"
-                  selected={currentDate}
-                  onSelect={(d) => d && setCurrentDate(d)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setCurrentDate(addDays(currentDate, 1))}
-              className="h-10 w-10 sm:h-9 sm:w-9 rounded-xl"
-            >
-              <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4" />
+            <div className="px-4 font-bold text-slate-800 min-w-[140px] text-center capitalize">
+              {viewMode === 'month' ? format(currentDate, 'MMMM yyyy', { locale: ptBR }) : 
+               viewMode === 'week' ? `Semana de ${format(startOfWeek(currentDate), 'dd/MM')}` :
+               format(currentDate, "dd 'de' MMM", { locale: ptBR })}
+            </div>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(viewMode === 'month' ? addDays(currentDate, 30) : addDays(currentDate, viewMode === 'week' ? 7 : 1))} className="h-10 w-10 rounded-xl">
+              <ChevronRight className="w-5 h-5" />
             </Button>
           </div>
-          <Tabs
-            value={view}
-            onValueChange={(v) => setView(v as any)}
-            className="bg-slate-50 border border-slate-200 rounded-2xl p-1 shrink-0 w-full sm:w-auto"
-          >
-            <TabsList className="h-11 sm:h-10 bg-transparent gap-1 w-full flex">
-              <TabsTrigger
-                value="daily"
-                className="flex-1 rounded-xl data-[state=active]:shadow-sm"
-              >
-                Dia
-              </TabsTrigger>
-              <TabsTrigger
-                value="weekly"
-                className="flex-1 rounded-xl data-[state=active]:shadow-sm"
-              >
-                Semana
-              </TabsTrigger>
+          
+          <div className="h-8 w-px bg-slate-200 hidden sm:block mx-1"></div>
+          
+          <Tabs value={viewMode} onValueChange={(v: any) => setViewMode(v)} className="w-full sm:w-auto">
+            <TabsList className="h-10 bg-slate-100 p-1 rounded-xl grid grid-cols-3 w-full">
+              <TabsTrigger value="day" className="rounded-lg text-xs font-bold">Dia</TabsTrigger>
+              <TabsTrigger value="week" className="rounded-lg text-xs font-bold">Semana</TabsTrigger>
+              <TabsTrigger value="month" className="rounded-lg text-xs font-bold">Mês</TabsTrigger>
             </TabsList>
           </Tabs>
-        </div>
-        <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full lg:w-auto justify-end shrink-0">
-          <Button
-            onClick={() => setIsNewModalOpen(true)}
-            className="gap-2 rounded-2xl h-12 sm:h-11 px-8 shadow-sm w-full sm:w-auto text-base sm:text-sm"
-          >
-            <Plus className="w-5 h-5 sm:w-4 sm:h-4" /> Novo Agendamento
+
+          <Button onClick={() => openNewAppointment()} className="h-10 rounded-xl gap-2 w-full sm:w-auto ml-0 sm:ml-2">
+            <Plus className="w-4 h-4" /> Novo
           </Button>
         </div>
-      </header>
+      </div>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="h-[400px] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filteredAppointments.map((apt) => renderAppointmentCard(apt))}
-            {filteredAppointments.length === 0 && (
-              <div className="col-span-full text-center p-12 bg-white rounded-[2rem] shadow-sm border border-slate-100 text-slate-500 font-medium">
-                Nenhum agendamento para este dia.
-              </div>
-            )}
-          </div>
-        </div>
+        <>
+          {viewMode === 'day' && renderDayView()}
+          {viewMode === 'week' && renderWeekView()}
+          {viewMode === 'month' && renderMonthView()}
+        </>
       )}
 
-      {/* Appointment Modal */}
-      <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col w-[95vw] p-0 rounded-[2rem] overflow-hidden">
-          <DialogHeader className="p-6 pb-4 shrink-0 border-b border-slate-100">
-            <DialogTitle className="text-2xl font-bold">Novo Agendamento</DialogTitle>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-[2rem] p-0 flex flex-col max-h-[90vh]">
+          <DialogHeader className="p-6 pb-4 border-b border-slate-100 shrink-0">
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <CalendarIcon className="w-6 h-6 text-primary" />
+              {formData.id ? 'Editar Agendamento' : 'Novo Agendamento'}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCreateAppointment} className="flex-1 overflow-y-auto p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
             <div className="space-y-2">
-              <Label>Paciente</Label>
-              <Select
-                value={formData.paciente_id}
-                onValueChange={(v) => setFormData({ ...formData, paciente_id: v })}
-                required
-              >
-                <SelectTrigger className="bg-slate-50 h-12 rounded-xl border-slate-200">
-                  <SelectValue placeholder="Selecione o paciente" />
+              <Label className="text-slate-700 font-bold">Paciente</Label>
+              <Select value={formData.paciente_id} onValueChange={handlePatientSelect} required>
+                <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
+                  <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  {patients.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="rounded-xl max-h-64">
+                  {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-              <div className="flex justify-between items-end mb-2">
-                <Label className="text-base font-bold text-slate-800">Data e Hora</Label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 text-indigo-600 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 rounded-lg"
-                  onClick={handleSuggestTime}
-                  disabled={isSuggesting}
-                >
-                  {isSuggesting ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <BrainCircuit className="w-4 h-4 mr-2" />
-                  )}
-                  IA Sugestão
-                </Button>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-bold">Data</Label>
+                <Input type="date" value={formData.data} onChange={e => setFormData({...formData, data: e.target.value})} required className="bg-slate-50 h-12 rounded-xl" />
               </div>
-              <Input
-                type="datetime-local"
-                required
-                value={formData.data_hora}
-                onChange={(e) => setFormData({ ...formData, data_hora: e.target.value })}
-                className="bg-white h-12 rounded-xl text-base"
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-bold">Hora</Label>
+                <Input type="time" value={formData.hora} onChange={e => setFormData({...formData, hora: e.target.value})} required className="bg-slate-50 h-12 rounded-xl" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+               <div className="space-y-2">
+                <Label className="text-slate-700 font-bold">Status</Label>
+                <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
+                  <SelectTrigger className="bg-slate-50 h-12 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="agendado">Agendado</SelectItem>
+                    <SelectItem value="confirmado">Confirmado</SelectItem>
+                    <SelectItem value="compareceu">Compareceu</SelectItem>
+                    <SelectItem value="faltou">Faltou</SelectItem>
+                    <SelectItem value="desmarcou">Desmarcou</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-bold">Valor (R$)</Label>
+                <Input type="number" step="0.01" value={formData.valor_total} onChange={e => setFormData({...formData, valor_total: e.target.value})} className="bg-slate-50 h-12 rounded-xl" placeholder="0.00" />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+              <Checkbox 
+                id="online" 
+                checked={formData.is_online} 
+                onCheckedChange={(c) => setFormData({...formData, is_online: !!c})}
+                className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
               />
-
-              {suggestions.length > 0 && (
-                <div className="mt-4 space-y-2 animate-fade-in-up">
-                  <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider pl-1">
-                    Sugestões (Gemini AI)
-                  </p>
-                  {suggestions.map((sug, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 p-3 rounded-xl bg-white border border-indigo-100 shadow-sm cursor-pointer hover:border-indigo-300"
-                      onClick={() => setFormData({ ...formData, data_hora: sug.data_hora })}
-                    >
-                      <div className="bg-indigo-50 text-indigo-700 font-bold text-xs px-3 py-2 rounded-lg shrink-0">
-                        {new Date(sug.data_hora).toLocaleDateString('pt-BR')} <br />
-                        <span className="text-lg">
-                          {new Date(sug.data_hora).toLocaleTimeString('pt-BR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-snug mt-1">
-                        {sug.justificativa}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Label htmlFor="online" className="cursor-pointer font-bold text-blue-900 flex items-center gap-2">
+                <Video className="w-4 h-4" /> Sessão Online (Telemedicina)
+              </Label>
             </div>
 
-            <div className="space-y-4 bg-blue-50/30 p-5 rounded-2xl border border-blue-100">
-              <div className="flex items-center space-x-3">
-                <Checkbox
-                  id="is_online"
-                  checked={formData.is_online}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_online: !!checked })}
-                  className="w-5 h-5 rounded-md"
-                />
-                <Label
-                  htmlFor="is_online"
-                  className="font-bold text-slate-800 text-base cursor-pointer"
-                >
-                  Consulta Online (Gerar Link de Vídeo)
-                </Label>
-              </div>
-              {formData.is_online && (
-                <div className="space-y-2 pt-2">
-                  <Label>Plataforma</Label>
-                  <Select
-                    value={formData.plataforma}
-                    onValueChange={(v) => setFormData({ ...formData, plataforma: v })}
-                  >
-                    <SelectTrigger className="bg-white h-12 rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="google_meet">Google Meet</SelectItem>
-                      <SelectItem value="zoom">Zoom</SelectItem>
-                      <SelectItem value="portal">Portal Interno (Recomendado)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-
-            {/* Invisibile div for spacing above footer */}
-            <div className="pb-2"></div>
-
-            <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-slate-100 flex gap-3 sm:static sm:bg-transparent sm:border-0 sm:p-0">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsNewModalOpen(false)}
-                className="w-full sm:w-auto h-12 rounded-xl"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full sm:w-auto h-12 px-8 rounded-xl text-base"
-              >
-                {isSubmitting ? 'Salvando...' : 'Confirmar'}
+            <div className="pt-4 flex gap-3">
+              <Button type="button" variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+              <Button type="submit" className="flex-1 h-12 rounded-xl" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar'}
               </Button>
             </div>
           </form>

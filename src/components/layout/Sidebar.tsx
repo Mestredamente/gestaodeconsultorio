@@ -1,115 +1,184 @@
-import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import {
+  CalendarDays,
+  Users,
+  Wallet,
+  Settings as SettingsIcon,
+  BarChart3,
+  Video,
+  Database,
+  Megaphone,
+  BriefcaseMedical,
+  Users2,
+  Stethoscope,
+  LogOut,
+  ChevronRight,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
-import { supabase } from '@/lib/supabase/client'
-import { navItems } from '@/lib/nav'
+import { ScrollArea } from '@/components/ui/scroll-area'
+
+const NAV_ITEMS = [
+  { path: '/', label: 'Dashboard', icon: BarChart3 },
+  { path: '/agenda', label: 'Agenda', icon: CalendarDays },
+  { path: '/sala-virtual', label: 'Sala Virtual', icon: Video, badge: 'Novo' },
+  { path: '/pacientes', label: 'Pacientes', icon: Users },
+  { path: '/carteira', label: 'Carteira', icon: Wallet },
+]
+
+const TOOLS_ITEMS = [
+  { path: '/relatorios', label: 'Relatórios', icon: BarChart3 },
+  { path: '/marketing', label: 'Marketing', icon: Megaphone },
+  { path: '/rh', label: 'Recursos Humanos', icon: Users2 },
+  { path: '/estoque', label: 'Estoque', icon: Database },
+  { path: '/supervisao', label: 'Supervisão', icon: BriefcaseMedical },
+]
+
+const SYSTEM_ITEMS = [
+  { path: '/configuracoes', label: 'Ajustes', icon: SettingsIcon },
+  { path: '/logs', label: 'Auditoria', icon: Database },
+]
 
 export default function Sidebar() {
   const location = useLocation()
-  const { user, signOut } = useAuth()
-  const [clinic, setClinic] = useState({ name: '', logo: '' })
-
-  useEffect(() => {
-    if (!user) return
-
-    const fetchClinic = async () => {
-      const { data } = await supabase
-        .from('usuarios')
-        .select('nome_consultorio, logo_url')
-        .eq('id', user.id)
-        .single()
-      if (data) {
-        setClinic({ name: data.nome_consultorio || '', logo: data.logo_url || '' })
-      }
-    }
-    fetchClinic()
-
-    const channel = supabase
-      .channel('sidebar_clinic_layout')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'usuarios', filter: `id=eq.${user.id}` },
-        (payload) => {
-          setClinic({ name: payload.new.nome_consultorio || '', logo: payload.new.logo_url || '' })
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [user])
+  const { signOut } = useAuth()
 
   return (
-    <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen shrink-0 sticky top-0 hidden lg:flex">
-      <div className="h-16 flex items-center px-6 bg-slate-950 font-bold text-white text-lg gap-3 tracking-tight border-b border-slate-800">
-        {clinic.logo ? (
-          <img
-            src={clinic.logo}
-            alt="Logo da Clínica"
-            className="w-8 h-8 rounded object-contain bg-white shadow-sm"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
-            {clinic.name ? clinic.name.substring(0, 2).toUpperCase() : 'C'}
+    <aside className="w-[80px] lg:w-[280px] bg-white border-r border-slate-200 flex flex-col transition-all duration-300 h-screen sticky top-0 shrink-0 z-50">
+      <div className="h-16 px-4 flex items-center border-b border-slate-100 justify-center lg:justify-start shrink-0">
+        <Link to="/" className="flex items-center gap-3 w-full hover:opacity-90 transition-opacity">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0">
+            <Stethoscope className="w-6 h-6" />
           </div>
-        )}
-        <span className="truncate flex-1">
-          {clinic.name || (
-            <>
-              Gestão<span className="text-primary">Consultório</span>
-            </>
-          )}
-        </span>
+          <span className="font-extrabold text-xl tracking-tight text-slate-800 hidden lg:block truncate">
+            PsicoGestor
+          </span>
+        </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive =
-            location.pathname === item.path ||
-            (item.path !== '/' && location.pathname.startsWith(item.path))
-          return (
-            <Link
-              key={item.name}
-              to={item.path}
-              className={cn(
-                'flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-sm font-medium',
-                isActive
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'hover:bg-slate-800 hover:text-white',
-              )}
-            >
-              <item.icon
-                className={cn(
-                  'w-5 h-5 transition-colors',
-                  isActive ? 'text-primary-foreground' : 'text-slate-400 group-hover:text-primary',
-                )}
-              />
-              {item.name}
-            </Link>
-          )
-        })}
-      </nav>
-
-      <div className="p-4 border-t border-slate-800">
-        <div className="bg-slate-800 rounded-lg p-4 flex items-center gap-3 cursor-pointer hover:bg-slate-700 transition-colors">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
-            {clinic.name ? clinic.name.substring(0, 2).toUpperCase() : 'GC'}
+      <ScrollArea className="flex-1 py-6">
+        <div className="px-3 lg:px-4 space-y-6">
+          <div>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2 lg:px-3 hidden lg:block">
+              Gestão Clínica
+            </h3>
+            <nav className="space-y-1">
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon
+                const isActive =
+                  location.pathname === item.path ||
+                  (item.path !== '/' && location.pathname.startsWith(item.path))
+                return (
+                  <Link key={item.path} to={item.path}>
+                    <Button
+                      variant={isActive ? 'secondary' : 'ghost'}
+                      className={cn(
+                        'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group relative',
+                        isActive
+                          ? 'bg-primary/10 text-primary font-bold shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
+                      )}
+                      title={item.label}
+                    >
+                      <Icon className={cn('w-5 h-5 lg:mr-3 shrink-0', isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600')} />
+                      <span className="hidden lg:block truncate">{item.label}</span>
+                      {item.badge && (
+                        <span className="hidden lg:flex absolute right-3 items-center justify-center px-1.5 h-5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-md">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Button>
+                  </Link>
+                )
+              })}
+            </nav>
           </div>
-          <div className="overflow-hidden flex-1">
-            <p className="text-sm font-medium text-white truncate">
-              {clinic.name || 'Minha Clínica'}
-            </p>
-            <p
-              className="text-xs text-slate-400 truncate hover:text-slate-300 transition-colors"
-              onClick={signOut}
-            >
-              Sair da Conta
-            </p>
+
+          <div>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2 lg:px-3 hidden lg:block">
+              Ferramentas Extras
+            </h3>
+            <nav className="space-y-1">
+              {TOOLS_ITEMS.map((item) => {
+                const Icon = item.icon
+                const isActive = location.pathname.startsWith(item.path)
+                return (
+                  <Link key={item.path} to={item.path}>
+                    <Button
+                      variant={isActive ? 'secondary' : 'ghost'}
+                      className={cn(
+                        'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group',
+                        isActive
+                          ? 'bg-slate-100 text-slate-900 font-bold shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
+                      )}
+                      title={item.label}
+                    >
+                      <Icon className={cn('w-5 h-5 lg:mr-3 shrink-0', isActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-600')} />
+                      <span className="hidden lg:block truncate">{item.label}</span>
+                    </Button>
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2 lg:px-3 hidden lg:block">
+              Sistema
+            </h3>
+            <nav className="space-y-1">
+              {SYSTEM_ITEMS.map((item) => {
+                const Icon = item.icon
+                const isActive = location.pathname.startsWith(item.path)
+                return (
+                  <Link key={item.path} to={item.path}>
+                    <Button
+                      variant={isActive ? 'secondary' : 'ghost'}
+                      className={cn(
+                        'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group',
+                        isActive
+                          ? 'bg-slate-100 text-slate-900 font-bold shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
+                      )}
+                      title={item.label}
+                    >
+                      <Icon className={cn('w-5 h-5 lg:mr-3 shrink-0', isActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-600')} />
+                      <span className="hidden lg:block truncate">{item.label}</span>
+                    </Button>
+                  </Link>
+                )
+              })}
+            </nav>
           </div>
         </div>
+      </ScrollArea>
+
+      <div className="p-3 lg:p-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
+        <Link to="/planos">
+          <Button
+            variant="ghost"
+            className="w-full justify-center lg:justify-between h-12 lg:h-11 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold mb-2 group"
+            title="Meu Plano"
+          >
+            <span className="hidden lg:flex items-center gap-2 truncate">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span> Plano Pro
+            </span>
+            <span className="lg:hidden text-indigo-500"><ChevronRight className="w-5 h-5" /></span>
+            <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 hidden lg:block shrink-0" />
+          </Button>
+        </Link>
+        <Button
+          variant="ghost"
+          className="w-full justify-center lg:justify-start text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl h-12 lg:h-11 font-semibold group"
+          onClick={() => signOut()}
+          title="Sair"
+        >
+          <LogOut className="w-5 h-5 lg:mr-2 shrink-0 group-hover:scale-110 transition-transform" />
+          <span className="hidden lg:block">Sair</span>
+        </Button>
       </div>
-    </div>
+    </aside>
   )
 }

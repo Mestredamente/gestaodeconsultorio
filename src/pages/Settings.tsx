@@ -5,576 +5,229 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useToast } from '@/hooks/use-toast'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { BillingSettings } from '@/components/settings/BillingSettings'
-import {
-  Shield,
-  Landmark,
-  User,
-  Key,
-  CheckCircle2,
-  RefreshCw,
-  ExternalLink,
-  Palette,
-  Image as ImageIcon,
-  CreditCard,
-} from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
-import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
-
-const SECRETS_LIST = [
-  {
-    key: 'STRIPE_SECRET_KEY',
-    desc: 'Pagamentos via Cartão de Crédito',
-    doc: 'https://stripe.com/docs/keys',
-  },
-  {
-    key: 'MERCADO_PAGO_TOKEN',
-    desc: 'Pagamentos via PIX e Cartão',
-    doc: 'https://www.mercadopago.com.br/developers/pt/guides',
-  },
-  {
-    key: 'PAGSEGURO_TOKEN',
-    desc: 'Pagamentos via Boleto',
-    doc: 'https://dev.pagseguro.uol.com.br/',
-  },
-  {
-    key: 'WHATSAPP_API_KEY',
-    desc: 'Envio automático de lembretes',
-    doc: 'https://developers.facebook.com/docs/whatsapp',
-  },
-  {
-    key: 'GEMINI_API_KEY',
-    desc: 'Inteligência Artificial para Agenda',
-    doc: 'https://ai.google.dev/',
-  },
-  {
-    key: 'ZOOM_CLIENT_ID',
-    desc: 'Geração de links de videoconferência',
-    doc: 'https://developers.zoom.us/',
-  },
-]
-
-const THEMES = [
-  { id: 'theme-indigo', name: 'Roxo (Padrão)', color: 'bg-[#8b5cf6]' },
-  { id: 'theme-blue', name: 'Azul', color: 'bg-[#3b82f6]' },
-  { id: 'theme-emerald', name: 'Esmeralda', color: 'bg-[#10b981]' },
-  { id: 'theme-rose', name: 'Rosé', color: 'bg-[#f43f5e]' },
-  { id: 'theme-slate', name: 'Grafite', color: 'bg-[#64748b]' },
-  { id: 'theme-pink', name: 'Rosa', color: 'bg-[#ec4899]' },
-  { id: 'theme-diamond', name: 'Diamante', color: 'bg-[#06b6d4]' },
-  { id: 'theme-ruby', name: 'Rubi', color: 'bg-[#e11d48]' },
-]
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { useToast } from '@/hooks/use-toast'
+import { Save, Loader2, Building2, MessageCircle, Calendar, Link as LinkIcon, Shield } from 'lucide-react'
 
 export default function Settings() {
-  const { user, updatePassword } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [passData, setPassData] = useState({ newPass: '', confirm: '' })
-
-  const [formData, setFormData] = useState({
+  
+  const [settings, setSettings] = useState({
     nome_consultorio: '',
-    email: '',
-    telefone_consultorio: '',
     endereco_consultorio: '',
+    telefone_consultorio: '',
     chave_pix: '',
-    logo_url: '',
-    preferencias_dashboard: {} as any,
-    plano: 'gratuito',
-    data_proxima_cobranca: null as string | null,
-    cartao_final: '',
-    cartao_bandeira: '',
-  })
-
-  const [configuredSecrets, setConfiguredSecrets] = useState<Record<string, boolean>>({})
-
-  const [bankInfo, setBankInfo] = useState({
-    banco: '',
-    agencia: '',
-    conta: '',
-    tipo: 'corrente',
+    lembrete_whatsapp_ativo: false,
+    template_lembrete: '',
+    whatsapp_confirmacao_ativa: false,
+    template_confirmacao: '',
+    pre_consulta_ativa: false,
+    template_pre_consulta: '',
+    agendamento_publico_ativo: false,
+    politica_cancelamento: '',
+    texto_contrato: '',
+    whatsapp_tipo: 'personal'
   })
 
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchSettings = async () => {
       if (!user) return
-      const { data, error } = await supabase.from('usuarios').select('*').eq('id', user.id).single()
+      const { data } = await supabase.from('usuarios').select('*').eq('id', user.id).single()
       if (data) {
-        setFormData({
+        setSettings({
           nome_consultorio: data.nome_consultorio || '',
-          email: data.email || '',
-          telefone_consultorio: data.telefone_consultorio || '',
           endereco_consultorio: data.endereco_consultorio || '',
+          telefone_consultorio: data.telefone_consultorio || '',
           chave_pix: data.chave_pix || '',
-          logo_url: data.logo_url || '',
-          preferencias_dashboard: data.preferencias_dashboard || {},
-          plano: data.plano || 'gratuito',
-          data_proxima_cobranca: data.data_proxima_cobranca || null,
-          cartao_final: (data as any).cartao_final || '',
-          cartao_bandeira: (data as any).cartao_bandeira || '',
+          lembrete_whatsapp_ativo: data.lembrete_whatsapp_ativo || false,
+          template_lembrete: data.template_lembrete || '',
+          whatsapp_confirmacao_ativa: data.whatsapp_confirmacao_ativa || false,
+          template_confirmacao: data.template_confirmacao || '',
+          pre_consulta_ativa: data.pre_consulta_ativa || false,
+          template_pre_consulta: data.template_pre_consulta || '',
+          agendamento_publico_ativo: data.agendamento_publico_ativo || false,
+          politica_cancelamento: data.politica_cancelamento || '',
+          texto_contrato: data.texto_contrato || '',
+          whatsapp_tipo: data.whatsapp_tipo || 'personal'
         })
-        if (data.preferencias_dashboard?.bankInfo) {
-          setBankInfo(data.preferencias_dashboard.bankInfo)
-        }
-        if (data.preferencias_dashboard?.configuredSecrets) {
-          setConfiguredSecrets(data.preferencias_dashboard.configuredSecrets)
-        }
       }
       setLoading(false)
     }
-    fetchUser()
+    fetchSettings()
   }, [user])
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSave = async () => {
     if (!user) return
     setSaving(true)
-
-    const prefs = {
-      ...formData.preferencias_dashboard,
-      bankInfo,
-      configuredSecrets,
-    }
-
-    const { error } = await supabase
-      .from('usuarios')
-      .update({
-        nome_consultorio: formData.nome_consultorio,
-        telefone_consultorio: formData.telefone_consultorio,
-        endereco_consultorio: formData.endereco_consultorio,
-        chave_pix: formData.chave_pix,
-        logo_url: formData.logo_url,
-        preferencias_dashboard: prefs,
-      })
-      .eq('id', user.id)
-
-    setSaving(false)
-    if (error)
-      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
-    else toast({ title: 'Configurações salvas com sucesso!' })
-  }
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (passData.newPass !== passData.confirm) {
-      toast({ title: 'As senhas não coincidem', variant: 'destructive' })
-      return
-    }
-    setSaving(true)
-    const { error } = await updatePassword(passData.newPass)
-    setSaving(false)
-    if (error)
-      toast({
-        title: 'Erro ao atualizar senha',
-        description: error.message,
-        variant: 'destructive',
-      })
-    else {
-      toast({ title: 'Senha atualizada com sucesso!' })
-      setPassData({ newPass: '', confirm: '' })
+    try {
+      const { error } = await supabase.from('usuarios').update(settings).eq('id', user.id)
+      if (error) throw error
+      toast({ title: 'Configurações salvas com sucesso!' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleToggleSecret = (key: string, checked: boolean) => {
-    setConfiguredSecrets((prev) => ({ ...prev, [key]: checked }))
-  }
-
-  if (loading)
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+  if (loading) return <div className="flex h-64 justify-center items-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-12">
-      <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-          Configurações Gerais
-        </h1>
-        <p className="text-slate-500 mt-1 text-base">
-          Gerencie seu perfil, conta bancária, assinatura e integrações do sistema.
-        </p>
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Configurações</h1>
+          <p className="text-slate-500 mt-1">Personalize o comportamento do seu sistema</p>
+        </div>
+        <Button onClick={handleSave} disabled={saving} className="h-11 px-6 rounded-xl gap-2 shadow-sm w-full sm:w-auto">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 
+          Salvar Alterações
+        </Button>
       </div>
 
-      <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="bg-slate-100/80 p-1.5 rounded-2xl mb-8 flex overflow-x-auto [&::-webkit-scrollbar]:hidden scroll-smooth">
-          <TabsTrigger
-            value="perfil"
-            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
-          >
-            <User className="w-4 h-4" /> Perfil & Clínica
+      <Tabs defaultValue="geral" className="w-full">
+        <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl [&::-webkit-scrollbar]:hidden scroll-smooth">
+          <TabsTrigger value="geral" className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2">
+            <Building2 className="w-4 h-4"/> Perfil e Clínica
           </TabsTrigger>
-          <TabsTrigger
-            value="aparencia"
-            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
-          >
-            <Palette className="w-4 h-4" /> Aparência
+          <TabsTrigger value="comunicacao" className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2">
+            <MessageCircle className="w-4 h-4"/> WhatsApp & Avisos
           </TabsTrigger>
-          <TabsTrigger
-            value="financeiro"
-            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
-          >
-            <Landmark className="w-4 h-4" /> Financeiro
+          <TabsTrigger value="portal" className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2">
+            <LinkIcon className="w-4 h-4"/> Portal do Paciente
           </TabsTrigger>
-          <TabsTrigger
-            value="assinatura"
-            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
-          >
-            <CreditCard className="w-4 h-4" /> Plano & Faturamento
-          </TabsTrigger>
-          <TabsTrigger
-            value="seguranca"
-            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
-          >
-            <Shield className="w-4 h-4" /> Segurança
-          </TabsTrigger>
-          <TabsTrigger
-            value="integracoes"
-            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
-          >
-            <Key className="w-4 h-4" /> Integrações (Secrets)
+          <TabsTrigger value="legal" className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2">
+            <Shield className="w-4 h-4"/> Documentos Legais
           </TabsTrigger>
         </TabsList>
 
-        <form onSubmit={handleSaveProfile}>
-          <TabsContent value="perfil" className="space-y-6">
-            <Card className="rounded-[2rem] shadow-sm border-slate-100">
-              <CardHeader className="p-6 md:p-8 pb-4">
-                <CardTitle className="text-xl">Identidade do Profissional</CardTitle>
-                <CardDescription>Informações que aparecem para seus pacientes.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 md:p-8 pt-0 grid gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label>Nome do Profissional / Clínica</Label>
-                    <Input
-                      value={formData.nome_consultorio}
-                      onChange={(e) =>
-                        setFormData({ ...formData, nome_consultorio: e.target.value })
-                      }
-                      className="bg-slate-50/50 rounded-xl h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>E-mail de Contato</Label>
-                    <Input
-                      value={formData.email}
-                      disabled
-                      className="bg-slate-100 rounded-xl h-11 cursor-not-allowed opacity-70"
-                      title="Não é possível alterar o e-mail de login por aqui"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Telefone Principal</Label>
-                    <Input
-                      value={formData.telefone_consultorio}
-                      onChange={(e) =>
-                        setFormData({ ...formData, telefone_consultorio: e.target.value })
-                      }
-                      className="bg-slate-50/50 rounded-xl h-11"
-                    />
-                  </div>
+        <TabsContent value="geral" className="space-y-6">
+          <Card className="rounded-[2rem] shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+              <CardTitle className="text-lg">Dados Principais</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <Label>Nome do Consultório / Profissional</Label>
+                  <Input value={settings.nome_consultorio} onChange={e => setSettings({...settings, nome_consultorio: e.target.value})} className="h-11 rounded-xl" />
                 </div>
                 <div className="space-y-2">
+                  <Label>Telefone Principal</Label>
+                  <Input value={settings.telefone_consultorio} onChange={e => setSettings({...settings, telefone_consultorio: e.target.value})} className="h-11 rounded-xl" />
+                </div>
+                <div className="space-y-2 md:col-span-2">
                   <Label>Endereço Completo</Label>
-                  <Textarea
-                    value={formData.endereco_consultorio}
-                    onChange={(e) =>
-                      setFormData({ ...formData, endereco_consultorio: e.target.value })
-                    }
-                    className="bg-slate-50/50 rounded-xl min-h-[100px] resize-none"
-                  />
+                  <Input value={settings.endereco_consultorio} onChange={e => setSettings({...settings, endereco_consultorio: e.target.value})} className="h-11 rounded-xl" />
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="aparencia" className="space-y-6">
-            <Card className="rounded-[2rem] shadow-sm border-slate-100">
-              <CardHeader className="p-6 md:p-8 pb-4">
-                <CardTitle className="text-xl">Identidade Visual</CardTitle>
-                <CardDescription>
-                  Personalize a aparência do sistema com a sua marca e cores.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 md:p-8 pt-0 space-y-8">
-                <div className="space-y-4">
-                  <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4" /> Logo e Nome
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                    <div className="space-y-2">
-                      <Label>Nome do Aplicativo / Clínica</Label>
-                      <Input
-                        value={formData.nome_consultorio}
-                        onChange={(e) =>
-                          setFormData({ ...formData, nome_consultorio: e.target.value })
-                        }
-                        className="bg-white rounded-xl h-11"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Este nome aparecerá no menu lateral e nos portais.
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>URL do Logo</Label>
-                      <Input
-                        value={formData.logo_url}
-                        onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                        placeholder="https://sua-imagem.com/logo.png"
-                        className="bg-white rounded-xl h-11"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Insira um link direto para a imagem do seu logo.
-                      </p>
-                      {formData.logo_url && (
-                        <div className="mt-2 p-3 bg-white rounded-xl border border-slate-200 inline-block h-20 flex items-center justify-center">
-                          <img
-                            src={formData.logo_url}
-                            alt="Logo"
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Chave PIX (Para cobranças)</Label>
+                  <Input value={settings.chave_pix} onChange={e => setSettings({...settings, chave_pix: e.target.value})} className="h-11 rounded-xl font-mono text-sm" placeholder="CPF, Email ou Telefone" />
                 </div>
-
-                <div className="space-y-4 pt-6 border-t border-slate-100">
-                  <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                    <Palette className="w-4 h-4" /> Tema de Cores
-                  </h3>
-                  <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
-                    {THEMES.map((theme) => (
-                      <button
-                        key={theme.id}
-                        type="button"
-                        onClick={() => {
-                          setFormData({
-                            ...formData,
-                            preferencias_dashboard: {
-                              ...formData.preferencias_dashboard,
-                              theme: theme.id,
-                            },
-                          })
-                          document.documentElement.classList.remove(
-                            'theme-indigo',
-                            'theme-blue',
-                            'theme-emerald',
-                            'theme-rose',
-                            'theme-slate',
-                            'theme-pink',
-                            'theme-diamond',
-                            'theme-ruby',
-                          )
-                          document.documentElement.classList.add(theme.id)
-                        }}
-                        className={cn(
-                          'w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-2 flex flex-col items-center justify-center gap-3 transition-all',
-                          formData.preferencias_dashboard?.theme === theme.id
-                            ? 'border-primary bg-primary/5 shadow-md'
-                            : 'border-slate-200 bg-white hover:border-slate-300',
-                        )}
-                      >
-                        <div className={cn('w-8 h-8 rounded-full shadow-sm', theme.color)} />
-                        <span className="text-[10px] sm:text-xs font-semibold text-slate-700 text-center px-1">
-                          {theme.name}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="financeiro" className="space-y-6">
-            <Card className="rounded-[2rem] shadow-sm border-slate-100">
-              <CardHeader className="p-6 md:p-8 pb-4">
-                <CardTitle className="text-xl">Dados de Recebimento</CardTitle>
-                <CardDescription>
-                  Configure suas contas para receber pagamentos e emitir cobranças.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 md:p-8 pt-0 space-y-8">
-                <div className="space-y-4">
-                  <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                    <Key className="w-4 h-4" /> Chave PIX Principal
-                  </h3>
-                  <div className="max-w-md space-y-2 bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                    <Label>Chave PIX (Aparecerá nas cobranças manuais)</Label>
-                    <Input
-                      value={formData.chave_pix}
-                      onChange={(e) => setFormData({ ...formData, chave_pix: e.target.value })}
-                      placeholder="CPF, E-mail, Telefone ou Aleatória"
-                      className="bg-white rounded-xl h-11"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4 pt-6 border-t border-slate-100">
-                  <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                    <Landmark className="w-4 h-4" /> Dados Bancários
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                    <div className="space-y-2">
-                      <Label>Banco</Label>
-                      <Input
-                        value={bankInfo.banco}
-                        onChange={(e) => setBankInfo({ ...bankInfo, banco: e.target.value })}
-                        placeholder="Ex: Nubank, Itaú"
-                        className="bg-white rounded-xl h-11"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Agência</Label>
-                      <Input
-                        value={bankInfo.agencia}
-                        onChange={(e) => setBankInfo({ ...bankInfo, agencia: e.target.value })}
-                        placeholder="Ex: 0001"
-                        className="bg-white rounded-xl h-11"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Conta</Label>
-                      <Input
-                        value={bankInfo.conta}
-                        onChange={(e) => setBankInfo({ ...bankInfo, conta: e.target.value })}
-                        placeholder="Ex: 12345-6"
-                        className="bg-white rounded-xl h-11"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="integracoes" className="space-y-6">
-            <Card className="rounded-[2rem] shadow-sm border-slate-100">
-              <CardHeader className="p-6 md:p-8 pb-4">
-                <CardTitle className="text-xl">Gerenciamento de Secrets</CardTitle>
-                <CardDescription>
-                  Para habilitar as integrações avançadas, você deve cadastrar as chaves oficiais no
-                  painel <strong>Edge Functions &gt; Secrets</strong> do seu banco de dados
-                  Supabase. Use este checklist visual para acompanhar o que já foi configurado.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 md:p-8 pt-0">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {SECRETS_LIST.map((s) => (
-                    <div
-                      key={s.key}
-                      className={cn(
-                        'flex items-start gap-4 p-5 rounded-2xl border transition-colors',
-                        configuredSecrets[s.key]
-                          ? 'bg-emerald-50/50 border-emerald-200'
-                          : 'bg-white border-slate-200',
-                      )}
-                    >
-                      <div className="pt-1">
-                        <Checkbox
-                          checked={configuredSecrets[s.key] || false}
-                          onCheckedChange={(val) => handleToggleSecret(s.key, !!val)}
-                          className={cn(
-                            'w-5 h-5 rounded-md',
-                            configuredSecrets[s.key] &&
-                              'data-[state=checked]:bg-emerald-500 border-emerald-500',
-                          )}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <p className="font-bold font-mono text-xs sm:text-sm text-slate-800 truncate">
-                            {s.key}
-                          </p>
-                          {configuredSecrets[s.key] && (
-                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200 text-[10px] px-2 py-0">
-                              Ativo
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs sm:text-sm text-slate-500 mt-1 mb-3">{s.desc}</p>
-                        <a
-                          href={s.doc}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" /> Documentação
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Sticky Save Button for Profile/Finance/Integrations */}
-          <div className="mt-8 flex flex-col sm:flex-row justify-end">
-            <Button
-              type="submit"
-              disabled={saving}
-              className="rounded-xl h-12 px-10 text-base shadow-md w-full sm:w-auto"
-            >
-              {saving ? (
-                <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-5 h-5 mr-2" />
-              )}
-              Salvar Alterações
-            </Button>
-          </div>
-        </form>
-
-        <TabsContent value="assinatura" className="space-y-6">
-          <BillingSettings user={user} formData={formData} setFormData={setFormData} />
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="seguranca" className="space-y-6">
-          <Card className="rounded-[2rem] shadow-sm border-slate-100">
-            <CardHeader className="p-6 md:p-8 pb-4">
-              <CardTitle className="text-xl">Atualizar Senha</CardTitle>
-              <CardDescription>Escolha uma senha forte para proteger seus dados.</CardDescription>
+        <TabsContent value="comunicacao" className="space-y-6">
+           <Card className="rounded-[2rem] shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+              <CardTitle className="text-lg">Automações de WhatsApp</CardTitle>
+              <CardDescription>O sistema enviará mensagens formatadas baseadas nestes templates.</CardDescription>
             </CardHeader>
-            <CardContent className="p-6 md:p-8 pt-0">
-              <form onSubmit={handleUpdatePassword} className="space-y-5 max-w-md">
-                <div className="space-y-2">
-                  <Label>Nova Senha</Label>
-                  <Input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={passData.newPass}
-                    onChange={(e) => setPassData({ ...passData, newPass: e.target.value })}
-                    className="bg-slate-50/50 rounded-xl h-11"
-                  />
+            <CardContent className="p-6 space-y-8">
+              {/* Lembrete 24h */}
+              <div className="space-y-4 p-4 rounded-xl border border-slate-100 bg-slate-50/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-bold text-slate-800">Lembrete de Sessão (24h antes)</Label>
+                    <p className="text-sm text-slate-500">Enviado automaticamente para agendamentos futuros.</p>
+                  </div>
+                  <Switch checked={settings.lembrete_whatsapp_ativo} onCheckedChange={c => setSettings({...settings, lembrete_whatsapp_ativo: c})} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Confirmar Nova Senha</Label>
-                  <Input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={passData.confirm}
-                    onChange={(e) => setPassData({ ...passData, confirm: e.target.value })}
-                    className="bg-slate-50/50 rounded-xl h-11"
+                {settings.lembrete_whatsapp_ativo && (
+                  <Textarea 
+                    value={settings.template_lembrete} 
+                    onChange={e => setSettings({...settings, template_lembrete: e.target.value})}
+                    className="min-h-[100px] rounded-xl text-sm"
+                    placeholder="Ex: Olá [Nome], lembrando da nossa sessão [data] às [hora]."
                   />
+                )}
+              </div>
+
+               {/* Confirmação Imediata */}
+               <div className="space-y-4 p-4 rounded-xl border border-slate-100 bg-slate-50/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-bold text-slate-800">Confirmação de Agendamento</Label>
+                    <p className="text-sm text-slate-500">Enviado no momento que você agenda o paciente.</p>
+                  </div>
+                  <Switch checked={settings.whatsapp_confirmacao_ativa} onCheckedChange={c => setSettings({...settings, whatsapp_confirmacao_ativa: c})} />
                 </div>
-                <Button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-xl h-12 w-full mt-2 text-base"
-                >
-                  {saving ? 'Atualizando...' : 'Alterar Senha'}
-                </Button>
-              </form>
+                {settings.whatsapp_confirmacao_ativa && (
+                  <Textarea 
+                    value={settings.template_confirmacao} 
+                    onChange={e => setSettings({...settings, template_confirmacao: e.target.value})}
+                    className="min-h-[100px] rounded-xl text-sm"
+                  />
+                )}
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-800 border border-blue-100">
+                <strong>Variáveis disponíveis:</strong> [Nome], [data], [hora], [TipoSessao], [link_portal]
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="portal" className="space-y-6">
+          <Card className="rounded-[2rem] shadow-sm border-slate-200">
+            <CardContent className="p-6 space-y-6 pt-6">
+              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50">
+                <div>
+                  <Label className="text-base font-bold text-slate-800">Agendamento Público</Label>
+                  <p className="text-sm text-slate-500 mt-1">Permitir que pacientes novos agendem horários pelo seu link público.</p>
+                </div>
+                <Switch checked={settings.agendamento_publico_ativo} onCheckedChange={c => setSettings({...settings, agendamento_publico_ativo: c})} />
+              </div>
+              
+              {settings.agendamento_publico_ativo && (
+                <div className="p-4 bg-emerald-50 text-emerald-800 rounded-xl text-sm font-medium flex justify-between items-center border border-emerald-100">
+                  <span>Seu link de agendamento:</span>
+                  <a href={`/agendar/${user?.id}`} target="_blank" rel="noreferrer" className="underline font-bold hover:text-emerald-900">Acessar Link</a>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="legal" className="space-y-6">
+          <Card className="rounded-[2rem] shadow-sm border-slate-200">
+            <CardContent className="p-6 space-y-6 pt-6">
+              <div className="space-y-3">
+                <Label className="text-base font-bold">Termos de Contrato de Prestação de Serviço</Label>
+                <p className="text-sm text-slate-500">Este texto será exibido no Portal do Paciente para aceite digital (Validade Jurídica).</p>
+                <Textarea 
+                  value={settings.texto_contrato} 
+                  onChange={e => setSettings({...settings, texto_contrato: e.target.value})}
+                  className="min-h-[250px] rounded-xl text-sm font-mono"
+                  placeholder="Insira as cláusulas do seu contrato terapêutico..."
+                />
+              </div>
+              <div className="space-y-3">
+                <Label className="text-base font-bold">Política de Cancelamento</Label>
+                <p className="text-sm text-slate-500">Regras para faltas e remarcações (ex: antecedência mínima de 24h).</p>
+                <Textarea 
+                  value={settings.politica_cancelamento} 
+                  onChange={e => setSettings({...settings, politica_cancelamento: e.target.value})}
+                  className="min-h-[100px] rounded-xl text-sm"
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
