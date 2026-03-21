@@ -1,641 +1,462 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import {
-  Calendar,
-  Check,
-  X,
-  Settings2,
-  Users,
-  MessageCircle,
-  ChevronRight,
-  GripVertical,
-  ArrowUp,
-  ArrowDown,
-  AlertTriangle,
-  RotateCcw,
-} from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
-import { useToast } from '@/hooks/use-toast'
-import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 import { useNavigate } from 'react-router-dom'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import { ServiceGoalTracker } from '@/components/ServiceGoalTracker'
-import { PerformanceDashboard } from '@/components/PerformanceDashboard'
-import { MentalHealthIndicators } from '@/components/MentalHealthIndicators'
-import { measurePerformance } from '@/lib/performance'
+  Users,
+  TrendingUp,
+  Plus,
+  Clock,
+  Wallet,
+  AlertCircle,
+  GripHorizontal,
+  RefreshCw,
+  CalendarDays,
+  FileText,
+  ChevronRight,
+} from 'lucide-react'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { BarChart, Bar, XAxis, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { formatBRL, cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 
-const DEFAULT_WIDGETS = [
-  { id: 'agenda', label: 'Agenda de Hoje', visible: true, order: 0 },
-  { id: 'dashboard', label: 'Dashboard de Performance', visible: true, order: 1 },
-  { id: 'indicators', label: 'Indicadores de Bem-estar', visible: true, order: 2 },
-  { id: 'goals', label: 'Metas e Supervisão', visible: true, order: 3 },
-]
+const DEFAULT_ORDER = ['kpis', 'upcoming', 'finances', 'alerts', 'shortcuts']
 
 export default function Index() {
   const { user } = useAuth()
-  const { toast } = useToast()
   const navigate = useNavigate()
-  const [appointments, setAppointments] = useState<any[]>([])
-  const [waitlist, setWaitlist] = useState<any[]>([])
-  const [lowStockItems, setLowStockItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_ORDER)
 
-  const [kpis, setKpis] = useState({
-    atendimentosHoje: 0,
-    pacientesNovos: 0,
-    pacientesAtivos: 0,
-    alertasFinanceiros: 0,
-  })
-
-  const [widgets, setWidgets] = useState(DEFAULT_WIDGETS)
-  const [isConfigOpen, setIsConfigOpen] = useState(false)
-
-  const todayStr = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  }).format(new Date())
-
-  const fetchIndexData = useCallback(async () => {
-    if (!user) return
-    setLoading(true)
-    setError(false)
-
-    try {
-      await measurePerformance('index_data', async () => {
-        const { data: u } = await supabase
-          .from('usuarios')
-          .select('preferencias_dashboard')
-          .eq('id', user.id)
-          .maybeSingle()
-
-        if (u?.preferencias_dashboard?.widgets) {
-          const loadedWidgets = u.preferencias_dashboard.widgets.filter(
-            (w: any) => w.id !== 'notifications',
-          )
-          setWidgets(loadedWidgets.length > 0 ? loadedWidgets : DEFAULT_WIDGETS)
-        } else if (u?.preferencias_dashboard) {
-          const mapped = DEFAULT_WIDGETS.map((w) => {
-            if (w.id === 'agenda' && u.preferencias_dashboard.show_agenda === false)
-              return { ...w, visible: false }
-            if (w.id === 'dashboard' && u.preferencias_dashboard.show_dashboard === false)
-              return { ...w, visible: false }
-            return w
-          })
-          setWidgets(mapped)
-        }
-
-        const startOfDay = new Date()
-        startOfDay.setHours(0, 0, 0, 0)
-        const endOfDay = new Date(startOfDay)
-        endOfDay.setDate(endOfDay.getDate() + 1)
-
-        const thirtyDaysAgo = new Date()
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-        const [
-          apptsRes,
-          wlRes,
-          stockRes,
-          atendimentosHojeRes,
-          pacientesNovosRes,
-          pacientesAtivosRes,
-          agendamentosFinanceirosRes,
-        ] = await Promise.all([
-          supabase
-            .from('agendamentos')
-            .select(
-              'id, data_hora, status, is_online, paciente_id, pacientes(id, nome, valor_sessao)',
-            )
-            .eq('usuario_id', user.id)
-            .gte('data_hora', startOfDay.toISOString())
-            .lt('data_hora', endOfDay.toISOString())
-            .order('data_hora', { ascending: true }),
-
-          supabase
-            .from('lista_espera' as any)
-            .select('id, dias_semana, periodos, pacientes(nome, telefone)')
-            .eq('usuario_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(5),
-
-          supabase
-            .from('estoque')
-            .select('id, nome_item, quantidade, quantidade_minima')
-            .eq('usuario_id', user.id),
-
-          supabase
-            .from('agendamentos')
-            .select('id', { count: 'exact' })
-            .eq('usuario_id', user.id)
-            .gte('data_hora', startOfDay.toISOString())
-            .lt('data_hora', endOfDay.toISOString())
-            .neq('status', 'desmarcou')
-            .limit(0),
-
-          supabase
-            .from('pacientes')
-            .select('id', { count: 'exact' })
-            .eq('usuario_id', user.id)
-            .gte('data_criacao', thirtyDaysAgo.toISOString())
-            .limit(0),
-
-          supabase
-            .from('pacientes')
-            .select('id', { count: 'exact' })
-            .eq('usuario_id', user.id)
-            .limit(0),
-
-          supabase
-            .from('agendamentos')
-            .select('valor_sinal')
-            .eq('usuario_id', user.id)
-            .gte('data_hora', new Date().toISOString())
-            .eq('sinal_pago', false),
-        ])
-
-        if (apptsRes.data) setAppointments(apptsRes.data)
-        if (wlRes.data) setWaitlist(wlRes.data)
-        if (stockRes.data) {
-          setLowStockItems(
-            stockRes.data.filter((item) => item.quantidade <= item.quantidade_minima),
-          )
-        }
-
-        const alertasFinanceiros =
-          agendamentosFinanceirosRes.data?.reduce(
-            (acc, curr) => acc + (Number(curr.valor_sinal) || 0),
-            0,
-          ) || 0
-
-        setKpis({
-          atendimentosHoje: atendimentosHojeRes.count || 0,
-          pacientesNovos: pacientesNovosRes.count || 0,
-          pacientesAtivos: pacientesAtivosRes.count || 0,
-          alertasFinanceiros,
-        })
-      })
-    } catch (err) {
-      console.error('Error fetching dashboard data:', err)
-      setError(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
+  const [stats, setStats] = useState({ sessoesHoje: 0, saldoMes: 0, pacientesAtivos: 0 })
+  const [upcoming, setUpcoming] = useState<any[]>([])
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [chartData, setChartData] = useState<any[]>([])
 
   useEffect(() => {
-    fetchIndexData()
-    const channelApt = supabase
-      .channel('dashboard_updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'agendamentos',
-          filter: `usuario_id=eq.${user?.id}`,
-        },
-        (payload) => {
-          if (payload.new.status === 'confirmado' && payload.old.status !== 'confirmado')
-            fetchIndexData()
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channelApt)
+    const saved = localStorage.getItem('dashboard_order')
+    if (saved) {
+      try {
+        setWidgetOrder(JSON.parse(saved))
+      } catch (e) {}
     }
-  }, [fetchIndexData, user?.id])
+  }, [])
 
-  const updateStatus = async (id: string, status: string) => {
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)))
-    const { error: updErr } = await supabase.from('agendamentos').update({ status }).eq('id', id)
-    if (!updErr) toast({ title: `Status atualizado: ${status.toUpperCase()}` })
-    else fetchIndexData()
-  }
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user) return
+      const today = new Date()
+      const year = today.getFullYear()
+      const month = today.getMonth() + 1
 
-  const savePrefs = async (newWidgets: typeof widgets) => {
-    setWidgets(newWidgets)
-    await supabase
-      .from('usuarios')
-      .update({ preferencias_dashboard: { widgets: newWidgets } })
-      .eq('id', user?.id)
-  }
+      const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString()
+      const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString()
 
-  const toggleWidget = (id: string, visible: boolean) => {
-    const updated = widgets.map((w) => (w.id === id ? { ...w, visible } : w))
-    savePrefs(updated)
-  }
+      const [aptRes, finRes, patRes, despRes, alertRes] = await Promise.all([
+        supabase
+          .from('agendamentos')
+          .select('*, pacientes(nome, telefone)')
+          .eq('usuario_id', user.id)
+          .gte('data_hora', startOfDay)
+          .lte('data_hora', endOfDay)
+          .order('data_hora'),
+        supabase.from('financeiro').select('*').eq('usuario_id', user.id).eq('ano', year),
+        supabase.from('pacientes').select('id', { count: 'exact' }).eq('usuario_id', user.id),
+        supabase
+          .from('despesas')
+          .select('*')
+          .eq('usuario_id', user.id)
+          .gte('data', `${year}-01-01`),
+        supabase
+          .from('financeiro')
+          .select('*, pacientes(nome)')
+          .eq('usuario_id', user.id)
+          .gt('valor_a_receber', 0)
+          .lt('mes', month),
+      ])
 
-  const moveWidget = (index: number, direction: -1 | 1) => {
-    if (index + direction < 0 || index + direction >= widgets.length) return
-    const updated = [...widgets]
-    const temp = updated[index]
-    updated[index] = updated[index + direction]
-    updated[index + direction] = temp
-    const reordered = updated.map((w, i) => ({ ...w, order: i }))
-    savePrefs(reordered)
-  }
+      const todayApts = aptRes.data || []
+      const sessoesHoje = todayApts.length
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.setData('text/plain', index.toString())
-    e.dataTransfer.effectAllowed = 'move'
-  }
+      const currMonthFin = (finRes.data || []).filter((f) => f.mes === month)
+      const currMonthDesp = (despRes.data || []).filter(
+        (d) => new Date(d.data).getMonth() + 1 === month,
+      )
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault()
-    const dragIndexStr = e.dataTransfer.getData('text/plain')
-    if (!dragIndexStr) return
-    const dragIndex = parseInt(dragIndexStr, 10)
-    if (dragIndex === dropIndex) return
+      const receitas = currMonthFin.reduce((acc, curr) => acc + Number(curr.valor_recebido), 0)
+      const despesas = currMonthDesp.reduce((acc, curr) => acc + Number(curr.valor), 0)
 
-    const visibleList = visibleWidgets
-    const [draggedItem] = visibleList.splice(dragIndex, 1)
-    visibleList.splice(dropIndex, 0, draggedItem)
+      setStats({
+        sessoesHoje,
+        saldoMes: receitas - despesas,
+        pacientesAtivos: patRes.count || 0,
+      })
 
-    const newWidgets = widgets.map((w) => {
-      const indexInVisible = visibleList.findIndex((v) => v.id === w.id)
-      if (indexInVisible !== -1) {
-        return { ...w, order: indexInVisible }
+      setUpcoming(todayApts.filter((a) => a.status === 'agendado'))
+      setAlerts(alertRes.data || [])
+
+      // Build chart data for the last 6 months
+      const monthsData = []
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date()
+        d.setMonth(today.getMonth() - i)
+        const m = d.getMonth() + 1
+        const y = d.getFullYear()
+
+        const r = (finRes.data || [])
+          .filter((f) => f.mes === m && f.ano === y)
+          .reduce((acc, curr) => acc + Number(curr.valor_recebido), 0)
+
+        const ex = (despRes.data || [])
+          .filter(
+            (f) => new Date(f.data).getMonth() + 1 === m && new Date(f.data).getFullYear() === y,
+          )
+          .reduce((acc, curr) => acc + Number(curr.valor), 0)
+
+        monthsData.push({
+          name: d.toLocaleDateString('pt-BR', { month: 'short' }),
+          receitas: r,
+          despesas: ex,
+        })
       }
-      return w
-    })
+      setChartData(monthsData)
+      setLoading(false)
+    }
 
-    savePrefs(newWidgets)
+    fetchDashboardData()
+  }, [user])
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('widgetId', id)
+  }
+
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault()
+    const draggedId = e.dataTransfer.getData('widgetId')
+    if (!draggedId || draggedId === targetId || draggedId === 'kpis' || targetId === 'kpis') return
+
+    const newOrder = [...widgetOrder]
+    const draggedIdx = newOrder.indexOf(draggedId)
+    const targetIdx = newOrder.indexOf(targetId)
+
+    newOrder.splice(draggedIdx, 1)
+    newOrder.splice(targetIdx, 0, draggedId)
+
+    setWidgetOrder(newOrder)
+    localStorage.setItem('dashboard_order', JSON.stringify(newOrder))
   }
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const WidgetWrapper = ({ id, title, children }: any) => (
+    <div
+      draggable={id !== 'kpis'}
+      onDragStart={(e) => handleDragStart(e, id)}
+      onDrop={(e) => handleDrop(e, id)}
+      onDragOver={handleDragOver}
+      className={cn(
+        'bg-white rounded-[2rem] shadow-sm border border-slate-100/60 p-6 sm:p-8 flex flex-col gap-4 transition-all relative group h-full',
+        id !== 'kpis' && 'cursor-grab active:cursor-grabbing hover:shadow-md',
+      )}
+    >
+      {id !== 'kpis' && (
+        <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 text-slate-300 transition-opacity">
+          <GripHorizontal className="w-5 h-5" />
+        </div>
+      )}
+      {title && (
+        <h3 className="font-bold text-slate-800 text-lg sm:text-xl tracking-tight">{title}</h3>
+      )}
+      <div className="flex-1 w-full">{children}</div>
+    </div>
+  )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   const renderWidget = (id: string) => {
     switch (id) {
-      case 'dashboard':
-        return <PerformanceDashboard key="dashboard" />
-      case 'indicators':
+      case 'kpis':
         return (
-          <div key="indicators" className="w-full">
-            <MentalHealthIndicators />
+          <div key={id} className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-2">
+            <div className="bg-primary/5 border border-primary/10 rounded-[2rem] p-6 flex flex-col justify-between">
+              <div className="flex items-center gap-3 text-primary mb-4">
+                <div className="p-2.5 bg-primary/10 rounded-xl">
+                  <CalendarDays className="w-5 h-5" />
+                </div>
+                <span className="font-bold text-sm tracking-wide uppercase">Sessões Hoje</span>
+              </div>
+              <p className="text-4xl font-extrabold text-slate-900">{stats.sessoesHoje}</p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-[2rem] p-6 flex flex-col justify-between">
+              <div className="flex items-center gap-3 text-emerald-600 mb-4">
+                <div className="p-2.5 bg-emerald-100 rounded-xl">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <span className="font-bold text-sm tracking-wide uppercase">Saldo Mensal</span>
+              </div>
+              <p className="text-4xl font-extrabold text-emerald-900">
+                {formatBRL(stats.saldoMes)}
+              </p>
+            </div>
+            <div className="bg-indigo-50 border border-indigo-100 rounded-[2rem] p-6 flex flex-col justify-between">
+              <div className="flex items-center gap-3 text-indigo-600 mb-4">
+                <div className="p-2.5 bg-indigo-100 rounded-xl">
+                  <Users className="w-5 h-5" />
+                </div>
+                <span className="font-bold text-sm tracking-wide uppercase">Pacientes Ativos</span>
+              </div>
+              <p className="text-4xl font-extrabold text-indigo-900">{stats.pacientesAtivos}</p>
+            </div>
           </div>
         )
-      case 'agenda':
+      case 'upcoming':
         return (
-          <Card key="agenda" className="shadow-sm border-slate-200 w-full h-fit rounded-2xl">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between rounded-t-2xl">
-              <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
-                <Calendar className="w-5 h-5 text-primary" /> Sessões de Hoje
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="p-8 flex justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <WidgetWrapper key={id} id={id} title="Próximas Sessões Hoje">
+            {upcoming.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-10">
+                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                  <Clock className="w-5 h-5 text-slate-400" />
                 </div>
-              ) : appointments.length === 0 ? (
-                <div className="p-8 text-center text-slate-500">Nenhuma sessão para hoje.</div>
-              ) : (
-                <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
-                  {appointments.map((apt) => {
-                    const pInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-                    const time = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                    return (
-                      <div
-                        key={apt.id}
-                        className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex gap-4 items-center">
-                          <div className="w-14 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-primary font-bold shadow-sm">
-                            {time}
-                          </div>
-                          <div>
-                            <p className="font-semibold text-slate-900">
-                              {pInfo?.nome || 'Paciente Excluído'}
-                            </p>
-                            <span
-                              className={cn(
-                                'text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider mt-1 inline-block',
-                                apt.status === 'compareceu'
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : apt.status === 'confirmado'
-                                    ? 'bg-indigo-100 text-indigo-700'
-                                    : apt.status === 'desmarcou'
-                                      ? 'bg-amber-100 text-amber-700'
-                                      : apt.status === 'faltou'
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-slate-100 text-slate-700',
-                              )}
-                            >
-                              {apt.status}
-                            </span>
-                          </div>
+                <p className="text-slate-500 font-medium">Nenhuma sessão pendente para hoje.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcoming.slice(0, 4).map((apt) => {
+                  const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+                  return (
+                    <div
+                      key={apt.id}
+                      className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/70 border border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => navigate('/agenda')}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm shrink-0">
+                          <span className="font-bold text-primary text-sm">
+                            {new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                            onClick={() => updateStatus(apt.id, 'compareceu')}
-                          >
-                            <Check className="w-4 h-4 mr-1" /> Comp.
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600 hover:bg-red-50 rounded-lg"
-                            onClick={() => updateStatus(apt.id, 'faltou')}
-                          >
-                            <X className="w-4 h-4 mr-1" /> Faltou
-                          </Button>
+                        <div>
+                          <p className="font-bold text-slate-800 line-clamp-1">{p?.nome}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {apt.is_online ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 py-0 h-4"
+                              >
+                                <Video className="w-3 h-3 mr-1" /> Online
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-slate-100 text-slate-600 border-slate-200 py-0 h-4"
+                              >
+                                Presencial
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )
-      case 'goals':
-        return (
-          <div key="goals" className="space-y-6 w-full">
-            <ServiceGoalTracker />
-            <Card
-              className="shadow-sm border-slate-200 cursor-pointer hover:border-primary/50 transition-colors rounded-2xl"
-              onClick={() => navigate('/supervisao')}
-            >
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-slate-800 text-sm">Supervisão Clínica</h3>
-                    <p className="text-xs text-slate-500">Casos e orientações</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
-              </CardContent>
-            </Card>
-
-            {lowStockItems.length > 0 && (
-              <Card className="shadow-sm border-red-200 rounded-2xl overflow-hidden">
-                <CardHeader className="border-b border-red-100 bg-red-50/50 pb-4 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-semibold text-red-800 flex items-center gap-2 uppercase tracking-wide">
-                    <AlertTriangle className="w-4 h-4 text-red-600" /> Estoque Baixo
-                  </CardTitle>
+                      <ChevronRight className="w-4 h-4 text-slate-300" />
+                    </div>
+                  )
+                })}
+                {upcoming.length > 4 && (
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-100"
-                    onClick={() => navigate('/estoque')}
+                    className="w-full text-slate-500 mt-2 rounded-xl"
+                    onClick={() => navigate('/agenda')}
                   >
-                    Ver Estoque
+                    Ver todas (+{upcoming.length - 4})
                   </Button>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-red-100 max-h-[250px] overflow-y-auto">
-                    {lowStockItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="p-4 bg-red-50/30 flex justify-between items-center gap-2"
-                      >
-                        <p className="font-semibold text-sm text-slate-800">{item.nome_item}</p>
-                        <Badge variant="destructive" className="text-xs">
-                          {item.quantidade} / {item.quantidade_minima}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                )}
+              </div>
             )}
-
-            <Card className="shadow-sm border-slate-200 rounded-2xl overflow-hidden">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
-                  <Users className="w-4 h-4 text-primary" /> Fila de Espera
-                </CardTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs px-2"
-                  onClick={() => navigate('/agenda')}
-                >
-                  Gerenciar
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-slate-100 max-h-[250px] overflow-y-auto">
-                  {waitlist.length === 0 ? (
-                    <div className="p-6 text-center text-sm text-slate-500">
-                      Nenhum paciente aguardando.
-                    </div>
-                  ) : (
-                    waitlist.map((wl) => (
-                      <div
-                        key={wl.id}
-                        className="p-4 hover:bg-slate-50 transition-colors flex justify-between items-center gap-2"
-                      >
-                        <div>
-                          <p className="font-semibold text-sm text-slate-800 leading-tight">
-                            {wl.pacientes?.nome}
-                          </p>
-                          <div className="flex gap-1 mt-1.5 flex-wrap">
-                            {wl.dias_semana.slice(0, 2).map((d: string) => (
-                              <span
-                                key={d}
-                                className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded capitalize"
-                              >
-                                {d}
-                              </span>
-                            ))}
-                            {wl.periodos.slice(0, 1).map((p: string) => (
-                              <span
-                                key={p}
-                                className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded capitalize"
-                              >
-                                {p}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        {wl.pacientes?.telefone && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 shrink-0 text-emerald-600 hover:bg-emerald-50"
-                            onClick={() =>
-                              window.open(
-                                `https://wa.me/${wl.pacientes.telefone.replace(/\D/g, '')}`,
-                                '_blank',
-                              )
-                            }
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))
-                  )}
+          </WidgetWrapper>
+        )
+      case 'finances':
+        return (
+          <WidgetWrapper key={id} id={id} title="Fluxo Financeiro (6 Meses)">
+            <div className="h-[250px] w-full mt-4">
+              <ChartContainer
+                config={{
+                  receitas: { label: 'Receitas', color: '#10b981' },
+                  despesas: { label: 'Despesas', color: '#f43f5e' },
+                }}
+                className="w-full h-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
+                      dy={10}
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: '#f8fafc' }} />
+                    <Bar
+                      dataKey="receitas"
+                      fill="var(--color-receitas)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={30}
+                    />
+                    <Bar
+                      dataKey="despesas"
+                      fill="var(--color-despesas)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={30}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
+          </WidgetWrapper>
+        )
+      case 'alerts':
+        return (
+          <WidgetWrapper key={id} id={id} title="Inadimplência (> 30 dias)">
+            {alerts.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center py-10">
+                <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mb-3">
+                  <TrendingUp className="w-5 h-5 text-emerald-500" />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <p className="text-slate-500 font-medium">Nenhuma pendência crítica.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {alerts.slice(0, 4).map((al) => {
+                  const p = Array.isArray(al.pacientes) ? al.pacientes[0] : al.pacientes
+                  return (
+                    <div
+                      key={al.id}
+                      className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="font-bold text-amber-900 line-clamp-1">{p?.nome}</p>
+                        <p className="text-xs text-amber-700 mt-0.5">
+                          Ref: {String(al.mes).padStart(2, '0')}/{al.ano}
+                        </p>
+                      </div>
+                      <span className="font-extrabold text-amber-700">
+                        {formatBRL(al.valor_a_receber)}
+                      </span>
+                    </div>
+                  )
+                })}
+                {alerts.length > 4 && (
+                  <Button
+                    variant="ghost"
+                    className="w-full text-amber-700 mt-2 rounded-xl hover:bg-amber-100"
+                    onClick={() => navigate('/carteira')}
+                  >
+                    Ver todas (+{alerts.length - 4})
+                  </Button>
+                )}
+              </div>
+            )}
+          </WidgetWrapper>
+        )
+      case 'shortcuts':
+        return (
+          <WidgetWrapper key={id} id={id} title="Acesso Rápido">
+            <div className="grid grid-cols-2 gap-3 h-full pb-4">
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-primary/30 hover:bg-primary/5 transition-all"
+                onClick={() => navigate('/agenda')}
+              >
+                <div className="p-3 bg-primary/10 rounded-full text-primary">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <span className="font-semibold text-slate-700">Novo Agendamento</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-indigo-500/30 hover:bg-indigo-50 transition-all"
+                onClick={() => navigate('/pacientes/novo')}
+              >
+                <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
+                  <Users className="w-5 h-5" />
+                </div>
+                <span className="font-semibold text-slate-700">Novo Paciente</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-emerald-500/30 hover:bg-emerald-50 transition-all"
+                onClick={() => navigate('/carteira')}
+              >
+                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <span className="font-semibold text-slate-700">Receber Pagamento</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-rose-500/30 hover:bg-rose-50 transition-all"
+                onClick={() => navigate('/carteira')}
+              >
+                <div className="p-3 bg-rose-100 rounded-full text-rose-600">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <span className="font-semibold text-slate-700">Nova Despesa</span>
+              </Button>
+            </div>
+          </WidgetWrapper>
         )
       default:
         return null
     }
   }
 
-  const visibleWidgets = [...widgets].sort((a, b) => a.order - b.order).filter((w) => w.visible)
-
   return (
-    <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="max-w-[1400px] mx-auto space-y-8 animate-fade-in pb-12">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Visão Geral</h1>
-          <p className="text-slate-500 capitalize">{todayStr}</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            Olá, {user?.email?.split('@')[0]} 👋
+          </h1>
+          <p className="text-slate-500 mt-1.5 text-base">
+            Aqui está o resumo do seu consultório hoje.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2 rounded-xl shadow-sm">
-                <Settings2 className="w-4 h-4" /> Organizar Painel
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md rounded-2xl">
-              <DialogHeader>
-                <DialogTitle>Personalizar Dashboard</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-2 py-4">
-                {widgets.map((w, index) => (
-                  <div
-                    key={w.id}
-                    className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <GripVertical className="w-4 h-4 text-slate-400 cursor-grab" />
-                      <Label className="cursor-pointer">{w.label}</Label>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Switch checked={w.visible} onCheckedChange={(v) => toggleWidget(w.id, v)} />
-                      <div className="flex flex-col gap-1">
-                        <button
-                          type="button"
-                          onClick={() => moveWidget(index, -1)}
-                          disabled={index === 0}
-                          className="text-slate-400 hover:text-primary disabled:opacity-30"
-                        >
-                          <ArrowUp className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveWidget(index, 1)}
-                          disabled={index === widgets.length - 1}
-                          className="text-slate-400 hover:text-primary disabled:opacity-30"
-                        >
-                          <ArrowDown className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <Button
-                  variant="ghost"
-                  onClick={() => savePrefs(DEFAULT_WIDGETS)}
-                  className="w-full mt-4 text-slate-500 hover:text-slate-800"
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" /> Restaurar Padrão
-                </Button>
+        <Button
+          variant="ghost"
+          className="rounded-xl gap-2 text-slate-400 hover:text-slate-700"
+          onClick={() => {
+            setWidgetOrder(DEFAULT_ORDER)
+            localStorage.removeItem('dashboard_order')
+          }}
+          title="Resetar ordem dos widgets"
+        >
+          <RefreshCw className="w-4 h-4" /> <span className="hidden sm:inline">Resetar Layout</span>
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-6">
+        {widgetOrder.includes('kpis') && renderWidget('kpis')}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          {widgetOrder
+            .filter((id) => id !== 'kpis')
+            .map((id) => (
+              <div key={id} className="h-full">
+                {renderWidget(id)}
               </div>
-            </DialogContent>
-          </Dialog>
+            ))}
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="shadow-sm border-slate-200 rounded-2xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Atendimentos do Dia
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900">{kpis.atendimentosHoje}</div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-slate-200 rounded-2xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Pacientes Novos (30d)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900">{kpis.pacientesNovos}</div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-slate-200 rounded-2xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Pacientes Ativos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900">{kpis.pacientesAtivos}</div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-red-200 bg-red-50/30 rounded-2xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-semibold text-red-600 uppercase tracking-wide">
-              Alertas Financeiros
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-700">
-              {kpis.alertasFinanceiros.toLocaleString('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              })}
-            </div>
-            <p className="text-[10px] text-red-500 mt-1 font-medium uppercase tracking-wide">
-              Sinais pendentes (futuro)
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {visibleWidgets.map((w, index) => (
-          <div
-            key={w.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, index)}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, index)}
-            className={cn(
-              'transition-all cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 rounded-2xl',
-              w.id === 'dashboard' ? 'lg:col-span-3' : 'lg:col-span-1',
-            )}
-          >
-            {renderWidget(w.id)}
-          </div>
-        ))}
       </div>
     </div>
   )

@@ -1,267 +1,124 @@
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Calendar,
+  Calendar as CalendarIcon,
   Users,
-  PieChart,
-  Settings,
+  BarChart3,
+  Settings as SettingsIcon,
   LogOut,
   Menu,
+  X,
+  Wallet,
   Activity,
-  User,
   PackageSearch,
-  FileText,
-  Bell,
-  Megaphone,
   BookOpenCheck,
+  Brain,
+  MonitorPlay,
   Briefcase,
+  Megaphone,
 } from 'lucide-react'
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarProvider,
-  SidebarTrigger,
-  SidebarFooter,
-  SidebarGroup,
-} from '@/components/ui/sidebar'
+import { useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
-import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 export default function Layout() {
-  const { pathname } = useLocation()
-  const { signOut, user } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
-  const [clinicName, setClinicName] = useState('Consultório')
-  const [logoUrl, setLogoUrl] = useState('')
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [userRole, setUserRole] = useState('admin')
-  const [permissions, setPermissions] = useState({
-    agenda: true,
-    pacientes: true,
-    prontuarios: true,
-    financeiro: true,
-    relatorios: true,
-  })
+  const { signOut } = useAuth()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  useEffect(() => {
-    if (user) {
-      supabase
-        .from('usuarios')
-        .select('nome_consultorio, logo_url, role, parent_id')
-        .eq('id', user.id)
-        .single()
-        .then(async ({ data }) => {
-          if (data) {
-            setClinicName(data.nome_consultorio || 'Consultório')
-            setLogoUrl(data.logo_url || '')
-            setUserRole(data.role || 'admin')
-
-            let parentId = user.id
-            if (data.parent_id) parentId = data.parent_id
-
-            if (data.role !== 'admin') {
-              const { data: parentData } = await supabase
-                .from('usuarios')
-                .select('preferencias_dashboard')
-                .eq('id', parentId)
-                .single()
-              const rolePerms = parentData?.preferencias_dashboard?.role_permissions
-              if (rolePerms && rolePerms[data.role]) {
-                setPermissions(rolePerms[data.role])
-              } else if (data.role === 'recepcao') {
-                setPermissions({
-                  agenda: true,
-                  pacientes: true,
-                  prontuarios: false,
-                  financeiro: false,
-                  relatorios: false,
-                })
-              }
-            }
-          }
-        })
-
-      supabase
-        .from('notificacoes')
-        .select('id', { count: 'exact' })
-        .eq('usuario_id', user.id)
-        .eq('lida', false)
-        .limit(0)
-        .then(({ count, error }) => {
-          if (error) {
-            console.error('Erro ao buscar total de notificações:', error)
-          } else if (count !== null) {
-            setUnreadCount(count)
-          }
-        })
-        .catch((err) => console.error('Erro inesperado ao buscar notificações:', err))
-
-      const sub = supabase
-        .channel('notificacoes_changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notificacoes',
-            filter: `usuario_id=eq.${user.id}`,
-          },
-          () => {
-            setUnreadCount((prev) => prev + 1)
-          },
-        )
-        .subscribe()
-
-      return () => {
-        supabase.removeChannel(sub)
-      }
-    }
-  }, [user])
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/auth')
+  }
 
   const menuItems = [
-    { icon: Activity, label: 'Dashboard', path: '/' },
-    ...(permissions.agenda ? [{ icon: Calendar, label: 'Agenda', path: '/agenda' }] : []),
-    ...(permissions.pacientes ? [{ icon: Users, label: 'Pacientes', path: '/pacientes' }] : []),
-    ...(permissions.financeiro ? [{ icon: PieChart, label: 'Financeiro', path: '/carteira' }] : []),
-    ...(permissions.relatorios
-      ? [{ icon: FileText, label: 'Relatórios', path: '/relatorios' }]
-      : []),
-    { icon: Megaphone, label: 'Marketing', path: '/marketing' },
-    ...(permissions.prontuarios
-      ? [{ icon: BookOpenCheck, label: 'Supervisão', path: '/supervisao' }]
-      : []),
-    { icon: PackageSearch, label: 'Estoque', path: '/estoque' },
-    { icon: Briefcase, label: 'RH & Gestão', path: '/rh' },
+    { path: '/', icon: BarChart3, label: 'Dashboard' },
+    { path: '/agenda', icon: CalendarIcon, label: 'Agenda' },
+    { path: '/pacientes', icon: Users, label: 'Pacientes' },
+    { path: '/carteira', icon: Wallet, label: 'Financeiro' },
+    { path: '/rh', icon: Briefcase, label: 'RH & Equipe' },
+    { path: '/marketing', icon: Megaphone, label: 'Marketing' },
+    { path: '/relatorios', icon: Activity, label: 'Relatórios' },
+    { path: '/estoque', icon: PackageSearch, label: 'Estoque' },
+    { path: '/supervisao', icon: BookOpenCheck, label: 'Supervisão' },
+    { path: '/configuracoes', icon: SettingsIcon, label: 'Configurações' },
   ]
 
-  const isActive = (path: string) => {
-    if (path === '/' && pathname !== '/') return false
-    return pathname.startsWith(path)
-  }
-
-  const handleLogout = async () => {
-    await signOut()
-  }
-
   return (
-    <SidebarProvider>
-      <div className="flex h-screen w-full bg-slate-50 overflow-hidden">
-        <Sidebar className="border-r border-slate-200 bg-white">
-          <SidebarHeader className="border-b border-slate-100 p-4 min-h-[70px] flex justify-center">
-            <div className="flex items-center gap-3 overflow-hidden">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt="Logo"
-                  className="w-8 h-8 rounded-md object-cover shrink-0"
-                />
-              ) : (
-                <div className="w-8 h-8 bg-primary/10 text-primary rounded-md flex items-center justify-center shrink-0 font-bold">
-                  {clinicName.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <span className="font-bold text-slate-800 truncate text-sm">{clinicName}</span>
-            </div>
-          </SidebarHeader>
-
-          <SidebarContent className="p-3">
-            <SidebarGroup>
-              <SidebarMenu className="gap-1.5">
-                {menuItems.map((item) => (
-                  <SidebarMenuItem key={item.path}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(item.path)}
-                      tooltip={item.label}
-                      className="rounded-md"
-                    >
-                      <Link to={item.path} className="flex items-center gap-3">
-                        <item.icon className="h-4 w-4" />
-                        <span className="font-medium">{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
-          </SidebarContent>
-
-          <SidebarFooter className="border-t border-slate-100 p-3 space-y-2">
-            <SidebarMenu>
-              {userRole === 'admin' && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive('/configuracoes')}
-                    tooltip="Configurações"
-                  >
-                    <Link to="/configuracoes">
-                      <Settings className="h-4 w-4" />
-                      <span className="font-medium">Configurações</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  onClick={handleLogout}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span className="font-medium">Sair</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarFooter>
-        </Sidebar>
-
-        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-          <header className="h-[70px] bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-20">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="text-slate-500 md:hidden" />
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-bold text-slate-800">App Gestão de Consultório</h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/notificacoes')}
-                className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
-                title="Notificações"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border border-white">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </button>
-              <div className="hidden md:flex flex-col items-end mr-2">
-                <span className="text-sm font-semibold text-slate-700">{user?.email}</span>
-                <span className="text-xs text-slate-500 capitalize">{userRole}</span>
-              </div>
-              <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
-                {logoUrl ? (
-                  <img src={logoUrl} className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-5 h-5 text-slate-400" />
-                )}
-              </div>
-            </div>
-          </header>
-
-          <main className="flex-1 overflow-auto p-4 sm:p-6 md:p-8 w-full">
-            <div className="max-w-7xl mx-auto h-full">
-              <Outlet />
-            </div>
-          </main>
+    <div className="min-h-screen bg-slate-50 font-sans">
+      {/* Mobile Header */}
+      <header className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-100 sticky top-0 z-50">
+        <div className="flex items-center gap-2 text-primary font-bold text-xl">
+          <Brain className="w-6 h-6" /> PsicManager
         </div>
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 -mr-2 text-slate-600 hover:bg-slate-50 rounded-xl"
+        >
+          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </header>
+
+      <div className="flex">
+        {/* Sidebar */}
+        <aside
+          className={cn(
+            'fixed lg:sticky top-0 left-0 z-40 h-screen w-72 bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 ease-in-out',
+            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          )}
+        >
+          <div className="p-6 flex items-center gap-3 text-primary font-black text-2xl tracking-tight hidden lg:flex">
+            <Brain className="w-8 h-8" /> PsicManager
+          </div>
+
+          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+            {menuItems.map((item) => {
+              const isActive =
+                location.pathname === item.path ||
+                (item.path !== '/' && location.pathname.startsWith(item.path))
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    'flex items-center gap-3 px-4 py-3.5 rounded-2xl font-bold transition-all',
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900',
+                  )}
+                >
+                  <item.icon className="w-5 h-5 shrink-0" />
+                  {item.label}
+                </Link>
+              )
+            })}
+          </nav>
+
+          <div className="p-4 border-t border-slate-100">
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-3 px-4 py-3.5 w-full rounded-2xl font-bold text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+            >
+              <LogOut className="w-5 h-5 shrink-0" />
+              Sair da conta
+            </button>
+          </div>
+        </aside>
+
+        {/* Overlay */}
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 sm:p-8 lg:p-10 max-w-full overflow-x-hidden min-h-screen">
+          <Outlet />
+        </main>
       </div>
-    </SidebarProvider>
+    </div>
   )
 }

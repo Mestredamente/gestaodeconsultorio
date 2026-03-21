@@ -25,12 +25,7 @@ export default function Patients() {
         .eq('usuario_id', user.id)
         .order('nome')
 
-      if (error) {
-        console.error('Error fetching patients:', error)
-      } else if (data) {
-        setPatients(data)
-      }
-
+      if (!error && data) setPatients(data)
       setLoading(false)
     }
     fetchPatients()
@@ -38,45 +33,34 @@ export default function Patients() {
 
   const filtered = patients.filter((p) => {
     if (!search) return true
-
     const s = search.toLowerCase()
-    const sDigits = s.replace(/\D/g, '')
-
-    const matchName = p.nome?.toLowerCase().includes(s)
-    const matchEmail = p.email?.toLowerCase().includes(s)
-
-    const pCpfDigits = p.cpf?.replace(/\D/g, '')
-    const matchCpf = p.cpf?.toLowerCase().includes(s) || (sDigits && pCpfDigits?.includes(sDigits))
-
-    const pPhoneDigits = p.telefone?.replace(/\D/g, '')
-    const matchPhone =
-      p.telefone?.toLowerCase().includes(s) || (sDigits && pPhoneDigits?.includes(sDigits))
-
-    return matchName || matchEmail || matchCpf || matchPhone
+    return p.nome?.toLowerCase().includes(s) || p.email?.toLowerCase().includes(s)
   })
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-10">
+    <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-12">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Pacientes</h1>
-          <p className="text-slate-500">Gerencie sua base de pacientes e níveis de engajamento.</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Pacientes</h1>
+          <p className="text-slate-500 mt-1 text-base">
+            Gerencie sua base de pacientes e prontuários.
+          </p>
         </div>
         <Button
-          className="gap-2 shadow-sm rounded-full"
+          className="gap-2 shadow-sm rounded-xl h-11 px-6 text-base"
           onClick={() => navigate('/pacientes/novo')}
         >
-          <Plus className="w-4 h-4" /> Adicionar Paciente
+          <Plus className="w-5 h-5" /> Novo Paciente
         </Button>
       </div>
 
-      <Card className="shadow-sm border-slate-200">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-          <div className="relative max-w-md w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <Card className="shadow-sm border-slate-100 rounded-[2rem] overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-6">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
-              className="pl-9 bg-white"
-              placeholder="Buscar por nome, email, CPF ou telefone..."
+              className="pl-11 bg-white h-12 rounded-xl border-slate-200 text-base"
+              placeholder="Buscar por nome ou e-mail..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -84,46 +68,35 @@ export default function Patients() {
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-12 flex justify-center">
+            <div className="p-16 flex justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-12 text-center text-slate-500">Nenhum paciente encontrado.</div>
+            <div className="p-16 text-center text-slate-500 font-medium">
+              Nenhum paciente encontrado.
+            </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {filtered.map((p) => {
-                const achievementsCount = p.testes_pacientes?.length || 0
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => navigate(`/pacientes/${p.id}`)}
-                    className="p-4 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
-                        <UserRound className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-slate-900 group-hover:text-primary transition-colors">
-                          {p.nome}
-                        </h3>
-                        <p className="text-sm text-slate-500">{p.telefone || 'Sem telefone'}</p>
-                      </div>
+              {filtered.map((p) => (
+                <div
+                  key={p.id}
+                  onClick={() => navigate(`/pacientes/${p.id}`)}
+                  className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between hover:bg-slate-50/50 cursor-pointer transition-colors group gap-4"
+                >
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 shrink-0 shadow-sm border border-indigo-100">
+                      <UserRound className="w-6 h-6" />
                     </div>
-                    <div className="flex items-center gap-4">
-                      {achievementsCount > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="bg-amber-50 text-amber-700 border-amber-200 gap-1.5 shadow-sm"
-                        >
-                          <Trophy className="w-3 h-3 text-amber-500" /> Nível {achievementsCount}
-                        </Badge>
-                      )}
-                      <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" />
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-800 group-hover:text-primary transition-colors">
+                        {p.nome}
+                      </h3>
+                      <p className="text-slate-500">{p.telefone || 'Sem telefone'}</p>
                     </div>
                   </div>
-                )
-              })}
+                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors hidden sm:block" />
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
