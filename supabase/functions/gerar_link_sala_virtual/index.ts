@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
         global: {
           headers: { Authorization: req.headers.get('Authorization')! },
         },
-      },
+      }
     )
 
     const { agendamento_id } = await req.json()
