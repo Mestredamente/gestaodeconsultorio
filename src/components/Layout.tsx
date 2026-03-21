@@ -12,19 +12,72 @@ import {
   PackageSearch,
   BookOpenCheck,
   Brain,
-  MonitorPlay,
   Briefcase,
   Megaphone,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase/client'
 
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [clinic, setClinic] = useState({ name: 'PsicManager', logo: '' })
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('usuarios')
+        .select('nome_consultorio, logo_url, preferencias_dashboard')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setClinic({ name: data.nome_consultorio || 'PsicManager', logo: data.logo_url || '' })
+            if (data.preferencias_dashboard?.theme) {
+              document.documentElement.classList.remove(
+                'theme-indigo',
+                'theme-blue',
+                'theme-emerald',
+                'theme-rose',
+                'theme-slate',
+              )
+              document.documentElement.classList.add(data.preferencias_dashboard.theme)
+            }
+          }
+        })
+
+      const channel = supabase
+        .channel('layout_changes')
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'usuarios', filter: `id=eq.${user.id}` },
+          (payload) => {
+            const newName = payload.new.nome_consultorio || 'PsicManager'
+            const newLogo = payload.new.logo_url || ''
+            setClinic({ name: newName, logo: newLogo })
+            if (payload.new.preferencias_dashboard?.theme) {
+              document.documentElement.classList.remove(
+                'theme-indigo',
+                'theme-blue',
+                'theme-emerald',
+                'theme-rose',
+                'theme-slate',
+              )
+              document.documentElement.classList.add(payload.new.preferencias_dashboard.theme)
+            }
+          },
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [user])
 
   const handleSignOut = async () => {
     await signOut()
@@ -48,12 +101,21 @@ export default function Layout() {
     <div className="min-h-screen bg-slate-50 font-sans">
       {/* Mobile Header */}
       <header className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-100 sticky top-0 z-50">
-        <div className="flex items-center gap-2 text-primary font-bold text-xl">
-          <Brain className="w-6 h-6" /> PsicManager
+        <div className="flex items-center gap-2 text-primary font-bold text-xl truncate max-w-[200px]">
+          {clinic.logo ? (
+            <img
+              src={clinic.logo}
+              alt="Logo"
+              className="w-8 h-8 object-contain rounded-md shrink-0"
+            />
+          ) : (
+            <Brain className="w-6 h-6 shrink-0" />
+          )}
+          <span className="truncate">{clinic.name}</span>
         </div>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 -mr-2 text-slate-600 hover:bg-slate-50 rounded-xl"
+          className="p-2 -mr-2 text-slate-600 hover:bg-slate-50 rounded-xl shrink-0"
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -68,7 +130,16 @@ export default function Layout() {
           )}
         >
           <div className="p-6 flex items-center gap-3 text-primary font-black text-2xl tracking-tight hidden lg:flex">
-            <Brain className="w-8 h-8" /> PsicManager
+            {clinic.logo ? (
+              <img
+                src={clinic.logo}
+                alt="Logo"
+                className="w-8 h-8 object-contain rounded-md shrink-0"
+              />
+            ) : (
+              <Brain className="w-8 h-8 shrink-0" />
+            )}
+            <span className="truncate">{clinic.name}</span>
           </div>
 
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">

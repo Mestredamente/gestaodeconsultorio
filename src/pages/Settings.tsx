@@ -7,7 +7,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Shield, Landmark, User, Key, CheckCircle2, RefreshCw, ExternalLink } from 'lucide-react'
+import {
+  Shield,
+  Landmark,
+  User,
+  Key,
+  CheckCircle2,
+  RefreshCw,
+  ExternalLink,
+  Palette,
+  Image as ImageIcon,
+} from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
@@ -46,6 +56,14 @@ const SECRETS_LIST = [
   },
 ]
 
+const THEMES = [
+  { id: 'theme-indigo', name: 'Roxo (Padrão)', color: 'bg-[#8b5cf6]' },
+  { id: 'theme-blue', name: 'Azul', color: 'bg-[#3b82f6]' },
+  { id: 'theme-emerald', name: 'Esmeralda', color: 'bg-[#10b981]' },
+  { id: 'theme-rose', name: 'Rosa', color: 'bg-[#f43f5e]' },
+  { id: 'theme-slate', name: 'Grafite', color: 'bg-[#64748b]' },
+]
+
 export default function Settings() {
   const { user, updatePassword } = useAuth()
   const { toast } = useToast()
@@ -59,6 +77,7 @@ export default function Settings() {
     telefone_consultorio: '',
     endereco_consultorio: '',
     chave_pix: '',
+    logo_url: '',
     preferencias_dashboard: {} as any,
   })
 
@@ -83,6 +102,7 @@ export default function Settings() {
           telefone_consultorio: data.telefone_consultorio || '',
           endereco_consultorio: data.endereco_consultorio || '',
           chave_pix: data.chave_pix || '',
+          logo_url: data.logo_url || '',
           preferencias_dashboard: data.preferencias_dashboard || {},
         })
         if (data.preferencias_dashboard?.bankInfo) {
@@ -115,6 +135,7 @@ export default function Settings() {
         telefone_consultorio: formData.telefone_consultorio,
         endereco_consultorio: formData.endereco_consultorio,
         chave_pix: formData.chave_pix,
+        logo_url: formData.logo_url,
         preferencias_dashboard: prefs,
       })
       .eq('id', user.id)
@@ -172,6 +193,9 @@ export default function Settings() {
         <TabsList className="bg-slate-100/80 p-1.5 rounded-2xl mb-8 flex overflow-x-auto [&::-webkit-scrollbar]:hidden">
           <TabsTrigger value="perfil" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
             <User className="w-4 h-4" /> Perfil & Clínica
+          </TabsTrigger>
+          <TabsTrigger value="aparencia" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
+            <Palette className="w-4 h-4" /> Aparência
           </TabsTrigger>
           <TabsTrigger value="financeiro" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
             <Landmark className="w-4 h-4" /> Financeiro
@@ -232,6 +256,100 @@ export default function Settings() {
                     }
                     className="bg-slate-50/50 rounded-xl min-h-[100px] resize-none"
                   />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="aparencia" className="space-y-6">
+            <Card className="rounded-[2rem] shadow-sm border-slate-100">
+              <CardHeader className="p-8 pb-4">
+                <CardTitle className="text-xl">Identidade Visual</CardTitle>
+                <CardDescription>
+                  Personalize a aparência do sistema com a sua marca e cores.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-8 pt-0 space-y-8">
+                <div className="space-y-4">
+                  <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4" /> Logo e Nome
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <div className="space-y-2">
+                      <Label>Nome do Aplicativo / Clínica</Label>
+                      <Input
+                        value={formData.nome_consultorio}
+                        onChange={(e) =>
+                          setFormData({ ...formData, nome_consultorio: e.target.value })
+                        }
+                        className="bg-white rounded-xl h-11"
+                      />
+                      <p className="text-xs text-slate-500">
+                        Este nome aparecerá no menu lateral e nos portais.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>URL do Logo</Label>
+                      <Input
+                        value={formData.logo_url}
+                        onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
+                        placeholder="https://sua-imagem.com/logo.png"
+                        className="bg-white rounded-xl h-11"
+                      />
+                      <p className="text-xs text-slate-500">
+                        Insira um link direto para a imagem do seu logo.
+                      </p>
+                      {formData.logo_url && (
+                        <div className="mt-2 p-3 bg-white rounded-xl border border-slate-200 inline-block h-20 flex items-center justify-center">
+                          <img
+                            src={formData.logo_url}
+                            alt="Logo"
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-6 border-t border-slate-100">
+                  <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                    <Palette className="w-4 h-4" /> Tema de Cores
+                  </h3>
+                  <div className="flex flex-wrap gap-4">
+                    {THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            preferencias_dashboard: {
+                              ...formData.preferencias_dashboard,
+                              theme: theme.id,
+                            },
+                          })
+                          document.documentElement.classList.remove(
+                            'theme-indigo',
+                            'theme-blue',
+                            'theme-emerald',
+                            'theme-rose',
+                            'theme-slate',
+                          )
+                          document.documentElement.classList.add(theme.id)
+                        }}
+                        className={cn(
+                          'w-28 h-28 rounded-2xl border-2 flex flex-col items-center justify-center gap-3 transition-all',
+                          formData.preferencias_dashboard?.theme === theme.id
+                            ? 'border-primary bg-primary/5 shadow-md'
+                            : 'border-slate-200 bg-white hover:border-slate-300',
+                        )}
+                      >
+                        <div className={cn('w-8 h-8 rounded-full shadow-sm', theme.color)} />
+                        <span className="text-xs font-semibold text-slate-700">{theme.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
