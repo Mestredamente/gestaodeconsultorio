@@ -651,7 +651,7 @@ export default function Agenda() {
                 htmlFor="online"
                 className="cursor-pointer font-bold text-blue-900 flex items-center gap-2"
               >
-                <Video className="w-4 h-4" /> Sessão Online (Telemedicina)
+                <Video className="w-4 h-4" /> Sessão Online
               </Label>
             </div>
 

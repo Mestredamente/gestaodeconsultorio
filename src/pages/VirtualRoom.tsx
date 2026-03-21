@@ -42,6 +42,9 @@ import {
   CheckCircle,
   CalendarPlus,
   Clock,
+  Play,
+  Settings,
+  ArrowLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -53,6 +56,24 @@ export default function VirtualRoom() {
   const [loading, setLoading] = useState(true)
   const [appointments, setAppointments] = useState<any[]>([])
   const [activeSession, setActiveSession] = useState<any | null>(null)
+
+  // Dispositivos state
+  const [inDeviceTest, setInDeviceTest] = useState(false)
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([])
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedVideo, setSelectedVideo] = useState<string>('')
+  const [selectedAudio, setSelectedAudio] = useState<string>('')
+  const [audioLevel, setAudioLevel] = useState(0)
+  const [deviceError, setDeviceError] = useState<string | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const localVideoRef = useRef<HTMLVideoElement>(null)
+  const [stream, setStream] = useState<MediaStream | null>(null)
+
+  // Media controls
+  const [micOn, setMicOn] = useState(true)
+  const [camOn, setCamOn] = useState(true)
 
   // Notes state
   const [isNotesOpen, setIsNotesOpen] = useState(false)
@@ -68,10 +89,6 @@ export default function VirtualRoom() {
   const [nextType, setNextType] = useState('online')
   const [availableTimes, setAvailableTimes] = useState<string[]>([])
   const [isScheduling, setIsScheduling] = useState(false)
-
-  // Media controls (mock)
-  const [micOn, setMicOn] = useState(true)
-  const [videoOn, setVideoOn] = useState(true)
 
   useEffect(() => {
     fetchTodayAppointments()
@@ -98,9 +115,30 @@ export default function VirtualRoom() {
     setLoading(false)
   }
 
-  // Handle joining a session
-  const joinSession = async (apt: any) => {
+  // Handle preparing a session
+  const prepareSession = async (apt: any) => {
     setActiveSession(apt)
+    setInDeviceTest(true)
+
+    // Setup devices
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoInput = devices.filter((device) => device.kind === 'videoinput')
+      const audioInput = devices.filter((device) => device.kind === 'audioinput')
+
+      setVideoDevices(videoInput)
+      setAudioDevices(audioInput)
+
+      if (videoInput.length > 0) setSelectedVideo(videoInput[0].deviceId)
+      if (audioInput.length > 0) setSelectedAudio(audioInput[0].deviceId)
+    } catch (err: any) {
+      setDeviceError(
+        'Permissão negada ou dispositivos não encontrados. Por favor, libere o acesso à câmera e ao microfone no seu navegador.',
+      )
+      setCamOn(false)
+      setMicOn(false)
+    }
 
     // Ensure prontuario exists and load notes
     let { data: pront } = await supabase
@@ -124,9 +162,104 @@ export default function VirtualRoom() {
     }
   }
 
+  useEffect(() => {
+    let activeStream: MediaStream | null = null
+
+    const initMedia = async () => {
+      if (deviceError || (!inDeviceTest && !activeSession)) return
+      try {
+        if (activeStream) {
+          activeStream.getTracks().forEach((t) => t.stop())
+        }
+
+        const constraints = {
+          video: selectedVideo ? { deviceId: { exact: selectedVideo } } : true,
+          audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true,
+        }
+
+        activeStream = await navigator.mediaDevices.getUserMedia(constraints)
+        setStream(activeStream)
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = activeStream
+        }
+
+        // Setup audio level meter
+        if (inDeviceTest && activeStream.getAudioTracks().length > 0) {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (
+              window.AudioContext || (window as any).webkitAudioContext
+            )()
+          }
+          if (audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume()
+          }
+
+          const source = audioContextRef.current.createMediaStreamSource(activeStream)
+          analyserRef.current = audioContextRef.current.createAnalyser()
+          analyserRef.current.fftSize = 256
+          source.connect(analyserRef.current)
+
+          const bufferLength = analyserRef.current.frequencyBinCount
+          const dataArray = new Uint8Array(bufferLength)
+
+          const updateVolume = () => {
+            if (!analyserRef.current) return
+            analyserRef.current.getByteFrequencyData(dataArray)
+            let sum = 0
+            for (let i = 0; i < bufferLength; i++) {
+              sum += dataArray[i]
+            }
+            const average = sum / bufferLength
+            setAudioLevel(Math.min(100, Math.round((average / 255) * 100 * 1.5)))
+            animationFrameRef.current = requestAnimationFrame(updateVolume)
+          }
+          updateVolume()
+        }
+      } catch (err) {
+        console.error('Error starting media', err)
+      }
+    }
+
+    initMedia()
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach((t) => t.stop())
+      }
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
+    }
+  }, [selectedVideo, selectedAudio, inDeviceTest, activeSession, deviceError])
+
+  useEffect(() => {
+    if (stream) {
+      const videoTrack = stream.getVideoTracks()[0]
+      if (videoTrack) videoTrack.enabled = camOn
+      const audioTrack = stream.getAudioTracks()[0]
+      if (audioTrack) audioTrack.enabled = micOn
+    }
+  }, [camOn, micOn, stream])
+
+  const playTestSound = () => {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContext) return
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(440, ctx.currentTime)
+    gain.gain.setValueAtTime(0, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.1)
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 1)
+  }
+
   // Real-time and Debounce for notes
   useEffect(() => {
-    if (!activeSession) return
+    if (!activeSession || inDeviceTest) return
 
     const channel = supabase
       .channel(`prontuarios_${activeSession.paciente_id}`)
@@ -150,7 +283,7 @@ export default function VirtualRoom() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [activeSession])
+  }, [activeSession, inDeviceTest])
 
   const handleNotesChange = (val: string) => {
     setNotes(val)
@@ -270,7 +403,7 @@ export default function VirtualRoom() {
         window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank')
       }
 
-      navigate('/')
+      endSessionCleanup()
     } catch (err: any) {
       toast({ title: 'Erro ao agendar', description: err.message, variant: 'destructive' })
     } finally {
@@ -283,7 +416,20 @@ export default function VirtualRoom() {
     if (!activeSession) return
     await supabase.from('agendamentos').update({ status: 'compareceu' }).eq('id', activeSession.id)
     toast({ title: 'Sessão finalizada com sucesso.' })
+    endSessionCleanup()
+  }
+
+  const endSessionCleanup = () => {
+    if (stream) stream.getTracks().forEach((track) => track.stop())
+    setActiveSession(null)
+    setInDeviceTest(false)
+    setIsFinishModalOpen(false)
     navigate('/')
+  }
+
+  const joinLiveSession = () => {
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
+    setInDeviceTest(false)
   }
 
   if (loading)
@@ -345,10 +491,10 @@ export default function VirtualRoom() {
                       </div>
                     </div>
                     <Button
-                      onClick={() => joinSession(apt)}
+                      onClick={() => prepareSession(apt)}
                       className="w-full gap-2 rounded-xl h-11 bg-primary hover:bg-primary/90"
                     >
-                      <Video className="w-4 h-4" /> Entrar na Sala
+                      <Video className="w-4 h-4" /> Preparar Sala
                     </Button>
                   </CardContent>
                 </Card>
@@ -363,6 +509,158 @@ export default function VirtualRoom() {
   const patient = Array.isArray(activeSession.pacientes)
     ? activeSession.pacientes[0]
     : activeSession.pacientes
+
+  if (inDeviceTest) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center py-6 px-4 animate-fade-in overflow-y-auto">
+        <div className="w-full max-w-4xl mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              if (stream) stream.getTracks().forEach((t) => t.stop())
+              setActiveSession(null)
+              setInDeviceTest(false)
+            }}
+            className="gap-2 text-slate-500 hover:text-slate-800 -ml-2 mb-2"
+          >
+            <ArrowLeft className="w-4 h-4" /> Voltar
+          </Button>
+          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-xl text-primary">
+              <Settings className="w-6 h-6" />
+            </div>
+            Teste de Dispositivos e Preparação
+          </h1>
+          <p className="text-slate-500 mt-2 text-lg">
+            Configure seu áudio e vídeo antes de iniciar a sessão com {patient?.nome}.
+          </p>
+        </div>
+
+        <div className="w-full max-w-4xl space-y-6">
+          <Card className="shadow-sm border-slate-200 bg-white">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Video className="w-5 h-5 text-primary" /> Preview de Câmera
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              {deviceError ? (
+                <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 text-sm font-medium">
+                  {deviceError}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden relative flex items-center justify-center border-4 border-slate-100 shadow-inner">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`w-full h-full object-cover transition-all duration-300 ${!camOn ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+                    />
+                    {!camOn && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900">
+                        <VideoOff className="w-12 h-12 mb-3" />
+                        <span className="font-medium">Câmera Desativada</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <Label className="font-bold text-slate-700">Selecione a Câmera</Label>
+                      <Select
+                        value={selectedVideo}
+                        onValueChange={setSelectedVideo}
+                        disabled={videoDevices.length === 0 || !camOn}
+                      >
+                        <SelectTrigger className="bg-slate-50 h-11">
+                          <SelectValue placeholder="Câmera Padrão" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {videoDevices.map((device) => (
+                            <SelectItem key={device.deviceId} value={device.deviceId}>
+                              {device.label || `Câmera ${device.deviceId.substring(0, 5)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="font-bold text-slate-700">Selecione o Microfone</Label>
+                      <Select
+                        value={selectedAudio}
+                        onValueChange={setSelectedAudio}
+                        disabled={audioDevices.length === 0 || !micOn}
+                      >
+                        <SelectTrigger className="bg-slate-50 h-11">
+                          <SelectValue placeholder="Microfone Padrão" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {audioDevices.map((device) => (
+                            <SelectItem key={device.deviceId} value={device.deviceId}>
+                              {device.label || `Microfone ${device.deviceId.substring(0, 5)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Label className="font-bold text-slate-700">Nível do Microfone</Label>
+                        {micOn && (
+                          <span className="text-xs font-medium text-emerald-600">Captando...</span>
+                        )}
+                      </div>
+                      <div className="h-3 bg-slate-100 rounded-full overflow-hidden flex items-center">
+                        <div
+                          className="h-full bg-emerald-500 transition-all duration-100 ease-out"
+                          style={{ width: micOn ? `${audioLevel}%` : '0%' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center gap-2 flex-wrap">
+                      <div className="flex gap-2">
+                        <Button
+                          variant={micOn ? 'outline' : 'destructive'}
+                          onClick={() => setMicOn(!micOn)}
+                          className={`w-12 h-12 rounded-full p-0 ${micOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
+                          title={micOn ? 'Desativar Microfone' : 'Ativar Microfone'}
+                        >
+                          {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                        </Button>
+                        <Button
+                          variant={camOn ? 'outline' : 'destructive'}
+                          onClick={() => setCamOn(!camOn)}
+                          className={`w-12 h-12 rounded-full p-0 ${camOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
+                          title={camOn ? 'Desativar Câmera' : 'Ativar Câmera'}
+                        >
+                          {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                        </Button>
+                      </div>
+                      <Button variant="secondary" onClick={playTestSound} className="gap-2">
+                        <Play className="w-4 h-4 text-slate-600" /> Testar Saída de Áudio
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Button
+            className="w-full gap-2 text-lg h-14 bg-primary hover:bg-primary/90 text-white shadow-lg"
+            onClick={joinLiveSession}
+          >
+            <CheckCircle className="w-5 h-5" /> Confirmar e Continuar
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 animate-fade-in relative mt-2 mb-6 max-w-[1600px] mx-auto">
@@ -443,13 +741,25 @@ export default function VirtualRoom() {
           </div>
         </div>
 
-        {/* Local Video Mock */}
+        {/* Local Video - Real Stream from WebRTC */}
         <div className="absolute bottom-24 right-6 w-48 h-64 bg-slate-800 rounded-2xl border-2 border-slate-700 overflow-hidden shadow-xl">
-          <img
-            src={`https://img.usecurling.com/ppl/thumbnail?gender=male&seed=${user?.id}`}
-            alt="You"
-            className="w-full h-full object-cover"
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
+            ref={(node) => {
+              if (node && stream && node.srcObject !== stream) {
+                node.srcObject = stream
+              }
+            }}
           />
+          {!camOn && (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-500">
+              <VideoOff className="w-8 h-8 mb-2" />
+            </div>
+          )}
           <div className="absolute bottom-2 left-2 text-white bg-black/40 px-2 py-1 rounded text-xs backdrop-blur-sm">
             Você
           </div>
@@ -474,7 +784,7 @@ export default function VirtualRoom() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => setVideoOn(!videoOn)}
+          onClick={() => setCamOn(!camOn)}
           className={cn(
             'w-12 h-12 rounded-full border-0',
             videoOn
@@ -482,7 +792,7 @@ export default function VirtualRoom() {
               : 'bg-red-500 text-white hover:bg-red-600',
           )}
         >
-          {videoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+          {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
         </Button>
 
         <Dialog open={isFinishModalOpen} onOpenChange={setIsFinishModalOpen}>

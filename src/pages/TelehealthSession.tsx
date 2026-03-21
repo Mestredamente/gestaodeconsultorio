@@ -9,6 +9,13 @@ import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Video,
   Mic,
   MicOff,
@@ -26,6 +33,9 @@ import {
   Calendar,
   Link as LinkIcon,
   Plus,
+  Play,
+  Settings,
+  CheckCircle,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
@@ -59,35 +69,111 @@ export default function TelehealthSession() {
   const [avulsaValue, setAvulsaValue] = useState('')
   const [creatingAvulsa, setCreatingAvulsa] = useState(false)
 
+  // Device Test states
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([])
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedVideo, setSelectedVideo] = useState<string>('')
+  const [selectedAudio, setSelectedAudio] = useState<string>('')
+  const [audioLevel, setAudioLevel] = useState(0)
+  const [deviceError, setDeviceError] = useState<string | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+
   const isAvulsa = agendamentoId === 'nova'
 
   useEffect(() => {
-    let activeStream: MediaStream | null = null
-    const initMedia = async () => {
+    const getDevices = async () => {
       try {
-        activeStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-        setStream(activeStream)
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = activeStream
-        }
-      } catch (err) {
-        toast({
-          title: 'Atenção (Permissão Negada)',
-          description:
-            'Não foi possível acessar a câmera ou microfone. Verifique as permissões do seu navegador.',
-          variant: 'destructive',
-        })
+        await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const videoInput = devices.filter((device) => device.kind === 'videoinput')
+        const audioInput = devices.filter((device) => device.kind === 'audioinput')
+
+        setVideoDevices(videoInput)
+        setAudioDevices(audioInput)
+
+        if (videoInput.length > 0) setSelectedVideo(videoInput[0].deviceId)
+        if (audioInput.length > 0) setSelectedAudio(audioInput[0].deviceId)
+      } catch (err: any) {
+        setDeviceError(
+          'Permissão negada ou dispositivos não encontrados. Por favor, libere o acesso à câmera e ao microfone no seu navegador.',
+        )
         setCamOn(false)
         setMicOn(false)
       }
     }
+    getDevices()
+  }, [])
+
+  useEffect(() => {
+    let activeStream: MediaStream | null = null
+
+    const initMedia = async () => {
+      if (deviceError) return
+      try {
+        if (activeStream) {
+          activeStream.getTracks().forEach((t) => t.stop())
+        }
+
+        const constraints = {
+          video: selectedVideo ? { deviceId: { exact: selectedVideo } } : true,
+          audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true,
+        }
+
+        activeStream = await navigator.mediaDevices.getUserMedia(constraints)
+        setStream(activeStream)
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = activeStream
+        }
+
+        // Setup audio level meter
+        if (inWaitingRoom && activeStream.getAudioTracks().length > 0) {
+          if (!audioContextRef.current) {
+            audioContextRef.current = new (
+              window.AudioContext || (window as any).webkitAudioContext
+            )()
+          }
+          if (audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume()
+          }
+
+          const source = audioContextRef.current.createMediaStreamSource(activeStream)
+          analyserRef.current = audioContextRef.current.createAnalyser()
+          analyserRef.current.fftSize = 256
+          source.connect(analyserRef.current)
+
+          const bufferLength = analyserRef.current.frequencyBinCount
+          const dataArray = new Uint8Array(bufferLength)
+
+          const updateVolume = () => {
+            if (!analyserRef.current) return
+            analyserRef.current.getByteFrequencyData(dataArray)
+            let sum = 0
+            for (let i = 0; i < bufferLength; i++) {
+              sum += dataArray[i]
+            }
+            const average = sum / bufferLength
+            setAudioLevel(Math.min(100, Math.round((average / 255) * 100 * 1.5)))
+            animationFrameRef.current = requestAnimationFrame(updateVolume)
+          }
+          updateVolume()
+        }
+      } catch (err) {
+        console.error('Error starting media', err)
+      }
+    }
+
     initMedia()
+
     return () => {
       if (activeStream) {
         activeStream.getTracks().forEach((t) => t.stop())
       }
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
     }
-  }, [toast])
+  }, [selectedVideo, selectedAudio, inWaitingRoom, deviceError])
 
   useEffect(() => {
     if (stream) {
@@ -302,6 +388,23 @@ export default function TelehealthSession() {
     toast({ title: 'Link copiado!', description: 'Envie para o paciente acessar a sala.' })
   }
 
+  const playTestSound = () => {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext
+    if (!AudioContext) return
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(440, ctx.currentTime)
+    gain.gain.setValueAtTime(0, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.1)
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 1)
+  }
+
   if (loading)
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
@@ -322,60 +425,134 @@ export default function TelehealthSession() {
           </Button>
           <h1 className="text-3xl font-bold text-slate-900 mt-2 flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-xl text-primary">
-              <Video className="w-6 h-6" />
+              <Settings className="w-6 h-6" />
             </div>
-            Ambiente de Pré-Sessão
+            Teste de Dispositivos e Preparação
           </h1>
           <p className="text-slate-500 mt-2 text-lg">
-            Prepare seu equipamento e gerencie seus links de acesso.
+            Configure seu áudio e vídeo antes de iniciar a sessão online.
           </p>
         </div>
 
         <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card className="shadow-sm border-slate-200 h-fit bg-white">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-              <CardTitle className="text-lg">Teste de Câmera e Microfone</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Video className="w-5 h-5 text-primary" /> Preview de Câmera
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
-              <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center border border-slate-200 shadow-inner">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
-                />
-                {!camOn && <VideoOff className="w-12 h-12 text-slate-600" />}
-              </div>
-              <div className="flex justify-center gap-4 flex-wrap">
-                <Button
-                  variant={micOn ? 'outline' : 'destructive'}
-                  onClick={() => setMicOn(!micOn)}
-                  className={`w-40 ${micOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
-                >
-                  {micOn ? <Mic className="w-4 h-4 mr-2" /> : <MicOff className="w-4 h-4 mr-2" />}
-                  {micOn ? 'Microfone OK' : 'Mudo'}
-                </Button>
-                <Button
-                  variant={camOn ? 'outline' : 'destructive'}
-                  onClick={() => setCamOn(!camOn)}
-                  className={`w-40 ${camOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
-                >
-                  {camOn ? (
-                    <Video className="w-4 h-4 mr-2" />
-                  ) : (
-                    <VideoOff className="w-4 h-4 mr-2" />
-                  )}
-                  {camOn ? 'Câmera OK' : 'Desligada'}
-                </Button>
-              </div>
+              {deviceError ? (
+                <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 text-sm font-medium">
+                  {deviceError}
+                </div>
+              ) : (
+                <>
+                  <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden relative flex items-center justify-center border-4 border-slate-100 shadow-inner">
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`w-full h-full object-cover transition-all duration-300 ${!camOn ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+                    />
+                    {!camOn && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900">
+                        <VideoOff className="w-12 h-12 mb-3" />
+                        <span className="font-medium">Câmera Desativada</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="font-bold text-slate-700">Selecione a Câmera</Label>
+                      <Select
+                        value={selectedVideo}
+                        onValueChange={setSelectedVideo}
+                        disabled={videoDevices.length === 0 || !camOn}
+                      >
+                        <SelectTrigger className="bg-slate-50 h-11">
+                          <SelectValue placeholder="Câmera Padrão" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {videoDevices.map((device) => (
+                            <SelectItem key={device.deviceId} value={device.deviceId}>
+                              {device.label || `Câmera ${device.deviceId.substring(0, 5)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="font-bold text-slate-700">Selecione o Microfone</Label>
+                      <Select
+                        value={selectedAudio}
+                        onValueChange={setSelectedAudio}
+                        disabled={audioDevices.length === 0 || !micOn}
+                      >
+                        <SelectTrigger className="bg-slate-50 h-11">
+                          <SelectValue placeholder="Microfone Padrão" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {audioDevices.map((device) => (
+                            <SelectItem key={device.deviceId} value={device.deviceId}>
+                              {device.label || `Microfone ${device.deviceId.substring(0, 5)}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Label className="font-bold text-slate-700">Nível do Microfone</Label>
+                        {micOn && (
+                          <span className="text-xs font-medium text-emerald-600">Captando...</span>
+                        )}
+                      </div>
+                      <div className="h-3 bg-slate-100 rounded-full overflow-hidden flex items-center">
+                        <div
+                          className="h-full bg-emerald-500 transition-all duration-100 ease-out"
+                          style={{ width: micOn ? `${audioLevel}%` : '0%' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-4 border-t border-slate-100 gap-2 flex-wrap">
+                    <div className="flex gap-2">
+                      <Button
+                        variant={micOn ? 'outline' : 'destructive'}
+                        onClick={() => setMicOn(!micOn)}
+                        className={`w-12 h-12 rounded-full p-0 ${micOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
+                        title={micOn ? 'Desativar Microfone' : 'Ativar Microfone'}
+                      >
+                        {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                      </Button>
+                      <Button
+                        variant={camOn ? 'outline' : 'destructive'}
+                        onClick={() => setCamOn(!camOn)}
+                        className={`w-12 h-12 rounded-full p-0 ${camOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
+                        title={camOn ? 'Desativar Câmera' : 'Ativar Câmera'}
+                      >
+                        {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                      </Button>
+                    </div>
+                    <Button variant="secondary" onClick={playTestSound} className="gap-2">
+                      <Play className="w-4 h-4 text-slate-600" /> Testar Saída de Áudio
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
           {isAvulsa ? (
-            <Card className="shadow-sm border-slate-200 bg-white">
-              <Tabs defaultValue="agendados" className="w-full">
-                <CardHeader className="p-0 border-b border-slate-100 bg-slate-50/50 rounded-t-lg">
+            <Card className="shadow-sm border-slate-200 bg-white flex flex-col">
+              <Tabs defaultValue="agendados" className="w-full flex-1 flex flex-col">
+                <CardHeader className="p-0 border-b border-slate-100 bg-slate-50/50 rounded-t-lg shrink-0">
                   <TabsList className="w-full justify-start rounded-none h-auto p-0 bg-transparent flex-wrap">
                     <TabsTrigger
                       value="agendados"
@@ -391,14 +568,15 @@ export default function TelehealthSession() {
                     </TabsTrigger>
                   </TabsList>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <TabsContent value="agendados" className="m-0">
+                <CardContent className="p-0 flex-1 overflow-y-auto">
+                  <TabsContent value="agendados" className="m-0 h-full">
                     {todayApts.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500">
+                      <div className="text-center py-12 text-slate-500 flex flex-col items-center">
+                        <Calendar className="w-12 h-12 text-slate-300 mb-3" />
                         Nenhuma sessão agendada para hoje.
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-100 max-h-[450px] overflow-y-auto">
+                      <div className="divide-y divide-slate-100">
                         {todayApts.map((apt) => {
                           const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
                           const time = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
@@ -435,7 +613,7 @@ export default function TelehealthSession() {
                                   onClick={() => navigate(`/atendimento/${apt.id}`)}
                                   className="gap-2 shrink-0 bg-indigo-600 hover:bg-indigo-700"
                                 >
-                                  Iniciar <ChevronRight className="w-3 h-3" />
+                                  Preparar <ChevronRight className="w-3 h-3" />
                                 </Button>
                               </div>
                             </div>
@@ -480,7 +658,7 @@ export default function TelehealthSession() {
                         ) : (
                           <Wallet className="w-5 h-5" />
                         )}
-                        {creatingAvulsa ? 'Gerando...' : 'Gerar Link PIX e Iniciar'}
+                        {creatingAvulsa ? 'Gerando...' : 'Gerar Link PIX e Preparar Sala'}
                       </Button>
                     </div>
                   </TabsContent>
@@ -488,50 +666,60 @@ export default function TelehealthSession() {
               </Tabs>
             </Card>
           ) : (
-            <Card className="shadow-sm border-slate-200 h-fit bg-white">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-                <CardTitle className="text-lg">Próximo Atendimento</CardTitle>
+            <Card className="shadow-sm border-slate-200 bg-white flex flex-col">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-6 shrink-0">
+                <CardTitle className="text-xl">Próximo Atendimento</CardTitle>
+                <p className="text-sm text-slate-500 mt-1">
+                  Confirme os dados do paciente antes de iniciar.
+                </p>
               </CardHeader>
-              <CardContent className="p-6 space-y-6">
+              <CardContent className="p-6 flex-1 flex flex-col justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 font-semibold uppercase tracking-wider mb-1">
-                    Paciente
-                  </p>
-                  <p className="text-2xl font-bold text-slate-800">{patientName}</p>
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="w-16 h-16 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-2xl">
+                      {patientName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500 font-semibold uppercase tracking-wider mb-0.5">
+                        Paciente
+                      </p>
+                      <p className="text-2xl font-bold text-slate-800">{patientName}</p>
+                    </div>
+                  </div>
+
+                  {patient?.hash_anamnese && (
+                    <div className="space-y-3 pt-4 border-t border-slate-100 mb-8">
+                      <p className="text-sm font-medium text-slate-700">Link da Sala de Vídeo</p>
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={`${window.location.origin}/sessao/${patient.hash_anamnese}`}
+                          className="bg-slate-50 font-mono text-sm text-slate-500"
+                        />
+                        <Button
+                          variant="outline"
+                          className="shrink-0 gap-2"
+                          onClick={() => copySessionLink(patient.hash_anamnese)}
+                        >
+                          <Copy className="w-4 h-4" /> Copiar
+                        </Button>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Envie este link para o paciente. Ele deverá acessá-lo para que você possa
+                        vê-lo na sala.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {patient?.hash_anamnese && (
-                  <div className="space-y-3 pt-4 border-t border-slate-100">
-                    <p className="text-sm font-medium text-slate-700">Link da Sala Segura</p>
-                    <div className="flex gap-2">
-                      <Input
-                        readOnly
-                        value={`${window.location.origin}/sessao/${patient.hash_anamnese}`}
-                        className="bg-slate-50 font-mono text-sm"
-                      />
-                      <Button
-                        variant="outline"
-                        className="shrink-0 gap-2"
-                        onClick={() => copySessionLink(patient.hash_anamnese)}
-                      >
-                        <Copy className="w-4 h-4" /> Copiar Link
-                      </Button>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Envie este link para o paciente acessar a vídeo-chamada.
-                    </p>
-                  </div>
-                )}
-
-                <div className="pt-6 border-t border-slate-100">
+                <div className="pt-6 border-t border-slate-100 mt-auto">
                   <Button
-                    className="w-full gap-2 text-lg h-14"
+                    className="w-full gap-2 text-lg h-14 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
                     onClick={() => {
-                      if (localVideoRef.current) localVideoRef.current.srcObject = null
                       setInWaitingRoom(false)
                     }}
                   >
-                    Entrar na Sessão <ChevronRight className="w-5 h-5" />
+                    <CheckCircle className="w-5 h-5" /> Confirmar Dispositivos e Iniciar Sessão
                   </Button>
                 </div>
               </CardContent>
@@ -549,9 +737,12 @@ export default function TelehealthSession() {
           <Button
             variant="ghost"
             className="text-white hover:bg-white/10"
-            onClick={() => navigate('/agenda')}
+            onClick={() => {
+              if (stream) stream.getTracks().forEach((t) => t.stop())
+              navigate('/agenda')
+            }}
           >
-            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
+            <ArrowLeft className="w-4 h-4 mr-2" /> Encerrar e Sair
           </Button>
           <div className="flex gap-3">
             {patient?.hash_anamnese && (
@@ -561,7 +752,7 @@ export default function TelehealthSession() {
                 className="bg-black/50 text-white border-white/20 hover:bg-white/20 gap-2 backdrop-blur-sm"
                 onClick={copyPatientLink}
               >
-                <Copy className="w-4 h-4" /> Link do Paciente
+                <Copy className="w-4 h-4" /> Copiar Link
               </Button>
             )}
             <div className="bg-black/50 px-4 py-1.5 rounded-full flex items-center gap-2 font-mono text-sm tracking-widest border border-white/10 shadow-sm backdrop-blur-sm">
@@ -572,15 +763,17 @@ export default function TelehealthSession() {
 
         <div className="flex-1 flex items-center justify-center relative p-4 mt-12 md:mt-0">
           <div className="w-full max-w-5xl aspect-video bg-slate-900/50 rounded-2xl border border-slate-800 flex items-center justify-center relative shadow-2xl overflow-hidden ring-1 ring-white/5">
+            {/* Mock do vídeo do paciente */}
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <UserSquare className="w-32 h-32 text-slate-700 mb-4 animate-pulse" />
-              <p className="text-slate-500 font-medium">Aguardando câmera do paciente...</p>
+              <p className="text-slate-500 font-medium">Aguardando entrada de {patientName}...</p>
             </div>
-            <p className="absolute bottom-4 left-4 font-medium drop-shadow-md text-slate-300 z-10">
+            <p className="absolute bottom-4 left-4 font-medium drop-shadow-md text-slate-300 z-10 bg-black/40 px-3 py-1 rounded-md backdrop-blur-sm text-sm">
               {patientName}
             </p>
 
-            <div className="absolute top-4 right-4 w-32 md:w-48 aspect-video bg-slate-800 rounded-lg overflow-hidden border border-slate-700 shadow-xl flex items-center justify-center z-10">
+            {/* Vídeo Local */}
+            <div className="absolute top-4 right-4 w-32 md:w-48 aspect-video bg-slate-800 rounded-xl overflow-hidden border-2 border-slate-700 shadow-xl flex items-center justify-center z-10">
               <video
                 ref={localVideoRef}
                 autoPlay
@@ -594,7 +787,7 @@ export default function TelehealthSession() {
                 }}
               />
               {!camOn && <VideoOff className="w-8 h-8 text-slate-600 absolute" />}
-              <span className="absolute bottom-1 left-2 text-[10px] bg-black/50 px-1.5 rounded text-white shadow-sm z-20">
+              <span className="absolute bottom-1 left-2 text-[10px] bg-black/60 px-1.5 rounded text-white shadow-sm z-20 backdrop-blur-sm">
                 Você
               </span>
             </div>
@@ -605,7 +798,7 @@ export default function TelehealthSession() {
           <Button
             size="icon"
             variant="outline"
-            className={`rounded-full w-14 h-14 transition-colors ${!micOn ? 'bg-red-500/20 text-red-500 border-red-500/50 hover:bg-red-500/30' : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700'}`}
+            className={`rounded-full w-14 h-14 transition-colors border-0 shadow-md ${!micOn ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-700 text-white hover:bg-slate-600'}`}
             onClick={() => setMicOn(!micOn)}
           >
             {micOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
@@ -613,7 +806,7 @@ export default function TelehealthSession() {
           <Button
             size="icon"
             variant="outline"
-            className={`rounded-full w-14 h-14 transition-colors ${!camOn ? 'bg-red-500/20 text-red-500 border-red-500/50 hover:bg-red-500/30' : 'bg-slate-800 text-white border-slate-700 hover:bg-slate-700'}`}
+            className={`rounded-full w-14 h-14 transition-colors border-0 shadow-md ${!camOn ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-slate-700 text-white hover:bg-slate-600'}`}
             onClick={() => setCamOn(!camOn)}
           >
             {camOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
@@ -621,8 +814,12 @@ export default function TelehealthSession() {
           <Button
             size="icon"
             variant="destructive"
-            className="rounded-full w-14 h-14 shadow-lg hover:shadow-red-500/20"
-            onClick={() => navigate('/agenda')}
+            className="rounded-full w-14 h-14 shadow-lg hover:shadow-red-500/20 ml-4"
+            onClick={() => {
+              if (stream) stream.getTracks().forEach((t) => t.stop())
+              navigate('/agenda')
+            }}
+            title="Finalizar Sessão"
           >
             <PhoneOff className="w-6 h-6" />
           </Button>

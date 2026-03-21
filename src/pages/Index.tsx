@@ -529,7 +529,7 @@ export default function Index() {
             <div className="grid grid-cols-2 gap-3 h-full pb-4 flex-1">
               <Button
                 variant="outline"
-                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-primary/30 hover:bg-primary/5 transition-all shadow-sm hover:shadow"
+                className="h-auto py-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-slate-200 hover:border-primary/30 hover:bg-primary/5 transition-all shadow-sm hover:shadow"
                 onClick={() => navigate('/agenda')}
               >
                 <div className="p-3 bg-primary/10 rounded-full text-primary">
@@ -539,7 +539,7 @@ export default function Index() {
               </Button>
               <Button
                 variant="outline"
-                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-indigo-500/30 hover:bg-indigo-50 transition-all shadow-sm hover:shadow"
+                className="h-auto py-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-slate-200 hover:border-indigo-500/30 hover:bg-indigo-50 transition-all shadow-sm hover:shadow"
                 onClick={() => navigate('/pacientes/novo')}
               >
                 <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
@@ -549,7 +549,7 @@ export default function Index() {
               </Button>
               <Button
                 variant="outline"
-                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-emerald-500/30 hover:bg-emerald-50 transition-all shadow-sm hover:shadow"
+                className="h-auto py-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-slate-200 hover:border-emerald-500/30 hover:bg-emerald-50 transition-all shadow-sm hover:shadow"
                 onClick={() => navigate('/carteira')}
               >
                 <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
@@ -559,7 +559,7 @@ export default function Index() {
               </Button>
               <Button
                 variant="outline"
-                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-rose-500/30 hover:bg-rose-50 transition-all shadow-sm hover:shadow"
+                className="h-auto py-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-slate-200 hover:border-rose-500/30 hover:bg-rose-50 transition-all shadow-sm hover:shadow"
                 onClick={() => navigate('/carteira')}
               >
                 <div className="p-3 bg-rose-100 rounded-full text-rose-600">

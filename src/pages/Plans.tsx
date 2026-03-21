@@ -25,7 +25,7 @@ const PLANS_DATA = [
       { name: 'Financeiro Simples', inc: true },
       { name: 'Lembretes WhatsApp', inc: false },
       { name: 'Portal do Paciente', inc: false },
-      { name: 'Telemedicina Integrada', inc: false },
+      { name: 'Sessão Online Integrada', inc: false },
     ],
   },
   {
@@ -44,7 +44,7 @@ const PLANS_DATA = [
       { name: 'Financeiro Completo', inc: true },
       { name: 'Lembretes WhatsApp', inc: true },
       { name: 'Portal do Paciente', inc: true },
-      { name: 'Telemedicina Integrada', inc: false },
+      { name: 'Sessão Online Integrada', inc: false },
     ],
   },
   {
@@ -63,7 +63,7 @@ const PLANS_DATA = [
       { name: 'Financeiro Completo', inc: true },
       { name: 'Lembretes WhatsApp', inc: true },
       { name: 'Portal do Paciente', inc: true },
-      { name: 'Telemedicina Integrada', inc: true },
+      { name: 'Sessão Online Integrada', inc: true },
     ],
   },
 ]
