@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
         signature,
         webhookSecret,
         undefined,
-        cryptoProvider,
+        cryptoProvider
       )
     } else {
       event = JSON.parse(body)
@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
   try {
@@ -76,9 +76,7 @@ Deno.serve(async (req: Request) => {
             await supabase
               .from('usuarios')
               .update({
-                data_proxima_cobranca: new Date(
-                  subscription.current_period_end * 1000,
-                ).toISOString(),
+                data_proxima_cobranca: new Date(subscription.current_period_end * 1000).toISOString(),
                 stripe_subscription_id: subscription.id,
               })
               .eq('id', user.id)
