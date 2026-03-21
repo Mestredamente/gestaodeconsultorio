@@ -80,20 +80,27 @@ export default function WhatsAppBillingDialog({
         cleanPhone = `55${cleanPhone}`
       }
 
-      const encodedMessage = encodeURIComponent(data.message)
-      let url = ''
+      const { data: userResp } = await supabase.auth.getUser()
+      const { data: sendData, error: sendError } = await supabase.functions.invoke(
+        'enviar_mensagem_whatsapp',
+        {
+          body: {
+            tipo_whatsapp: whatsappTipo,
+            telefone: cleanPhone,
+            mensagem: data.message,
+            usuario_id: userResp.user?.id,
+          },
+        },
+      )
 
-      if (whatsappTipo === 'business') {
-        url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
-      } else {
-        url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
-      }
+      if (sendError) throw new Error(sendError.message || 'Erro ao enviar mensagem via API')
+      if (sendData?.error) throw new Error(sendData.error)
 
-      window.open(url, '_blank')
+      toast({ title: 'Mensagem enviada com sucesso!' })
       setOpen(false)
       if (onSuccess) onSuccess()
     } catch (err: any) {
-      toast({ title: 'Erro ao gerar cobrança', description: err.message, variant: 'destructive' })
+      toast({ title: 'Erro ao enviar cobrança', description: err.message, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -111,9 +118,10 @@ export default function WhatsAppBillingDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Gerar Cobrança via WhatsApp</DialogTitle>
+          <DialogTitle>Enviar Cobrança via WhatsApp</DialogTitle>
           <DialogDescription>
-            Cria uma mensagem padronizada para {patientName} com o saldo devedor do mês selecionado.
+            Gera e envia automaticamente a mensagem de cobrança para {patientName} referente ao
+            saldo devedor.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -154,12 +162,12 @@ export default function WhatsAppBillingDialog({
               <RadioGroup
                 value={whatsappTipo}
                 onValueChange={setWhatsappTipo}
-                className="flex items-center gap-4"
+                className="flex flex-col gap-3"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="personal" id="personal" />
                   <Label htmlFor="personal" className="font-normal cursor-pointer text-slate-700">
-                    WhatsApp
+                    WhatsApp Padrão
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -181,7 +189,7 @@ export default function WhatsAppBillingDialog({
             disabled={loading}
             className="bg-emerald-600 hover:bg-emerald-700 text-white"
           >
-            {loading ? 'Gerando...' : 'Enviar WhatsApp'}
+            {loading ? 'Enviando...' : 'Enviar Mensagem'}
           </Button>
         </DialogFooter>
       </DialogContent>

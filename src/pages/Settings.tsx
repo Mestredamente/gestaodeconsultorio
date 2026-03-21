@@ -8,16 +8,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useToast } from '@/hooks/use-toast'
-import {
-  Save,
-  Loader2,
-  Building2,
-  MessageCircle,
-  Calendar,
-  Link as LinkIcon,
-  Shield,
-} from 'lucide-react'
+import { Save, Loader2, Building2, MessageCircle, Link as LinkIcon, Shield } from 'lucide-react'
 
 export default function Settings() {
   const { user } = useAuth()
@@ -40,6 +33,9 @@ export default function Settings() {
     politica_cancelamento: '',
     texto_contrato: '',
     whatsapp_tipo: 'personal',
+    whatsapp_api_key: '',
+    whatsapp_business_phone_id: '',
+    whatsapp_business_account_id: '',
   })
 
   useEffect(() => {
@@ -62,6 +58,9 @@ export default function Settings() {
           politica_cancelamento: data.politica_cancelamento || '',
           texto_contrato: data.texto_contrato || '',
           whatsapp_tipo: data.whatsapp_tipo || 'personal',
+          whatsapp_api_key: data.whatsapp_api_key || '',
+          whatsapp_business_phone_id: data.whatsapp_business_phone_id || '',
+          whatsapp_business_account_id: data.whatsapp_business_account_id || '',
         })
       }
       setLoading(false)
@@ -185,6 +184,83 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="comunicacao" className="space-y-6">
+          <Card className="rounded-[2rem] shadow-sm border-slate-200">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+              <CardTitle className="text-lg">Integração WhatsApp</CardTitle>
+              <CardDescription>
+                Configure as credenciais para envio de mensagens automáticas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="space-y-4">
+                <Label>Tipo de Integração</Label>
+                <RadioGroup
+                  value={settings.whatsapp_tipo}
+                  onValueChange={(v) => setSettings({ ...settings, whatsapp_tipo: v })}
+                  className="flex flex-col sm:flex-row gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="personal" id="config_personal" />
+                    <Label
+                      htmlFor="config_personal"
+                      className="font-normal cursor-pointer text-slate-700"
+                    >
+                      WhatsApp Padrão
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="business" id="config_business" />
+                    <Label
+                      htmlFor="config_business"
+                      className="font-normal cursor-pointer text-slate-700"
+                    >
+                      WhatsApp Business
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-100">
+                <div className="space-y-2 md:col-span-2">
+                  <Label>API Key</Label>
+                  <Input
+                    value={settings.whatsapp_api_key}
+                    onChange={(e) => setSettings({ ...settings, whatsapp_api_key: e.target.value })}
+                    className="h-11 rounded-xl"
+                    placeholder="Token de Acesso (API Key)"
+                    type="password"
+                  />
+                </div>
+                {settings.whatsapp_tipo === 'business' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Phone ID</Label>
+                      <Input
+                        value={settings.whatsapp_business_phone_id}
+                        onChange={(e) =>
+                          setSettings({ ...settings, whatsapp_business_phone_id: e.target.value })
+                        }
+                        className="h-11 rounded-xl"
+                        placeholder="Ex: 10492839281"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Account ID</Label>
+                      <Input
+                        value={settings.whatsapp_business_account_id}
+                        onChange={(e) =>
+                          setSettings({ ...settings, whatsapp_business_account_id: e.target.value })
+                        }
+                        className="h-11 rounded-xl"
+                        placeholder="Ex: 192837465"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="rounded-[2rem] shadow-sm border-slate-200">
             <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
               <CardTitle className="text-lg">Automações de WhatsApp</CardTitle>

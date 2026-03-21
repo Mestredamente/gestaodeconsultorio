@@ -1,13 +1,13 @@
 {
   "_versions": {
-    "enviar_cobranca_whatsapp": 13,
-    "enviar_lembrete_consulta": 16,
+    "enviar_cobranca_whatsapp": 14,
+    "enviar_lembrete_consulta": 17,
     "emitir_nota_fiscal": 4,
     "enviar_comunicado_massa": 5,
     "transcrever_audio": 3,
     "processar_cobrancas_recorrentes": 5,
     "functions": 6,
-    "lembrete_sessao": 5,
+    "lembrete_sessao": 6,
     "gerar_insights_paciente": 4,
     "gerar_sugestao_evolucao": 2,
     "processar_pagamento": 2,
@@ -15,6 +15,6 @@
     "criar_checkout_stripe": 5,
     "stripe_webhook": 2,
     "gerar_link_sala_virtual": 3,
-    "enviar_mensagem_whatsapp": 1
+    "enviar_mensagem_whatsapp": 2
   }
 }
