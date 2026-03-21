@@ -14,7 +14,7 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, tipo_pagamento, usuario_id, paciente_id, pacientes (id, nome, telefone, hash_anamnese), usuarios (id, nome_consultorio, lembrete_whatsapp_ativo, template_lembrete)`
+        `id, data_hora, status, tipo_pagamento, usuario_id, paciente_id, pacientes (id, nome, telefone, hash_anamnese), usuarios (id, nome_consultorio, lembrete_whatsapp_ativo, template_lembrete)`,
       )
       .eq('status', 'agendado')
 
@@ -49,7 +49,8 @@ Deno.serve(async (req: Request) => {
           const d = new Date(apt.data_hora)
           const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
           const dateStr = d.toLocaleDateString('pt-BR')
-          const template = u.template_lembrete || 'Olá [Nome], você tem uma consulta marcada às [hora].'
+          const template =
+            u.template_lembrete || 'Olá [Nome], você tem uma consulta marcada às [hora].'
           const portalLink = `${origin}/portal/${p.hash_anamnese}`
           const confirmLink = `${origin}/confirmar/${p.hash_anamnese}/${apt.id}`
 
@@ -64,15 +65,14 @@ Deno.serve(async (req: Request) => {
           console.log(`[Lembrete Sent] To: ${p.telefone} -> ${message}`)
           sentMessages.push({ patient: p.nome, phone: p.telefone, time: apt.data_hora, message })
           sentApptIds.push(apt.id)
-          
+
           historyLogs.push({
             usuario_id: apt.usuario_id,
             paciente_id: apt.paciente_id,
             tipo: 'lembrete',
             conteudo: message,
-            status_envio: 'enviado'
+            status_envio: 'enviado',
           })
-
         } else {
           failedApptIds.push(apt.id)
         }
@@ -108,4 +108,3 @@ Deno.serve(async (req: Request) => {
     })
   }
 })
-

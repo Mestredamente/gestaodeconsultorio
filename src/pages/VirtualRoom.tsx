@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -16,6 +16,7 @@ import {
   LogOut,
   Camera,
   FileText,
+  Save,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -55,7 +56,14 @@ export default function VirtualRoom() {
   // Drawer / Notas State
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [notes, setNotes] = useState('')
-  const [initialNotesFetched, setInitialNotesFetched] = useState(false)
+  const [prontuarioId, setProntuarioId] = useState<string | null>(null)
+  const [isSavingNote, setIsSavingNote] = useState(false)
+  const notesRef = useRef(notes)
+
+  // Keep ref updated for compileNotes to access latest state without dependency issues
+  useEffect(() => {
+    notesRef.current = notes
+  }, [notes])
 
   // Schedule Modal State
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
@@ -63,6 +71,7 @@ export default function VirtualRoom() {
   const [selectedTime, setSelectedTime] = useState<string>('')
   const [sessionType, setSessionType] = useState<'presencial' | 'online'>('online')
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
+  const [isScheduling, setIsScheduling] = useState(false)
 
   const allTimeSlots = [
     '08:00',
@@ -98,7 +107,7 @@ export default function VirtualRoom() {
       playBeep(ctx.currentTime, 880)
       playBeep(ctx.currentTime + 0.15, 1046.5)
     } catch (e) {
-      console.error('Audio Context falhou', e)
+      console.warn('Audio Context bloqueado pelo navegador', e)
     }
   }, [])
 
@@ -214,39 +223,58 @@ export default function VirtualRoom() {
     [localStream],
   )
 
-  // Fetch initial notes
+  // Prontuario Init & Fetch
   useEffect(() => {
-    if (activeSession) {
-      const fetchProntuario = async () => {
-        const { data } = await supabase
-          .from('prontuarios')
-          .select('nova_nota')
-          .eq('paciente_id', activeSession.paciente_id)
-          .maybeSingle()
-
-        if (data) setNotes(data.nova_nota || '')
-        setInitialNotesFetched(true)
-      }
-      fetchProntuario()
-    } else {
+    if (!activeSession || !user) {
+      setProntuarioId(null)
       setNotes('')
-      setInitialNotesFetched(false)
       setIsNotesOpen(false)
+      return
     }
-  }, [activeSession])
+
+    const fetchOrCreateProntuario = async () => {
+      let { data, error } = await supabase
+        .from('prontuarios')
+        .select('id, nova_nota')
+        .eq('paciente_id', activeSession.paciente_id)
+        .maybeSingle()
+
+      if (!data && !error) {
+        const { data: newData } = await supabase
+          .from('prontuarios')
+          .insert({
+            paciente_id: activeSession.paciente_id,
+            usuario_id: user.id,
+            nova_nota: '',
+            historico_sessoes: [],
+          })
+          .select('id, nova_nota')
+          .single()
+        data = newData
+      }
+
+      if (data) {
+        setProntuarioId(data.id)
+        setNotes(data.nova_nota || '')
+      }
+    }
+
+    fetchOrCreateProntuario()
+  }, [activeSession, user])
 
   // Real-time Notes Sync
   useEffect(() => {
-    if (!activeSession) return
+    if (!prontuarioId) return
+
     const channel = supabase
-      .channel('prontuario_notes')
+      .channel(`prontuario_${prontuarioId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'prontuarios',
-          filter: `paciente_id=eq.${activeSession.paciente_id}`,
+          filter: `id=eq.${prontuarioId}`,
         },
         (payload) => {
           if (payload.new && payload.new.nova_nota !== undefined) {
@@ -262,69 +290,54 @@ export default function VirtualRoom() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [activeSession])
+  }, [prontuarioId])
 
-  // Save Notes Debounce
+  // Auto-save Debounce
   useEffect(() => {
-    if (!initialNotesFetched || !activeSession) return
-    const timeoutId = setTimeout(() => {
-      saveNotes(notes)
-    }, 3000)
+    if (!prontuarioId) return
+
+    const timeoutId = setTimeout(async () => {
+      if (notes === notesRef.current) {
+        setIsSavingNote(true)
+        await supabase.from('prontuarios').update({ nova_nota: notes }).eq('id', prontuarioId)
+        setIsSavingNote(false)
+      }
+    }, 2000)
+
     return () => clearTimeout(timeoutId)
-  }, [notes, activeSession, initialNotesFetched])
-
-  const saveNotes = async (text: string) => {
-    if (!activeSession || !user) return
-    const { data: prontuario } = await supabase
-      .from('prontuarios')
-      .select('id')
-      .eq('paciente_id', activeSession.paciente_id)
-      .maybeSingle()
-
-    if (prontuario) {
-      await supabase.from('prontuarios').update({ nova_nota: text }).eq('id', prontuario.id)
-    } else {
-      await supabase.from('prontuarios').insert({
-        paciente_id: activeSession.paciente_id,
-        usuario_id: user.id,
-        nova_nota: text,
-        historico_sessoes: [],
-      })
-    }
-  }
+  }, [notes, prontuarioId])
 
   const compileNotes = async () => {
-    if (!activeSession || !user) return
-    const textToSave = notes.trim()
+    if (!prontuarioId || !activeSession) return
+    const textToSave = notesRef.current.trim()
 
     const { data: prontuario } = await supabase
       .from('prontuarios')
-      .select('id, historico_sessoes')
-      .eq('paciente_id', activeSession.paciente_id)
-      .maybeSingle()
+      .select('historico_sessoes')
+      .eq('id', prontuarioId)
+      .single()
 
     if (prontuario) {
       const history = Array.isArray(prontuario.historico_sessoes)
         ? prontuario.historico_sessoes
         : []
-      let newHistory = history
 
       if (textToSave) {
-        newHistory = [
-          {
-            data: new Date().toISOString(),
-            evolucao: textToSave,
-            agendamento_id: activeSession.id,
-          },
-          ...history,
-        ]
+        const newEntry = {
+          data: new Date().toISOString(),
+          evolucao: textToSave,
+          agendamento_id: activeSession.id,
+        }
+        await supabase
+          .from('prontuarios')
+          .update({
+            historico_sessoes: [newEntry, ...history],
+            nova_nota: '',
+          })
+          .eq('id', prontuarioId)
       }
-
-      await supabase
-        .from('prontuarios')
-        .update({ historico_sessoes: newHistory, nova_nota: '' })
-        .eq('id', prontuario.id)
     }
+    setNotes('')
   }
 
   // Load available slots for calendar
@@ -437,6 +450,7 @@ export default function VirtualRoom() {
   const handleConfirmSchedule = async () => {
     if (!selectedDate || !selectedTime || !activeSession || !user) return
 
+    setIsScheduling(true)
     const [hour, minute] = selectedTime.split(':').map(Number)
     const dataHora = new Date(selectedDate)
     dataHora.setHours(hour, minute, 0, 0)
@@ -461,10 +475,20 @@ export default function VirtualRoom() {
         window.open(link, '_blank')
       }
       toast({ title: 'Próxima sessão agendada!' })
+      await finishProcess()
     } else {
       toast({ title: 'Erro ao agendar', variant: 'destructive' })
+      setIsScheduling(false)
     }
-    await finishProcess()
+  }
+
+  const handleManualSave = async () => {
+    if (!prontuarioId) return
+    setIsSavingNote(true)
+    await supabase.from('prontuarios').update({ nova_nota: notes }).eq('id', prontuarioId)
+    setIsSavingNote(false)
+    setIsNotesOpen(false)
+    toast({ title: 'Notas salvas com sucesso' })
   }
 
   const roomName = activeSession ? `PsicManager_${activeSession.id.replace(/-/g, '')}` : ''
@@ -725,32 +749,37 @@ export default function VirtualRoom() {
       <Sheet open={isNotesOpen} onOpenChange={setIsNotesOpen}>
         <SheetContent
           side="right"
-          className="w-full sm:max-w-md flex flex-col h-full bg-white p-0 shadow-2xl"
+          className="w-full sm:max-w-md flex flex-col h-full bg-white p-0 shadow-2xl z-[60]"
         >
-          <SheetHeader className="p-6 border-b border-slate-100 bg-slate-50/50">
-            <SheetTitle className="flex items-center gap-2 text-xl">
-              <FileText className="w-5 h-5 text-primary" />
-              Notas da Sessão
-            </SheetTitle>
-            <SheetDescription>Anotações são salvas automaticamente.</SheetDescription>
+          <SheetHeader className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
+            <div>
+              <SheetTitle className="flex items-center gap-2 text-xl">
+                <FileText className="w-5 h-5 text-primary" />
+                Notas da Sessão
+              </SheetTitle>
+              <SheetDescription>Anotações são salvas automaticamente.</SheetDescription>
+            </div>
+            {isSavingNote ? (
+              <span className="text-xs font-medium text-amber-600 flex items-center gap-1 bg-amber-50 px-2 py-1 rounded-md">
+                <Loader2 className="w-3 h-3 animate-spin" /> Salvando...
+              </span>
+            ) : (
+              <span className="text-xs font-medium text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md">
+                <Check className="w-3 h-3" /> Salvo
+              </span>
+            )}
           </SheetHeader>
-          <div className="flex-1 p-6 overflow-hidden flex flex-col">
+          <div className="flex-1 p-6 overflow-hidden flex flex-col bg-slate-50/30">
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Comece a digitar as notas do atendimento aqui..."
-              className="flex-1 resize-none border-slate-200 focus-visible:ring-primary/20 text-base leading-relaxed p-4 h-full"
+              className="flex-1 resize-none border-slate-200 focus-visible:ring-primary/20 text-base leading-relaxed p-4 h-full shadow-inner rounded-xl"
             />
           </div>
           <SheetFooter className="p-6 border-t border-slate-100 bg-slate-50/50">
-            <Button
-              onClick={() => {
-                saveNotes(notes)
-                setIsNotesOpen(false)
-              }}
-              className="w-full sm:w-auto"
-            >
-              <Check className="w-4 h-4 mr-2" /> Salvar e Fechar
+            <Button onClick={handleManualSave} className="w-full sm:w-auto gap-2 rounded-xl">
+              <Save className="w-4 h-4" /> Salvar e Fechar
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -758,7 +787,7 @@ export default function VirtualRoom() {
 
       {/* Schedule Next Session Modal */}
       <Dialog open={isScheduleModalOpen} onOpenChange={setIsScheduleModalOpen}>
-        <DialogContent className="sm:max-w-md bg-white rounded-2xl overflow-hidden p-0">
+        <DialogContent className="sm:max-w-md bg-white rounded-2xl overflow-hidden p-0 z-[60]">
           <DialogHeader className="p-6 pb-2">
             <DialogTitle className="text-2xl font-bold">Agendar Próxima Sessão</DialogTitle>
             <DialogDescription className="text-base mt-2">
@@ -859,17 +888,23 @@ export default function VirtualRoom() {
           <DialogFooter className="p-6 bg-slate-50/80 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
             <Button
               variant="outline"
-              className="w-full sm:w-auto border-slate-300"
+              className="w-full sm:w-auto border-slate-300 rounded-xl"
               onClick={finishProcess}
+              disabled={isScheduling}
             >
               Pular
             </Button>
             <Button
-              className="w-full sm:w-auto gap-2"
-              disabled={!selectedDate || !selectedTime}
+              className="w-full sm:w-auto gap-2 rounded-xl"
+              disabled={!selectedDate || !selectedTime || isScheduling}
               onClick={handleConfirmSchedule}
             >
-              <Check className="w-4 h-4" /> Confirmar Agendamento
+              {isScheduling ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
+              Confirmar Agendamento
             </Button>
           </DialogFooter>
         </DialogContent>
