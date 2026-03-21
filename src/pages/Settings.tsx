@@ -412,10 +412,4 @@ export default function Settings() {
                   {saving ? 'Atualizando...' : 'Alterar Senha'}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
+            </CardCo
