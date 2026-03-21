@@ -15,6 +15,7 @@ import {
 export const navItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
   { name: 'Agenda', path: '/agenda', icon: Calendar },
+  { name: 'Sala Virtual', path: '/sala-virtual', icon: Video },
   { name: 'Pacientes', path: '/pacientes', icon: Users },
   { name: 'Sessão Online', path: '/atendimento/nova', icon: Video },
   { name: 'Financeiro', path: '/carteira', icon: Wallet },

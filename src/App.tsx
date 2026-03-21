@@ -31,6 +31,7 @@ import UpdatePassword from './pages/UpdatePassword'
 import Plans from './pages/Plans'
 import Onboarding from './pages/Onboarding'
 import HR from './pages/HR'
+import VirtualRoom from './pages/VirtualRoom'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth()
@@ -103,6 +104,7 @@ const AppRoutes = () => (
       }
     >
       <Route path="/" element={<Index />} />
+      <Route path="/sala-virtual" element={<VirtualRoom />} />
       <Route path="/agenda" element={<Agenda />} />
       <Route path="/pacientes" element={<Patients />} />
       <Route path="/pacientes/:id" element={<PatientDetail />} />

@@ -14,6 +14,7 @@ import {
   Brain,
   Briefcase,
   Megaphone,
+  Video,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
@@ -88,6 +89,7 @@ export default function Layout() {
   const menuItems = [
     { path: '/', icon: BarChart3, label: 'Dashboard' },
     { path: '/agenda', icon: CalendarIcon, label: 'Agenda' },
+    { path: '/sala-virtual', icon: Video, label: 'Sala Virtual' },
     { path: '/pacientes', icon: Users, label: 'Pacientes' },
     { path: '/carteira', icon: Wallet, label: 'Financeiro' },
     { path: '/rh', icon: Briefcase, label: 'RH & Equipe' },
