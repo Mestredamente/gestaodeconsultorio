@@ -336,11 +336,6 @@ export default function Settings() {
                   />
                 )}
               </div>
-
-              <div className="bg-blue-50 p-4 rounded-xl text-sm text-blue-800 border border-blue-100">
-                <strong>Variáveis disponíveis:</strong> [Nome], [data], [hora], [TipoSessao],
-                [link_portal]
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
