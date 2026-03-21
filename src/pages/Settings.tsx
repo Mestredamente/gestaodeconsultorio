@@ -202,23 +202,41 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="bg-slate-100/80 p-1.5 rounded-2xl mb-8 flex overflow-x-auto [&::-webkit-scrollbar]:hidden">
-          <TabsTrigger value="perfil" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
+        <TabsList className="bg-slate-100/80 p-1.5 rounded-2xl mb-8 flex overflow-x-auto [&::-webkit-scrollbar]:hidden scroll-smooth">
+          <TabsTrigger
+            value="perfil"
+            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
+          >
             <User className="w-4 h-4" /> Perfil & Clínica
           </TabsTrigger>
-          <TabsTrigger value="aparencia" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
+          <TabsTrigger
+            value="aparencia"
+            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
+          >
             <Palette className="w-4 h-4" /> Aparência
           </TabsTrigger>
-          <TabsTrigger value="financeiro" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
+          <TabsTrigger
+            value="financeiro"
+            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
+          >
             <Landmark className="w-4 h-4" /> Financeiro
           </TabsTrigger>
-          <TabsTrigger value="assinatura" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
+          <TabsTrigger
+            value="assinatura"
+            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
+          >
             <CreditCard className="w-4 h-4" /> Plano & Faturamento
           </TabsTrigger>
-          <TabsTrigger value="seguranca" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
+          <TabsTrigger
+            value="seguranca"
+            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
+          >
             <Shield className="w-4 h-4" /> Segurança
           </TabsTrigger>
-          <TabsTrigger value="integracoes" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
+          <TabsTrigger
+            value="integracoes"
+            className="rounded-xl px-6 py-2.5 font-semibold gap-2 flex-shrink-0"
+          >
             <Key className="w-4 h-4" /> Integrações (Secrets)
           </TabsTrigger>
         </TabsList>
@@ -226,11 +244,11 @@ export default function Settings() {
         <form onSubmit={handleSaveProfile}>
           <TabsContent value="perfil" className="space-y-6">
             <Card className="rounded-[2rem] shadow-sm border-slate-100">
-              <CardHeader className="p-8 pb-4">
+              <CardHeader className="p-6 md:p-8 pb-4">
                 <CardTitle className="text-xl">Identidade do Profissional</CardTitle>
                 <CardDescription>Informações que aparecem para seus pacientes.</CardDescription>
               </CardHeader>
-              <CardContent className="p-8 pt-0 grid gap-6">
+              <CardContent className="p-6 md:p-8 pt-0 grid gap-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label>Nome do Profissional / Clínica</Label>
@@ -278,13 +296,13 @@ export default function Settings() {
 
           <TabsContent value="aparencia" className="space-y-6">
             <Card className="rounded-[2rem] shadow-sm border-slate-100">
-              <CardHeader className="p-8 pb-4">
+              <CardHeader className="p-6 md:p-8 pb-4">
                 <CardTitle className="text-xl">Identidade Visual</CardTitle>
                 <CardDescription>
                   Personalize a aparência do sistema com a sua marca e cores.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-8 pt-0 space-y-8">
+              <CardContent className="p-6 md:p-8 pt-0 space-y-8">
                 <div className="space-y-4">
                   <h3 className="font-bold text-slate-700 flex items-center gap-2">
                     <ImageIcon className="w-4 h-4" /> Logo e Nome
@@ -331,7 +349,7 @@ export default function Settings() {
                   <h3 className="font-bold text-slate-700 flex items-center gap-2">
                     <Palette className="w-4 h-4" /> Tema de Cores
                   </h3>
-                  <div className="flex flex-wrap gap-4">
+                  <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
                     {THEMES.map((theme) => (
                       <button
                         key={theme.id}
@@ -357,14 +375,16 @@ export default function Settings() {
                           document.documentElement.classList.add(theme.id)
                         }}
                         className={cn(
-                          'w-28 h-28 rounded-2xl border-2 flex flex-col items-center justify-center gap-3 transition-all',
+                          'w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-2 flex flex-col items-center justify-center gap-3 transition-all',
                           formData.preferencias_dashboard?.theme === theme.id
                             ? 'border-primary bg-primary/5 shadow-md'
                             : 'border-slate-200 bg-white hover:border-slate-300',
                         )}
                       >
                         <div className={cn('w-8 h-8 rounded-full shadow-sm', theme.color)} />
-                        <span className="text-xs font-semibold text-slate-700">{theme.name}</span>
+                        <span className="text-[10px] sm:text-xs font-semibold text-slate-700 text-center px-1">
+                          {theme.name}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -375,13 +395,13 @@ export default function Settings() {
 
           <TabsContent value="financeiro" className="space-y-6">
             <Card className="rounded-[2rem] shadow-sm border-slate-100">
-              <CardHeader className="p-8 pb-4">
+              <CardHeader className="p-6 md:p-8 pb-4">
                 <CardTitle className="text-xl">Dados de Recebimento</CardTitle>
                 <CardDescription>
                   Configure suas contas para receber pagamentos e emitir cobranças.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-8 pt-0 space-y-8">
+              <CardContent className="p-6 md:p-8 pt-0 space-y-8">
                 <div className="space-y-4">
                   <h3 className="font-bold text-slate-700 flex items-center gap-2">
                     <Key className="w-4 h-4" /> Chave PIX Principal
@@ -437,16 +457,15 @@ export default function Settings() {
 
           <TabsContent value="integracoes" className="space-y-6">
             <Card className="rounded-[2rem] shadow-sm border-slate-100">
-              <CardHeader className="p-8 pb-4">
+              <CardHeader className="p-6 md:p-8 pb-4">
                 <CardTitle className="text-xl">Gerenciamento de Secrets</CardTitle>
                 <CardDescription>
-                  Para habilitar as integrações avançadas (Gateways de Pagamento, WhatsApp, IA),
-                  você deve cadastrar as chaves oficiais no painel{' '}
-                  <strong>Edge Functions &gt; Secrets</strong> do seu banco de dados Supabase. Use
-                  este checklist visual para acompanhar o que já foi configurado.
+                  Para habilitar as integrações avançadas, você deve cadastrar as chaves oficiais no
+                  painel <strong>Edge Functions &gt; Secrets</strong> do seu banco de dados
+                  Supabase. Use este checklist visual para acompanhar o que já foi configurado.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-8 pt-0">
+              <CardContent className="p-6 md:p-8 pt-0">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {SECRETS_LIST.map((s) => (
                     <div
@@ -469,9 +488,9 @@ export default function Settings() {
                           )}
                         />
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="font-bold font-mono text-sm text-slate-800 break-all">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <p className="font-bold font-mono text-xs sm:text-sm text-slate-800 truncate">
                             {s.key}
                           </p>
                           {configuredSecrets[s.key] && (
@@ -480,14 +499,14 @@ export default function Settings() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-slate-500 mt-1 mb-3">{s.desc}</p>
+                        <p className="text-xs sm:text-sm text-slate-500 mt-1 mb-3">{s.desc}</p>
                         <a
                           href={s.doc}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" /> Acessar Documentação
+                          <ExternalLink className="w-3.5 h-3.5" /> Documentação
                         </a>
                       </div>
                     </div>
@@ -498,11 +517,11 @@ export default function Settings() {
           </TabsContent>
 
           {/* Sticky Save Button for Profile/Finance/Integrations */}
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex flex-col sm:flex-row justify-end">
             <Button
               type="submit"
               disabled={saving}
-              className="rounded-xl h-12 px-10 text-base shadow-md"
+              className="rounded-xl h-12 px-10 text-base shadow-md w-full sm:w-auto"
             >
               {saving ? (
                 <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
@@ -520,11 +539,11 @@ export default function Settings() {
 
         <TabsContent value="seguranca" className="space-y-6">
           <Card className="rounded-[2rem] shadow-sm border-slate-100">
-            <CardHeader className="p-8 pb-4">
+            <CardHeader className="p-6 md:p-8 pb-4">
               <CardTitle className="text-xl">Atualizar Senha</CardTitle>
               <CardDescription>Escolha uma senha forte para proteger seus dados.</CardDescription>
             </CardHeader>
-            <CardContent className="p-8 pt-0">
+            <CardContent className="p-6 md:p-8 pt-0">
               <form onSubmit={handleUpdatePassword} className="space-y-5 max-w-md">
                 <div className="space-y-2">
                   <Label>Nova Senha</Label>
@@ -548,7 +567,11 @@ export default function Settings() {
                     className="bg-slate-50/50 rounded-xl h-11"
                   />
                 </div>
-                <Button type="submit" disabled={saving} className="rounded-xl h-12 w-full mt-2">
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-xl h-12 w-full mt-2 text-base"
+                >
                   {saving ? 'Atualizando...' : 'Alterar Senha'}
                 </Button>
               </form>

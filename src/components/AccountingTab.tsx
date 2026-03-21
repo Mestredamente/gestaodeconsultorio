@@ -85,7 +85,7 @@ export function AccountingTab({
             <Landmark className="w-5 h-5 text-primary" /> Relatório Fiscal Anual ({year})
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="space-y-1">
               <p className="text-sm font-medium text-slate-500">Faturamento Bruto</p>
@@ -107,8 +107,8 @@ export function AccountingTab({
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-6 items-end border-t border-slate-100 pt-6">
-            <div className="w-full sm:w-64 space-y-2">
+          <div className="flex flex-col md:flex-row gap-6 items-start md:items-end border-t border-slate-100 pt-6">
+            <div className="w-full md:w-64 space-y-2">
               <Label>Alíquota de Imposto (%)</Label>
               <div className="flex items-center gap-2">
                 <Input
@@ -123,17 +123,21 @@ export function AccountingTab({
               <p className="text-xs text-slate-500">Ex: 6% para Simples Nacional (Anexo III)</p>
             </div>
 
-            <div className="flex-1 flex flex-col sm:flex-row gap-3 justify-end">
-              <Button variant="outline" onClick={handleExportRFB} className="gap-2 shadow-sm">
+            <div className="flex-1 flex flex-col sm:flex-row gap-3 justify-end w-full md:w-auto mt-4 md:mt-0">
+              <Button
+                variant="outline"
+                onClick={handleExportRFB}
+                className="gap-2 shadow-sm w-full sm:w-auto h-11 sm:h-10"
+              >
                 <FileDown className="w-4 h-4" /> Exportar Padrão Receita
               </Button>
               <Button
                 onClick={handleSyncAccountant}
                 disabled={isSyncing}
-                className="gap-2 shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="gap-2 shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white w-full sm:w-auto h-11 sm:h-10"
               >
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                {isSyncing ? 'Sincronizando API...' : 'Enviar para Contador (API)'}
+                {isSyncing ? 'Sincronizando API...' : 'Enviar para Contador'}
               </Button>
             </div>
           </div>

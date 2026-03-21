@@ -109,14 +109,14 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="rounded-[2rem] shadow-sm border-slate-100 lg:col-span-2">
-          <CardHeader className="p-8 pb-4 border-b border-slate-50">
+          <CardHeader className="p-6 md:p-8 pb-4 border-b border-slate-50">
             <CardTitle className="text-xl">Resumo da Assinatura</CardTitle>
             <CardDescription>Acompanhe os detalhes do seu plano atual e limites.</CardDescription>
           </CardHeader>
-          <CardContent className="p-8 pt-6">
+          <CardContent className="p-6 md:p-8 pt-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
               <div className="space-y-1">
                 <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider">
@@ -170,14 +170,17 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                 />
               </div>
             </div>
-            <div className="mt-8 flex gap-4">
-              <Button onClick={() => setShowUpgradeModal(true)} className="rounded-xl px-8">
+            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+              <Button
+                onClick={() => setShowUpgradeModal(true)}
+                className="w-full sm:w-auto rounded-xl px-8 h-12 text-base"
+              >
                 Fazer Upgrade
               </Button>
               {(formData.plano === 'basico' || formData.plano === 'pro') && (
                 <Button
                   variant="outline"
-                  className="rounded-xl text-rose-600 border-rose-200 hover:bg-rose-50"
+                  className="w-full sm:w-auto rounded-xl h-12 text-base text-rose-600 border-rose-200 hover:bg-rose-50"
                   onClick={() => setShowCancelModal(true)}
                 >
                   Cancelar Assinatura
@@ -188,10 +191,10 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
         </Card>
 
         <Card className="rounded-[2rem] shadow-sm border-slate-100 flex flex-col">
-          <CardHeader className="p-8 pb-4 border-b border-slate-50">
+          <CardHeader className="p-6 md:p-8 pb-4 border-b border-slate-50">
             <CardTitle className="text-xl">Pagamento</CardTitle>
           </CardHeader>
-          <CardContent className="p-8 pt-6 flex-1 flex flex-col justify-center">
+          <CardContent className="p-6 md:p-8 pt-6 flex-1 flex flex-col justify-center">
             {formData.plano === 'basico' || formData.plano === 'pro' ? (
               <div className="space-y-6">
                 <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -208,7 +211,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                 </div>
                 <Button
                   variant="outline"
-                  className="w-full rounded-xl"
+                  className="w-full rounded-xl h-12 text-base"
                   onClick={() => toast({ title: 'Redirecionando para portal seguro...' })}
                 >
                   Atualizar Cartão
@@ -230,11 +233,11 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
       </div>
 
       <Card className="rounded-[2rem] shadow-sm border-slate-100">
-        <CardHeader className="p-8 pb-4">
+        <CardHeader className="p-6 md:p-8 pb-4">
           <CardTitle className="text-xl">Histórico de Faturas</CardTitle>
           <CardDescription>Suas cobranças dos últimos 12 meses.</CardDescription>
         </CardHeader>
-        <CardContent className="px-8 pb-8 pt-0">
+        <CardContent className="px-4 sm:px-8 pb-8 pt-0">
           <div className="border border-slate-100 rounded-2xl overflow-hidden">
             <Table>
               <TableHeader className="bg-slate-50/80">
@@ -255,7 +258,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                 ) : (
                   faturas.map((f) => (
                     <TableRow key={f.id}>
-                      <TableCell className="font-medium text-slate-700">
+                      <TableCell className="font-medium text-slate-700 whitespace-nowrap">
                         {new Date(f.data_vencimento).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="capitalize text-slate-600">{f.plano}</TableCell>
@@ -283,14 +286,14 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
       </Card>
 
       <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
-        <DialogContent className="max-w-3xl rounded-[2rem] p-8">
-          <DialogHeader className="mb-6">
+        <DialogContent className="max-w-3xl rounded-[2rem] p-0 flex flex-col max-h-[90vh]">
+          <DialogHeader className="p-6 shrink-0 border-b border-slate-100">
             <DialogTitle className="text-2xl">Escolha o plano ideal</DialogTitle>
-            <DialogDescription className="text-base">
+            <DialogDescription className="text-base mt-2">
               Faça upgrade para acessar novas funcionalidades.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="border-2 border-blue-500 bg-blue-50/30 rounded-2xl p-6 relative">
               <div className="absolute -top-3 -right-2 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase">
                 Mais Popular
@@ -305,7 +308,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                 <li className="flex items-center gap-2">✓ Portal do Paciente</li>
               </ul>
               <Button
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 text-base"
                 disabled={upgradingTo === 'basico' || formData.plano === 'basico'}
                 onClick={() => handleUpgrade('basico')}
               >
@@ -327,7 +330,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                 <li className="flex items-center gap-2">✓ Telemedicina Integrada</li>
               </ul>
               <Button
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-12 text-base"
                 disabled={upgradingTo === 'pro' || formData.plano === 'pro'}
                 onClick={() => handleUpgrade('pro')}
               >
@@ -343,7 +346,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
       </Dialog>
 
       <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
-        <DialogContent className="rounded-[2rem] p-8">
+        <DialogContent className="rounded-[2rem] p-6 sm:p-8">
           <DialogHeader>
             <DialogTitle className="text-xl text-rose-600 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" /> Cancelar Assinatura
@@ -353,17 +356,17 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
               pacientes e você perderá acesso às funcionalidades premium.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="mt-6 gap-3 sm:gap-0">
+          <DialogFooter className="mt-6 flex flex-col sm:flex-row gap-3">
             <Button
               variant="outline"
-              className="rounded-xl"
+              className="rounded-xl w-full sm:w-auto h-12"
               onClick={() => setShowCancelModal(false)}
             >
               Voltar
             </Button>
             <Button
               variant="destructive"
-              className="rounded-xl"
+              className="rounded-xl w-full sm:w-auto h-12"
               onClick={handleCancelSubscription}
               disabled={canceling}
             >

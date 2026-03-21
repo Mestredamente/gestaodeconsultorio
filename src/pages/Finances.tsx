@@ -198,9 +198,9 @@ export default function Finances() {
             Controle de receitas, despesas e emissão de cobranças
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
           <Select value={month} onValueChange={setMonth}>
-            <SelectTrigger className="w-[140px] bg-white rounded-xl h-11 border-slate-200">
+            <SelectTrigger className="w-full sm:w-[140px] bg-white rounded-xl h-12 sm:h-11 border-slate-200 text-base sm:text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -226,18 +226,21 @@ export default function Finances() {
           </Select>
           <Dialog open={isReceiveModalOpen} onOpenChange={setIsReceiveModalOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 rounded-xl h-11 px-6 shadow-sm">
-                <QrCode className="w-4 h-4" /> Receber Pagamento
+              <Button className="gap-2 rounded-xl h-12 sm:h-11 px-6 shadow-sm w-full sm:w-auto text-base sm:text-sm">
+                <QrCode className="w-5 h-5 sm:w-4 sm:h-4" /> Receber Pagamento
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md rounded-[2rem] p-8">
-              <DialogHeader>
+            <DialogContent className="sm:max-w-md rounded-[2rem] p-0 flex flex-col max-h-[90vh]">
+              <DialogHeader className="p-6 pb-2 shrink-0">
                 <DialogTitle className="text-2xl font-bold">Nova Cobrança</DialogTitle>
-                <DialogDescription className="text-base">
+                <DialogDescription className="text-base mt-1">
                   Gere um link de pagamento integrado.
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleReceivePayment} className="space-y-5 pt-4">
+              <form
+                onSubmit={handleReceivePayment}
+                className="flex-1 overflow-y-auto p-6 pt-2 space-y-5"
+              >
                 <div className="space-y-2">
                   <Label>Paciente</Label>
                   <Select
@@ -252,7 +255,7 @@ export default function Finances() {
                     }}
                     required
                   >
-                    <SelectTrigger className="bg-slate-50 h-12 rounded-xl">
+                    <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
@@ -281,7 +284,7 @@ export default function Finances() {
                     value={receiveData.gateway}
                     onValueChange={(v) => setReceiveData({ ...receiveData, gateway: v })}
                   >
-                    <SelectTrigger className="bg-slate-50 h-12 rounded-xl">
+                    <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
@@ -306,46 +309,46 @@ export default function Finances() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-emerald-50/50 border-emerald-100 rounded-[2rem] shadow-sm">
-          <CardContent className="p-8 flex justify-between items-start">
+          <CardContent className="p-6 sm:p-8 flex justify-between items-start">
             <div>
               <p className="text-emerald-700 font-bold text-sm uppercase tracking-wider mb-2">
                 Entradas (Mês)
               </p>
-              <h3 className="text-4xl font-extrabold text-emerald-900">
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-emerald-900 break-words">
                 {formatBRL(currentRecebido)}
               </h3>
             </div>
-            <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl">
+            <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl shrink-0 ml-2">
               <ArrowUpRight className="w-6 h-6" />
             </div>
           </CardContent>
         </Card>
         <Card className="bg-rose-50/50 border-rose-100 rounded-[2rem] shadow-sm">
-          <CardContent className="p-8 flex justify-between items-start">
+          <CardContent className="p-6 sm:p-8 flex justify-between items-start">
             <div>
               <p className="text-rose-700 font-bold text-sm uppercase tracking-wider mb-2">
                 Saídas (Mês)
               </p>
-              <h3 className="text-4xl font-extrabold text-rose-900">
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-rose-900 break-words">
                 {formatBRL(currentDespesas)}
               </h3>
             </div>
-            <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl">
+            <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0 ml-2">
               <ArrowDownRight className="w-6 h-6" />
             </div>
           </CardContent>
         </Card>
         <Card className="bg-indigo-50/50 border-indigo-100 rounded-[2rem] shadow-sm">
-          <CardContent className="p-8 flex justify-between items-start">
+          <CardContent className="p-6 sm:p-8 flex justify-between items-start">
             <div>
               <p className="text-indigo-700 font-bold text-sm uppercase tracking-wider mb-2">
                 Saldo Líquido
               </p>
-              <h3 className="text-4xl font-extrabold text-indigo-900">
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-indigo-900 break-words">
                 {formatBRL(currentRecebido - currentDespesas)}
               </h3>
             </div>
-            <div className="p-3 bg-indigo-100 text-indigo-600 rounded-2xl">
+            <div className="p-3 bg-indigo-100 text-indigo-600 rounded-2xl shrink-0 ml-2">
               <Wallet className="w-6 h-6" />
             </div>
           </CardContent>
@@ -353,22 +356,22 @@ export default function Finances() {
       </div>
 
       <Tabs defaultValue="receitas" className="w-full">
-        <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl [&::-webkit-scrollbar]:hidden">
+        <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl [&::-webkit-scrollbar]:hidden scroll-smooth">
           <TabsTrigger
             value="receitas"
-            className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold"
+            className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0"
           >
             Faturamento
           </TabsTrigger>
           <TabsTrigger
             value="fluxo"
-            className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold"
+            className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0"
           >
             Fluxo Anual
           </TabsTrigger>
           <TabsTrigger
             value="fiscal"
-            className="px-6 py-3 gap-2 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold"
+            className="px-6 py-3 gap-2 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0"
           >
             Contabilidade
           </TabsTrigger>
@@ -410,8 +413,8 @@ export default function Finances() {
         </TabsContent>
 
         <TabsContent value="fluxo">
-          <Card className="rounded-[2rem] shadow-sm border-slate-100">
-            <CardContent className="p-8 h-[400px]">
+          <Card className="rounded-[2rem] shadow-sm border-slate-100 overflow-hidden">
+            <CardContent className="p-4 sm:p-8 h-[300px] sm:h-[400px]">
               <ChartContainer
                 config={{
                   recebido: { label: 'Entradas', color: '#10b981' },
@@ -434,14 +437,14 @@ export default function Finances() {
                       dataKey="recebido"
                       name="Entradas"
                       fill="var(--color-recebido)"
-                      radius={[6, 6, 0, 0]}
+                      radius={[4, 4, 0, 0]}
                       maxBarSize={45}
                     />
                     <Bar
                       dataKey="saida"
                       name="Saídas"
                       fill="var(--color-saida)"
-                      radius={[6, 6, 0, 0]}
+                      radius={[4, 4, 0, 0]}
                       maxBarSize={45}
                     />
                   </BarChart>

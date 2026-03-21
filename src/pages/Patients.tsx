@@ -47,16 +47,16 @@ export default function Patients() {
           </p>
         </div>
         <Button
-          className="gap-2 shadow-sm rounded-xl h-11 px-6 text-base"
+          className="gap-2 shadow-sm rounded-xl h-12 sm:h-11 px-6 text-base sm:text-sm w-full sm:w-auto"
           onClick={() => navigate('/pacientes/novo')}
         >
-          <Plus className="w-5 h-5" /> Novo Paciente
+          <Plus className="w-5 h-5 sm:w-4 sm:h-4" /> Novo Paciente
         </Button>
       </div>
 
       <Card className="shadow-sm border-slate-100 rounded-[2rem] overflow-hidden">
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-6">
-          <div className="relative w-full max-w-md">
+        <CardHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-6">
+          <div className="relative w-full md:max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <Input
               className="pl-11 bg-white h-12 rounded-xl border-slate-200 text-base"
@@ -81,20 +81,22 @@ export default function Patients() {
                 <div
                   key={p.id}
                   onClick={() => navigate(`/pacientes/${p.id}`)}
-                  className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between hover:bg-slate-50/50 cursor-pointer transition-colors group gap-4"
+                  className="p-5 sm:p-6 flex flex-row items-center justify-between hover:bg-slate-50/50 cursor-pointer transition-colors group gap-4"
                 >
-                  <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 shrink-0 shadow-sm border border-indigo-100">
+                  <div className="flex items-center gap-4 sm:gap-5 w-full min-w-0">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 shrink-0 shadow-sm border border-indigo-100">
                       <UserRound className="w-6 h-6" />
                     </div>
-                    <div>
-                      <h3 className="font-bold text-lg text-slate-800 group-hover:text-primary transition-colors">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-base sm:text-lg text-slate-800 group-hover:text-primary transition-colors truncate">
                         {p.nome}
                       </h3>
-                      <p className="text-slate-500">{p.telefone || 'Sem telefone'}</p>
+                      <p className="text-sm sm:text-base text-slate-500 truncate">
+                        {p.telefone || 'Sem telefone'}
+                      </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors hidden sm:block" />
+                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors shrink-0" />
                 </div>
               ))}
             </div>

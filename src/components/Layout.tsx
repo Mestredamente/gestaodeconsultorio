@@ -101,9 +101,9 @@ export default function Layout() {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row">
       {/* Mobile Header */}
-      <header className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-100 sticky top-0 z-50">
+      <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-100 sticky top-0 z-50">
         <div className="flex items-center gap-2 text-primary font-bold text-xl truncate max-w-[200px]">
           {clinic.logo ? (
             <img
@@ -124,75 +124,85 @@ export default function Layout() {
         </button>
       </header>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <aside
-          className={cn(
-            'fixed lg:sticky top-0 left-0 z-40 h-screen w-72 bg-white border-r border-slate-100 flex flex-col transition-transform duration-300 ease-in-out',
-            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-          )}
-        >
-          <div className="p-6 flex items-center gap-3 text-primary font-black text-2xl tracking-tight hidden lg:flex">
-            {clinic.logo ? (
-              <img
-                src={clinic.logo}
-                alt="Logo"
-                className="w-8 h-8 object-contain rounded-md shrink-0"
-              />
-            ) : (
-              <Brain className="w-8 h-8 shrink-0" />
-            )}
-            <span className="truncate">{clinic.name}</span>
-          </div>
-
-          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            {menuItems.map((item) => {
-              const isActive =
-                location.pathname === item.path ||
-                (item.path !== '/' && location.pathname.startsWith(item.path))
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={cn(
-                    'flex items-center gap-3 px-4 py-3.5 rounded-2xl font-bold transition-all',
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900',
-                  )}
-                >
-                  <item.icon className="w-5 h-5 shrink-0" />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </nav>
-
-          <div className="p-4 border-t border-slate-100">
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-3 px-4 py-3.5 w-full rounded-2xl font-bold text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
-            >
-              <LogOut className="w-5 h-5 shrink-0" />
-              Sair da conta
-            </button>
-          </div>
-        </aside>
-
-        {/* Overlay */}
-        {isMobileMenuOpen && (
-          <div
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 lg:hidden"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'fixed md:sticky top-0 left-0 z-40 h-screen bg-white border-r border-slate-100 flex flex-col transition-all duration-300 ease-in-out',
+          isMobileMenuOpen
+            ? 'translate-x-0 w-72'
+            : '-translate-x-full md:translate-x-0 md:w-20 lg:w-72',
         )}
+      >
+        <div className="p-4 lg:p-6 flex items-center justify-center lg:justify-start gap-3 text-primary font-black text-2xl tracking-tight hidden md:flex">
+          {clinic.logo ? (
+            <img
+              src={clinic.logo}
+              alt="Logo"
+              className="w-8 h-8 object-contain rounded-md shrink-0"
+            />
+          ) : (
+            <Brain className="w-8 h-8 shrink-0" />
+          )}
+          <span className="truncate hidden lg:block">{clinic.name}</span>
+        </div>
 
-        {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-8 lg:p-10 max-w-full overflow-x-hidden min-h-screen">
-          <Outlet />
-        </main>
-      </div>
+        <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto overflow-x-hidden scrollbar-hide">
+          {menuItems.map((item) => {
+            const isActive =
+              location.pathname === item.path ||
+              (item.path !== '/' && location.pathname.startsWith(item.path))
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => setIsMobileMenuOpen(false)}
+                title={item.label}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-3.5 rounded-2xl font-bold transition-all whitespace-nowrap',
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900',
+                  !isMobileMenuOpen && 'md:justify-center lg:justify-start',
+                )}
+              >
+                <item.icon className="w-5 h-5 shrink-0" />
+                <span className={cn('transition-all', !isMobileMenuOpen && 'md:hidden lg:block')}>
+                  {item.label}
+                </span>
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-slate-100">
+          <button
+            onClick={handleSignOut}
+            title="Sair da conta"
+            className={cn(
+              'flex items-center gap-3 px-3 py-3.5 w-full rounded-2xl font-bold text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors whitespace-nowrap',
+              !isMobileMenuOpen && 'md:justify-center lg:justify-start',
+            )}
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            <span className={cn('transition-all', !isMobileMenuOpen && 'md:hidden lg:block')}>
+              Sair da conta
+            </span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 p-4 sm:p-6 lg:p-10 max-w-full overflow-x-hidden min-h-screen">
+        <Outlet />
+      </main>
     </div>
   )
 }

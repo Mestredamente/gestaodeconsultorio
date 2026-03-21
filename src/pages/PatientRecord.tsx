@@ -624,13 +624,13 @@ export default function PatientRecord() {
                 {historico.map((entry, index) => (
                   <div
                     key={entry.id}
-                    className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group animate-fade-in-up"
+                    className="relative flex items-start md:items-center justify-start md:justify-normal md:odd:flex-row-reverse group animate-fade-in-up"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-colors group-hover:bg-primary group-hover:text-white">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-slate-100 text-slate-500 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 transition-colors group-hover:bg-primary group-hover:text-white mt-1 md:mt-0">
                       <Calendar className="w-4 h-4" />
                     </div>
-                    <Card className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] shadow-sm border-slate-200 hover:shadow-md transition-shadow">
+                    <Card className="w-[calc(100%-3rem)] ml-4 md:ml-0 md:w-[calc(50%-2.5rem)] shadow-sm border-slate-200 hover:shadow-md transition-shadow">
                       <CardHeader className="py-3 px-5 border-b border-slate-50 bg-slate-50/50">
                         <span className="font-semibold text-slate-700 text-sm">
                           Sessão de {new Date(entry.date + 'T12:00:00').toLocaleDateString('pt-BR')}
@@ -867,11 +867,11 @@ export default function PatientRecord() {
       </div>
 
       <Dialog open={isEvolModalOpen} onOpenChange={setIsEvolModalOpen}>
-        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
-          <DialogHeader className="p-6 pb-4 bg-slate-50 border-b border-slate-100">
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden flex flex-col max-h-[90vh]">
+          <DialogHeader className="p-6 pb-4 bg-slate-50 border-b border-slate-100 shrink-0">
             <DialogTitle className="text-xl">Anotações da Sessão</DialogTitle>
           </DialogHeader>
-          <div className="p-6 space-y-5">
+          <div className="p-6 space-y-5 flex-1 overflow-y-auto">
             <div className="space-y-2">
               <Label htmlFor="date">Data da Sessão</Label>
               <Input
@@ -885,7 +885,7 @@ export default function PatientRecord() {
             <div className="space-y-2">
               <div className="flex justify-between items-center mt-2 flex-wrap gap-2">
                 <Label htmlFor="content">Evolução Clínica</Label>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -899,7 +899,7 @@ export default function PatientRecord() {
                     ) : (
                       <Sparkles className="w-4 h-4" />
                     )}
-                    {isGeneratingAI ? 'Gerando...' : 'Sugerir com IA'}
+                    {isGeneratingAI ? 'Gerando...' : 'Sugerir'}
                   </Button>
                   {isTranscribing ? (
                     <div className="flex items-center text-sm text-primary gap-2">
@@ -913,7 +913,7 @@ export default function PatientRecord() {
                       onClick={stopRecording}
                       className="gap-2 animate-pulse"
                     >
-                      <Square className="w-4 h-4" /> Parar Gravação
+                      <Square className="w-4 h-4" /> Parar
                     </Button>
                   ) : (
                     <Button
@@ -923,7 +923,7 @@ export default function PatientRecord() {
                       onClick={startRecording}
                       className="gap-2 text-primary border-primary hover:bg-primary/10"
                     >
-                      <Mic className="w-4 h-4" /> Gravar por Voz
+                      <Mic className="w-4 h-4" /> Gravar
                     </Button>
                   )}
                 </div>
@@ -937,7 +937,7 @@ export default function PatientRecord() {
               />
             </div>
           </div>
-          <DialogFooter className="p-6 pt-4 bg-slate-50 border-t border-slate-100">
+          <DialogFooter className="p-6 pt-4 bg-slate-50 border-t border-slate-100 shrink-0">
             <Button variant="outline" onClick={() => setIsEvolModalOpen(false)}>
               Cancelar
             </Button>
@@ -949,22 +949,22 @@ export default function PatientRecord() {
       </Dialog>
 
       <Dialog open={isLaudoModalOpen} onOpenChange={setIsLaudoModalOpen}>
-        <DialogContent className="sm:max-w-3xl p-0">
-          <DialogHeader className="p-6 pb-4 bg-slate-50 border-b border-slate-100">
+        <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[90vh]">
+          <DialogHeader className="p-6 pb-4 bg-slate-50 border-b border-slate-100 shrink-0">
             <DialogTitle>Gerar Laudo Psicológico</DialogTitle>
           </DialogHeader>
-          <div className="p-6 space-y-4">
-            <div className="flex gap-4 items-end">
+          <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+            <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
               <div className="space-y-2 flex-1">
                 <Label>Template de Laudo</Label>
                 <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white">
                     <SelectValue placeholder="Selecione um modelo base..." />
                   </SelectTrigger>
                   <SelectContent>
                     {laudoTemplates.length === 0 && (
                       <SelectItem value="empty" disabled>
-                        Nenhum template encontrado (Crie em Configurações)
+                        Nenhum template encontrado
                       </SelectItem>
                     )}
                     {laudoTemplates.map((t) => (
@@ -975,22 +975,26 @@ export default function PatientRecord() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={handleGenerateLaudo} variant="secondary" className="gap-2">
-                <RefreshCw className="w-4 h-4" /> Preencher Dados
+              <Button
+                onClick={handleGenerateLaudo}
+                variant="secondary"
+                className="gap-2 w-full sm:w-auto"
+              >
+                <RefreshCw className="w-4 h-4" /> Preencher
               </Button>
             </div>
 
             <div className="space-y-2">
               <Label>Conteúdo do Laudo (Editável)</Label>
               <Textarea
-                className="min-h-[300px] font-mono text-sm"
+                className="min-h-[300px] font-mono text-sm bg-white"
                 value={laudoContent}
                 onChange={(e) => setLaudoContent(e.target.value)}
-                placeholder="Selecione o template e clique em preencher para carregar as informações do paciente e histórico..."
+                placeholder="Selecione o template e clique em preencher..."
               />
             </div>
           </div>
-          <DialogFooter className="p-6 pt-4 bg-slate-50 border-t border-slate-100">
+          <DialogFooter className="p-6 pt-4 bg-slate-50 border-t border-slate-100 shrink-0">
             <Button variant="outline" onClick={() => setIsLaudoModalOpen(false)}>
               Cancelar
             </Button>
@@ -1002,7 +1006,7 @@ export default function PatientRecord() {
       </Dialog>
 
       <Dialog open={isRescheduleOpen} onOpenChange={setIsRescheduleOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Remarcar Sessão</DialogTitle>
           </DialogHeader>

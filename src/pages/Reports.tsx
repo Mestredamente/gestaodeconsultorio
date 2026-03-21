@@ -23,7 +23,7 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from '@/components/ui/chart'
-import { Pie, PieChart, Bar, BarChart, XAxis, CartesianGrid } from 'recharts'
+import { Pie, PieChart, Bar, BarChart, XAxis, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { AlertCircle, TrendingUp, Calendar as CalendarIcon, Package } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -207,11 +207,11 @@ export default function Reports() {
 
       <Card className="shadow-sm border-slate-200 print:hidden">
         <CardContent className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 items-end sm:items-center">
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-            <div className="flex-1 space-y-1.5">
+          <div className="flex flex-col sm:flex-row gap-4 w-full md:max-w-md">
+            <div className="flex-1 space-y-1.5 w-full">
               <label className="text-xs font-medium text-slate-500">Mês</label>
               <Select value={month} onValueChange={setMonth}>
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-white h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -223,10 +223,10 @@ export default function Reports() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex-1 space-y-1.5">
+            <div className="flex-1 space-y-1.5 w-full">
               <label className="text-xs font-medium text-slate-500">Ano</label>
               <Select value={year} onValueChange={setYear}>
-                <SelectTrigger className="bg-white">
+                <SelectTrigger className="bg-white h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -248,17 +248,17 @@ export default function Reports() {
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-slate-100/50 border border-slate-200 p-1 w-full sm:w-auto overflow-x-auto justify-start h-12 print:hidden">
-            <TabsTrigger value="overview" className="gap-2">
+          <TabsList className="bg-slate-100/50 border border-slate-200 p-1 w-full overflow-x-auto justify-start h-auto flex-nowrap scroll-smooth print:hidden [&::-webkit-scrollbar]:hidden">
+            <TabsTrigger value="overview" className="gap-2 px-6 py-2.5 whitespace-nowrap">
               <TrendingUp className="w-4 h-4" /> Visão Geral
             </TabsTrigger>
-            <TabsTrigger value="delinquency" className="gap-2">
+            <TabsTrigger value="delinquency" className="gap-2 px-6 py-2.5 whitespace-nowrap">
               <AlertCircle className="w-4 h-4" /> Inadimplência
             </TabsTrigger>
-            <TabsTrigger value="details" className="gap-2">
+            <TabsTrigger value="details" className="gap-2 px-6 py-2.5 whitespace-nowrap">
               <CalendarIcon className="w-4 h-4" /> Receitas
             </TabsTrigger>
-            <TabsTrigger value="consumo" className="gap-2">
+            <TabsTrigger value="consumo" className="gap-2 px-6 py-2.5 whitespace-nowrap">
               <Package className="w-4 h-4" /> Consumo e Despesas
             </TabsTrigger>
           </TabsList>
@@ -303,27 +303,29 @@ export default function Reports() {
               </Card>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2">
               <Card className="shadow-sm border-slate-200">
                 <CardHeader>
                   <CardTitle className="text-lg">Distribuição por Frequência</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ChartContainer config={chartConfig} className="h-[280px] w-full">
-                    <PieChart>
-                      <Pie
-                        data={distributionChartData}
-                        dataKey="valor"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                      />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <ChartLegend content={<ChartLegendContent />} />
-                    </PieChart>
+                    <ResponsiveContainer>
+                      <PieChart>
+                        <Pie
+                          data={distributionChartData}
+                          dataKey="valor"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <ChartLegend content={<ChartLegendContent />} />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </ChartContainer>
                 </CardContent>
               </Card>
@@ -333,15 +335,17 @@ export default function Reports() {
                 </CardHeader>
                 <CardContent>
                   <ChartContainer config={chartConfig} className="h-[280px] w-full">
-                    <BarChart data={cashFlowData}>
-                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                      <XAxis dataKey="name" tickLine={false} axisLine={false} />
-                      <ChartTooltip
-                        cursor={{ fill: 'transparent' }}
-                        content={<ChartTooltipContent hideLabel />}
-                      />
-                      <Bar dataKey="valor" radius={[6, 6, 0, 0]} maxBarSize={60} />
-                    </BarChart>
+                    <ResponsiveContainer>
+                      <BarChart data={cashFlowData}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                        <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                        <ChartTooltip
+                          cursor={{ fill: 'transparent' }}
+                          content={<ChartTooltipContent hideLabel />}
+                        />
+                        <Bar dataKey="valor" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </ChartContainer>
                 </CardContent>
               </Card>
@@ -373,12 +377,16 @@ export default function Reports() {
                   ) : (
                     delinquentPatients.map((p) => (
                       <TableRow key={p.patientId} className="hover:bg-slate-50">
-                        <TableCell className="font-medium">{p.patientName}</TableCell>
-                        <TableCell className="capitalize text-slate-600">{p.frequencia}</TableCell>
+                        <TableCell className="font-medium whitespace-nowrap">
+                          {p.patientName}
+                        </TableCell>
+                        <TableCell className="capitalize text-slate-600 whitespace-nowrap">
+                          {p.frequencia}
+                        </TableCell>
                         <TableCell className="text-center text-slate-600">
                           {p.diaPagamento || '-'}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-red-600">
+                        <TableCell className="text-right font-bold text-red-600 whitespace-nowrap">
                           {formatBRL(p.valorAReceber)}
                         </TableCell>
                       </TableRow>
@@ -414,7 +422,7 @@ export default function Reports() {
                         key={row.patientId}
                         className={cn(row.valorAReceber > 0 && 'bg-amber-50/20')}
                       >
-                        <TableCell className="font-medium">
+                        <TableCell className="font-medium whitespace-nowrap">
                           {row.patientName}{' '}
                           {row.delinquent && (
                             <Badge variant="destructive" className="ml-2 text-[10px] h-5">
@@ -424,10 +432,10 @@ export default function Reports() {
                         </TableCell>
                         <TableCell className="text-center">{row.totalSessions}</TableCell>
                         <TableCell className="text-center text-red-600">{row.faltas}</TableCell>
-                        <TableCell className="text-right text-emerald-600 font-medium">
+                        <TableCell className="text-right text-emerald-600 font-medium whitespace-nowrap">
                           {formatBRL(row.valorRecebido)}
                         </TableCell>
-                        <TableCell className="text-right text-amber-600 font-medium">
+                        <TableCell className="text-right text-amber-600 font-medium whitespace-nowrap">
                           {formatBRL(row.valorAReceber)}
                         </TableCell>
                       </TableRow>

@@ -365,12 +365,12 @@ export default function Agenda() {
           </div>
 
           <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-slate-100">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
+            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100 w-full sm:w-auto justify-center sm:justify-start">
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 text-emerald-600 hover:bg-emerald-100"
+                  className="h-8 w-8 text-emerald-600 hover:bg-emerald-100"
                   title="Confirmar"
                   onClick={() => updateStatus(apt.id, 'confirmado')}
                 >
@@ -379,7 +379,7 @@ export default function Agenda() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 text-red-600 hover:bg-red-100"
+                  className="h-8 w-8 text-red-600 hover:bg-red-100"
                   title="Faltou"
                   onClick={() => updateStatus(apt.id, 'faltou')}
                 >
@@ -388,7 +388,7 @@ export default function Agenda() {
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-7 w-7 text-amber-600 hover:bg-amber-100"
+                  className="h-8 w-8 text-amber-600 hover:bg-amber-100"
                   title="Desmarcou"
                   onClick={() => updateStatus(apt.id, 'desmarcou')}
                 >
@@ -396,11 +396,11 @@ export default function Agenda() {
                 </Button>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
                 <Button
                   size="icon"
                   variant="outline"
-                  className="h-8 w-8 text-slate-600 hover:bg-slate-50 border-slate-200 rounded-lg"
+                  className="h-9 w-9 text-slate-600 hover:bg-slate-50 border-slate-200 rounded-lg"
                   onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
                   title="Prontuário"
                 >
@@ -411,7 +411,7 @@ export default function Agenda() {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg"
+                      className="h-9 w-9 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </Button>
@@ -439,7 +439,7 @@ export default function Agenda() {
             {apt.is_online && (
               <Button
                 size="sm"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 h-9 shadow-sm"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 h-11 sm:h-9 shadow-sm"
                 onClick={() => handleStartVirtualSession(apt)}
               >
                 <Video className="w-4 h-4" /> Iniciar Sessão Virtual
@@ -467,20 +467,20 @@ export default function Agenda() {
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10">
       <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
-          <div className="flex items-center justify-between gap-1 bg-slate-50 border border-slate-200 rounded-2xl p-1 shrink-0">
+          <div className="flex items-center justify-between gap-1 bg-slate-50 border border-slate-200 rounded-2xl p-1 shrink-0 w-full sm:w-auto">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setCurrentDate(subDays(currentDate, 1))}
-              className="h-9 w-9 rounded-xl"
+              className="h-10 w-10 sm:h-9 sm:w-9 rounded-xl"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5 sm:w-4 sm:h-4" />
             </Button>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="h-9 flex-1 sm:min-w-[140px] font-medium px-2 hover:bg-white rounded-xl"
+                  className="h-10 sm:h-9 flex-1 sm:min-w-[140px] font-medium px-2 hover:bg-white rounded-xl text-base sm:text-sm"
                 >
                   {format(currentDate, 'dd/MM/yyyy')}
                 </Button>
@@ -498,21 +498,27 @@ export default function Agenda() {
               variant="ghost"
               size="icon"
               onClick={() => setCurrentDate(addDays(currentDate, 1))}
-              className="h-9 w-9 rounded-xl"
+              className="h-10 w-10 sm:h-9 sm:w-9 rounded-xl"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5 sm:w-4 sm:h-4" />
             </Button>
           </div>
           <Tabs
             value={view}
             onValueChange={(v) => setView(v as any)}
-            className="bg-slate-50 border border-slate-200 rounded-2xl p-1 shrink-0"
+            className="bg-slate-50 border border-slate-200 rounded-2xl p-1 shrink-0 w-full sm:w-auto"
           >
-            <TabsList className="h-10 bg-transparent gap-1">
-              <TabsTrigger value="daily" className="rounded-xl data-[state=active]:shadow-sm">
+            <TabsList className="h-11 sm:h-10 bg-transparent gap-1 w-full flex">
+              <TabsTrigger
+                value="daily"
+                className="flex-1 rounded-xl data-[state=active]:shadow-sm"
+              >
                 Dia
               </TabsTrigger>
-              <TabsTrigger value="weekly" className="rounded-xl data-[state=active]:shadow-sm">
+              <TabsTrigger
+                value="weekly"
+                className="flex-1 rounded-xl data-[state=active]:shadow-sm"
+              >
                 Semana
               </TabsTrigger>
             </TabsList>
@@ -521,9 +527,9 @@ export default function Agenda() {
         <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full lg:w-auto justify-end shrink-0">
           <Button
             onClick={() => setIsNewModalOpen(true)}
-            className="gap-2 rounded-2xl h-11 px-8 shadow-sm"
+            className="gap-2 rounded-2xl h-12 sm:h-11 px-8 shadow-sm w-full sm:w-auto text-base sm:text-sm"
           >
-            <Plus className="w-4 h-4" /> Novo Agendamento
+            <Plus className="w-5 h-5 sm:w-4 sm:h-4" /> Novo Agendamento
           </Button>
         </div>
       </header>
@@ -547,11 +553,11 @@ export default function Agenda() {
 
       {/* Appointment Modal */}
       <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] p-8 rounded-[2rem]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col w-[95vw] p-0 rounded-[2rem] overflow-hidden">
+          <DialogHeader className="p-6 pb-4 shrink-0 border-b border-slate-100">
             <DialogTitle className="text-2xl font-bold">Novo Agendamento</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCreateAppointment} className="space-y-6 pt-4">
+          <form onSubmit={handleCreateAppointment} className="flex-1 overflow-y-auto p-6 space-y-6">
             <div className="space-y-2">
               <Label>Paciente</Label>
               <Select
@@ -579,14 +585,14 @@ export default function Agenda() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 text-indigo-600 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 rounded-lg"
+                  className="h-9 text-indigo-600 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100 rounded-lg"
                   onClick={handleSuggestTime}
                   disabled={isSuggesting}
                 >
                   {isSuggesting ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <BrainCircuit className="w-3.5 h-3.5 mr-2" />
+                    <BrainCircuit className="w-4 h-4 mr-2" />
                   )}
                   IA Sugestão
                 </Button>
@@ -650,7 +656,7 @@ export default function Agenda() {
                     value={formData.plataforma}
                     onValueChange={(v) => setFormData({ ...formData, plataforma: v })}
                   >
-                    <SelectTrigger className="bg-white h-11 rounded-xl">
+                    <SelectTrigger className="bg-white h-12 rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl">
@@ -663,7 +669,10 @@ export default function Agenda() {
               )}
             </div>
 
-            <DialogFooter className="pt-4 border-t border-slate-100 gap-3">
+            {/* Invisibile div for spacing above footer */}
+            <div className="pb-2"></div>
+
+            <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-slate-100 flex gap-3 sm:static sm:bg-transparent sm:border-0 sm:p-0">
               <Button
                 type="button"
                 variant="outline"
@@ -677,9 +686,9 @@ export default function Agenda() {
                 disabled={isSubmitting}
                 className="w-full sm:w-auto h-12 px-8 rounded-xl text-base"
               >
-                {isSubmitting ? 'Salvando...' : 'Confirmar Agendamento'}
+                {isSubmitting ? 'Salvando...' : 'Confirmar'}
               </Button>
-            </DialogFooter>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

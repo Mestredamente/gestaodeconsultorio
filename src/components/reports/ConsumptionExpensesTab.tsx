@@ -126,13 +126,20 @@ export function ConsumptionExpensesTab({
         @page { size: auto; margin: 20mm; }
       `}</style>
       <div className="space-y-6 animate-fade-in-up print:hidden">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h2 className="text-lg font-bold text-slate-800">Resumo do Período</h2>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportPDF} className="gap-2 shadow-sm">
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <Button
+              variant="outline"
+              onClick={handleExportPDF}
+              className="gap-2 shadow-sm w-full sm:w-auto h-11 sm:h-10"
+            >
               <FileText className="w-4 h-4" /> Exportar PDF
             </Button>
-            <Button onClick={handleExportCSV} className="gap-2 shadow-sm">
+            <Button
+              onClick={handleExportCSV}
+              className="gap-2 shadow-sm w-full sm:w-auto h-11 sm:h-10"
+            >
               <Download className="w-4 h-4" /> Exportar Excel
             </Button>
           </div>
@@ -146,7 +153,9 @@ export function ConsumptionExpensesTab({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-rose-800">{formatBRL(totalExpenses)}</div>
+              <div className="text-3xl font-bold text-rose-800 break-words">
+                {formatBRL(totalExpenses)}
+              </div>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-indigo-200 bg-indigo-50/30">
@@ -156,7 +165,9 @@ export function ConsumptionExpensesTab({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-indigo-800">{totalConsumed} unid.</div>
+              <div className="text-3xl font-bold text-indigo-800 break-words">
+                {totalConsumed} unid.
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -186,11 +197,11 @@ export function ConsumptionExpensesTab({
                 ) : (
                   expenses.map((e) => (
                     <TableRow key={e.id}>
-                      <TableCell className="text-slate-600">
+                      <TableCell className="text-slate-600 whitespace-nowrap">
                         {new Date(e.data).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="font-medium text-slate-800">{e.descricao}</TableCell>
-                      <TableCell className="text-right font-semibold text-rose-600">
+                      <TableCell className="text-right font-semibold text-rose-600 whitespace-nowrap">
                         {formatBRL(e.valor)}
                       </TableCell>
                     </TableRow>
@@ -224,7 +235,7 @@ export function ConsumptionExpensesTab({
                   topItems.map(([name, qtd], i) => (
                     <TableRow key={i}>
                       <TableCell className="font-medium text-slate-800">{name}</TableCell>
-                      <TableCell className="text-right font-semibold text-indigo-600">
+                      <TableCell className="text-right font-semibold text-indigo-600 whitespace-nowrap">
                         {qtd} unid.
                       </TableCell>
                     </TableRow>
@@ -311,7 +322,7 @@ export function ConsumptionExpensesTab({
               {consumption.length === 0 && (
                 <tr>
                   <td colSpan={3} className="py-4 text-center italic text-slate-500">
-                    Nenhum consumo no período.
+                    Nenhuma consumo no período.
                   </td>
                 </tr>
               )}
