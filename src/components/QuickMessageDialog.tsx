@@ -111,8 +111,10 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
       toast({ title: 'Paciente sem telefone cadastrado', variant: 'destructive' })
       return
     }
+
+    // generateWhatsAppLink já executa a sanitização com a função formatPhoneForWhatsApp
     const link = generateWhatsAppLink(patient.telefone, message, waType)
-    window.open(link, '_blank')
+    window.open(link, '_blank', 'noopener,noreferrer')
 
     if (user && patient.id) {
       await supabase.from('historico_mensagens' as any).insert({

@@ -8,7 +8,12 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { tipo_whatsapp, telefone, mensagem, usuario_id } = await req.json()
+    let { tipo_whatsapp, telefone, mensagem, usuario_id } = await req.json()
+
+    // Resiliência: Garantir que valores obsoletos não quebrem a execução
+    if (tipo_whatsapp === 'personal') {
+      tipo_whatsapp = 'padrao'
+    }
 
     if (!tipo_whatsapp) {
       throw new Error('O parâmetro "tipo_whatsapp" é obrigatório.')
@@ -16,6 +21,12 @@ Deno.serve(async (req: Request) => {
 
     if (!telefone || !mensagem) {
       throw new Error('Os parâmetros "telefone" e "mensagem" são obrigatórios.')
+    }
+
+    // Sanitização de Telefone no servidor (garantia extra)
+    let cleanPhone = String(telefone).replace(/\D/g, '')
+    if (cleanPhone.length >= 10 && cleanPhone.length <= 11 && !cleanPhone.startsWith('55')) {
+      cleanPhone = `55${cleanPhone}`
     }
 
     let apiKey = Deno.env.get('WHATSAPP_API_KEY')
@@ -26,15 +37,15 @@ Deno.serve(async (req: Request) => {
     if (usuario_id) {
       const supabaseClient = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       )
-      
+
       const { data: userConfig } = await supabaseClient
         .from('usuarios')
         .select('whatsapp_api_key, whatsapp_business_phone_id, whatsapp_business_account_id')
         .eq('id', usuario_id)
         .single()
-        
+
       if (userConfig) {
         if (userConfig.whatsapp_api_key) {
           apiKey = userConfig.whatsapp_api_key
@@ -55,40 +66,43 @@ Deno.serve(async (req: Request) => {
       }
 
       // Simulação de chamada para a API padrão
-      console.log(`[API Padrão] Enviando mensagem para ${telefone}...`)
-      await new Promise(resolve => setTimeout(resolve, 500))
+      console.log(`[API Padrão] Enviando mensagem para ${cleanPhone}...`)
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           provider: 'padrao',
-          message: 'Mensagem processada com sucesso pela API Padrão do WhatsApp.' 
+          message: 'Mensagem processada com sucesso pela API Padrão do WhatsApp.',
+          telefone_processado: cleanPhone,
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
       )
-
     } else if (tipo_whatsapp === 'business') {
       if (!businessApiKey || !phoneId || !accountId) {
-        throw new Error('Credenciais da API Business (KEY, PHONE_ID, ACCOUNT_ID) incompletas no ambiente ou no perfil do usuário.')
+        throw new Error(
+          'Credenciais da API Business (KEY, PHONE_ID, ACCOUNT_ID) incompletas no ambiente ou no perfil do usuário.',
+        )
       }
 
       // Simulação de chamada para a Graph API da Meta (WhatsApp Business)
-      console.log(`[API Business] Enviando mensagem via Graph API (Phone ID: ${phoneId}) para ${telefone}...`)
-      await new Promise(resolve => setTimeout(resolve, 800))
+      console.log(
+        `[API Business] Enviando mensagem via Graph API (Phone ID: ${phoneId}) para ${cleanPhone}...`,
+      )
+      await new Promise((resolve) => setTimeout(resolve, 800))
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           provider: 'business',
-          message: 'Mensagem processada com sucesso pela API Oficial do WhatsApp Business.' 
+          message: 'Mensagem processada com sucesso pela API Oficial do WhatsApp Business.',
+          telefone_processado: cleanPhone,
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
       )
-
     } else {
       throw new Error('tipo_whatsapp inválido. Os valores permitidos são "padrao" ou "business".')
     }
-
   } catch (error: any) {
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       status: 400,

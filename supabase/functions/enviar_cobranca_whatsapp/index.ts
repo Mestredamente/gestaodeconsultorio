@@ -11,21 +11,25 @@ Deno.serve(async (req: Request) => {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } },
     )
 
-    const { data: { user } } = await supabaseClient.auth.getUser()
+    const {
+      data: { user },
+    } = await supabaseClient.auth.getUser()
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
       })
     }
 
     const { paciente_id, mes, ano } = await req.json()
 
     if (!paciente_id || !mes || !ano) {
-      return new Response(JSON.stringify({ error: 'Parâmetros incompletos' }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 
+      return new Response(JSON.stringify({ error: 'Parâmetros incompletos' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
       })
     }
 
@@ -37,14 +41,16 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (pacienteError || !paciente) {
-      return new Response(JSON.stringify({ error: 'Paciente não encontrado' }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 
+      return new Response(JSON.stringify({ error: 'Paciente não encontrado' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
       })
     }
 
     if (!paciente.telefone) {
-      return new Response(JSON.stringify({ error: 'Paciente não possui telefone cadastrado' }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 
+      return new Response(JSON.stringify({ error: 'Paciente não possui telefone cadastrado' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
       })
     }
 
@@ -60,8 +66,9 @@ Deno.serve(async (req: Request) => {
     const valor_a_receber = financeiro?.valor_a_receber || 0
 
     if (valor_a_receber <= 0) {
-      return new Response(JSON.stringify({ error: 'Não há saldo devedor para este período.' }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 
+      return new Response(JSON.stringify({ error: 'Não há saldo devedor para este período.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
       })
     }
 
@@ -73,10 +80,15 @@ Deno.serve(async (req: Request) => {
       .single()
 
     const chave_pix = usuario?.chave_pix || 'Chave PIX não cadastrada'
-    const template = usuario?.template_cobranca || 'Olá [Nome], você tem R$ [valor] a pagar referente a [periodo]. PIX: [chave_pix]'
+    const template =
+      usuario?.template_cobranca ||
+      'Olá [Nome], você tem R$ [valor] a pagar referente a [periodo]. PIX: [chave_pix]'
 
     // 4. Format Message
-    const valorStr = Number(valor_a_receber).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const valorStr = Number(valor_a_receber).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
     const message = template
       .replace(/\[Nome\]/gi, paciente.nome)
       .replace(/\[valor\]/gi, valorStr)
@@ -89,7 +101,7 @@ Deno.serve(async (req: Request) => {
       paciente_id: paciente_id,
       valor_cobrado: valor_a_receber,
       mes_referencia: mes,
-      ano_referencia: ano
+      ano_referencia: ano,
     })
 
     await supabaseClient.from('historico_mensagens').insert({
@@ -97,19 +109,17 @@ Deno.serve(async (req: Request) => {
       paciente_id: paciente_id,
       tipo: 'cobrança',
       conteudo: message,
-      status_envio: 'enviado'
+      status_envio: 'enviado',
     })
 
-    return new Response(
-      JSON.stringify({ message, telefone: paciente.telefone }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    )
-
+    return new Response(JSON.stringify({ message, telefone: paciente.telefone }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
   } catch (error: any) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    )
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    })
   }
 })
-

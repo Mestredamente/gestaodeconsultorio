@@ -60,16 +60,37 @@ export function parseWhatsAppTemplate(
   return text
 }
 
+export function formatPhoneForWhatsApp(phone: string): string {
+  if (!phone) return ''
+  const cleanPhone = phone.replace(/\D/g, '')
+
+  // Se já possui o DDI 55 e tamanho condizente com formato internacional BR
+  if (cleanPhone.startsWith('55') && cleanPhone.length >= 12) {
+    return cleanPhone
+  }
+
+  // Se possui 10 ou 11 dígitos, assumimos que é um número BR sem o código de país
+  if (cleanPhone.length === 10 || cleanPhone.length === 11) {
+    return `55${cleanPhone}`
+  }
+
+  return cleanPhone
+}
+
 export function generateWhatsAppLink(
   phone: string,
   message: string,
   type: 'padrao' | 'business' | 'personal' = 'padrao',
 ) {
-  const cleanPhone = phone.replace(/\D/g, '')
+  const cleanPhone = formatPhoneForWhatsApp(phone)
   const encodedMsg = encodeURIComponent(message)
 
+  // Utilizar api.whatsapp.com é uma prática mais resiliente para garantir
+  // um fallback (página web informando se o app não está instalado)
+  // que funciona bem em tablets (iPad/Android) e Desktops.
   if (type === 'business') {
     return `https://wa.me/${cleanPhone}?text=${encodedMsg}`
   }
+
   return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMsg}`
 }

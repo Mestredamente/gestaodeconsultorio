@@ -73,9 +73,17 @@ export default function Settings() {
     if (!user) return
     setSaving(true)
     try {
-      const { error } = await supabase.from('usuarios').update(settings).eq('id', user.id)
+      // Sincronização e sanitização antes de enviar
+      const payload = { ...settings }
+      if (payload.whatsapp_tipo === 'personal') {
+        payload.whatsapp_tipo = 'padrao'
+      }
+
+      const { error } = await supabase.from('usuarios').update(payload).eq('id', user.id)
       if (error) throw error
+
       toast({ title: 'Configurações salvas com sucesso!' })
+      setSettings(payload) // Atualiza o estado local para garantir consistência
     } catch (err: any) {
       toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
     } finally {

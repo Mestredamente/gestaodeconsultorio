@@ -23,6 +23,7 @@ import { MessageCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { gerarCobrancaWhatsapp } from '@/services/whatsapp'
 import { supabase } from '@/lib/supabase/client'
+import { formatPhoneForWhatsApp } from '@/lib/whatsapp'
 
 export default function WhatsAppBillingDialog({
   pacienteId,
@@ -74,15 +75,8 @@ export default function WhatsAppBillingDialog({
       if (data?.error) throw new Error(data.error)
       if (!data?.telefone) throw new Error('Dados incompletos retornados')
 
-      let cleanPhone = data.telefone.replace(/[^\d+]/g, '')
-      if (cleanPhone.startsWith('+')) {
-        cleanPhone = cleanPhone.substring(1)
-      }
-
-      // Assume Brazilian number if no country code and length is typical for BR (10-11 digits)
-      if (cleanPhone.length >= 10 && cleanPhone.length <= 11 && !cleanPhone.startsWith('55')) {
-        cleanPhone = `55${cleanPhone}`
-      }
+      // Utilizando a função utilitária global para limpar e padronizar o número
+      const cleanPhone = formatPhoneForWhatsApp(data.telefone)
 
       const { data: userResp } = await supabase.auth.getUser()
       const { data: sendData, error: sendError } = await supabase.functions.invoke(
