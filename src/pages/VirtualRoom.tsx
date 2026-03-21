@@ -1,16 +1,49 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
-import { Copy, Check, X, Video, Users, Loader2, Link2, Clock, LogOut, Camera } from 'lucide-react'
+import {
+  Copy,
+  Check,
+  X,
+  Video,
+  Users,
+  Loader2,
+  Link2,
+  LogOut,
+  Camera,
+  FileText,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Calendar } from '@/components/ui/calendar'
+import { Textarea } from '@/components/ui/textarea'
+import { generateWhatsAppLink } from '@/lib/whatsapp'
 
 export default function VirtualRoom() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
 
   const [appointments, setAppointments] = useState<any[]>([])
   const [waitingMap, setWaitingMap] = useState<Record<string, string>>({})
@@ -18,6 +51,32 @@ export default function VirtualRoom() {
   const [activeSession, setActiveSession] = useState<any | null>(null)
   const [generatingLinkFor, setGeneratingLinkFor] = useState<string | null>(null)
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
+
+  // Drawer / Notas State
+  const [isNotesOpen, setIsNotesOpen] = useState(false)
+  const [notes, setNotes] = useState('')
+  const [initialNotesFetched, setInitialNotesFetched] = useState(false)
+
+  // Schedule Modal State
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+  const [selectedTime, setSelectedTime] = useState<string>('')
+  const [sessionType, setSessionType] = useState<'presencial' | 'online'>('online')
+  const [availableSlots, setAvailableSlots] = useState<string[]>([])
+
+  const allTimeSlots = [
+    '08:00',
+    '09:00',
+    '10:00',
+    '11:00',
+    '13:00',
+    '14:00',
+    '15:00',
+    '16:00',
+    '17:00',
+    '18:00',
+    '19:00',
+  ]
 
   const playAlertSound = useCallback(() => {
     try {
@@ -54,7 +113,7 @@ export default function VirtualRoom() {
 
       const { data, error } = await supabase
         .from('agendamentos')
-        .select('*, pacientes(nome, hash_anamnese)')
+        .select('*, pacientes(nome, hash_anamnese, telefone)')
         .eq('usuario_id', user.id)
         .eq('is_online', true)
         .in('status', ['agendado', 'confirmado'])
@@ -91,6 +150,7 @@ export default function VirtualRoom() {
     fetchAppointments()
   }, [user])
 
+  // Real-time Patient Waitlist
   useEffect(() => {
     const channel = supabase
       .channel('sala_espera_admin')
@@ -110,10 +170,7 @@ export default function VirtualRoom() {
                 duration: 6000,
               })
             }
-            return {
-              ...prev,
-              [agendamento_id]: status,
-            }
+            return { ...prev, [agendamento_id]: status }
           })
         }
       })
@@ -124,16 +181,15 @@ export default function VirtualRoom() {
     }
   }, [playAlertSound, toast])
 
+  // Local Media Init
   useEffect(() => {
     let stream: MediaStream | null = null
-
     const initMedia = async () => {
       if (!activeSession) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
           setLocalStream(stream)
         } catch (err) {
-          console.error('Erro ao acessar mídia:', err)
           toast({
             title: 'Aviso de Permissão',
             description:
@@ -143,13 +199,9 @@ export default function VirtualRoom() {
         }
       }
     }
-
     initMedia()
-
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
-      }
+      if (stream) stream.getTracks().forEach((track) => track.stop())
     }
   }, [activeSession, toast])
 
@@ -161,6 +213,149 @@ export default function VirtualRoom() {
     },
     [localStream],
   )
+
+  // Fetch initial notes
+  useEffect(() => {
+    if (activeSession) {
+      const fetchProntuario = async () => {
+        const { data } = await supabase
+          .from('prontuarios')
+          .select('nova_nota')
+          .eq('paciente_id', activeSession.paciente_id)
+          .maybeSingle()
+
+        if (data) setNotes(data.nova_nota || '')
+        setInitialNotesFetched(true)
+      }
+      fetchProntuario()
+    } else {
+      setNotes('')
+      setInitialNotesFetched(false)
+      setIsNotesOpen(false)
+    }
+  }, [activeSession])
+
+  // Real-time Notes Sync
+  useEffect(() => {
+    if (!activeSession) return
+    const channel = supabase
+      .channel('prontuario_notes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'prontuarios',
+          filter: `paciente_id=eq.${activeSession.paciente_id}`,
+        },
+        (payload) => {
+          if (payload.new && payload.new.nova_nota !== undefined) {
+            setNotes((prev) => {
+              if (prev !== payload.new.nova_nota) return payload.new.nova_nota || ''
+              return prev
+            })
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [activeSession])
+
+  // Save Notes Debounce
+  useEffect(() => {
+    if (!initialNotesFetched || !activeSession) return
+    const timeoutId = setTimeout(() => {
+      saveNotes(notes)
+    }, 3000)
+    return () => clearTimeout(timeoutId)
+  }, [notes, activeSession, initialNotesFetched])
+
+  const saveNotes = async (text: string) => {
+    if (!activeSession || !user) return
+    const { data: prontuario } = await supabase
+      .from('prontuarios')
+      .select('id')
+      .eq('paciente_id', activeSession.paciente_id)
+      .maybeSingle()
+
+    if (prontuario) {
+      await supabase.from('prontuarios').update({ nova_nota: text }).eq('id', prontuario.id)
+    } else {
+      await supabase.from('prontuarios').insert({
+        paciente_id: activeSession.paciente_id,
+        usuario_id: user.id,
+        nova_nota: text,
+        historico_sessoes: [],
+      })
+    }
+  }
+
+  const compileNotes = async () => {
+    if (!activeSession || !user) return
+    const textToSave = notes.trim()
+
+    const { data: prontuario } = await supabase
+      .from('prontuarios')
+      .select('id, historico_sessoes')
+      .eq('paciente_id', activeSession.paciente_id)
+      .maybeSingle()
+
+    if (prontuario) {
+      const history = Array.isArray(prontuario.historico_sessoes)
+        ? prontuario.historico_sessoes
+        : []
+      let newHistory = history
+
+      if (textToSave) {
+        newHistory = [
+          {
+            data: new Date().toISOString(),
+            evolucao: textToSave,
+            agendamento_id: activeSession.id,
+          },
+          ...history,
+        ]
+      }
+
+      await supabase
+        .from('prontuarios')
+        .update({ historico_sessoes: newHistory, nova_nota: '' })
+        .eq('id', prontuario.id)
+    }
+  }
+
+  // Load available slots for calendar
+  useEffect(() => {
+    if (!selectedDate || !user) {
+      setAvailableSlots([])
+      return
+    }
+
+    const start = new Date(selectedDate)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(selectedDate)
+    end.setHours(23, 59, 59, 999)
+
+    supabase
+      .from('agendamentos')
+      .select('data_hora')
+      .eq('usuario_id', user.id)
+      .gte('data_hora', start.toISOString())
+      .lte('data_hora', end.toISOString())
+      .in('status', ['agendado', 'confirmado'])
+      .then(({ data }) => {
+        const booked =
+          data?.map((a) => {
+            const d = new Date(a.data_hora)
+            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+          }) || []
+
+        setAvailableSlots(allTimeSlots.filter((t) => !booked.includes(t)))
+      })
+  }, [selectedDate, user])
 
   const copyAccessLink = () => {
     const link = `${window.location.origin}/portal`
@@ -174,7 +369,6 @@ export default function VirtualRoom() {
       const { data, error } = await supabase.functions.invoke('gerar_link_sala_virtual', {
         body: { agendamento_id: appointmentId },
       })
-
       if (error) throw error
 
       if (data?.link) {
@@ -183,7 +377,6 @@ export default function VirtualRoom() {
           title: 'Link seguro copiado!',
           description: 'O link expirará automaticamente após a sessão.',
         })
-
         setAppointments((prev) =>
           prev.map((apt) =>
             apt.id === appointmentId ? { ...apt, link_sala_virtual: data.link } : apt,
@@ -191,26 +384,19 @@ export default function VirtualRoom() {
         )
       }
     } catch (err: any) {
-      toast({
-        title: 'Erro ao gerar link',
-        description: err.message || 'Tente novamente mais tarde.',
-        variant: 'destructive',
-      })
+      toast({ title: 'Erro ao gerar link', description: err.message, variant: 'destructive' })
     } finally {
       setGeneratingLinkFor(null)
     }
   }
 
   const handleApprove = async (apt: any) => {
-    await supabase.from('sala_espera').upsert(
-      {
-        agendamento_id: apt.id,
-        paciente_id: apt.paciente_id,
-        status: 'aprovado',
-      },
-      { onConflict: 'agendamento_id' },
-    )
-
+    await supabase
+      .from('sala_espera')
+      .upsert(
+        { agendamento_id: apt.id, paciente_id: apt.paciente_id, status: 'aprovado' },
+        { onConflict: 'agendamento_id' },
+      )
     setWaitingMap((prev) => ({ ...prev, [apt.id]: 'aprovado' }))
     setActiveSession(apt)
     toast({
@@ -226,16 +412,59 @@ export default function VirtualRoom() {
     toast({ title: 'Entrada rejeitada' })
   }
 
-  const handleEndSession = async () => {
+  const finishProcess = async () => {
+    await compileNotes()
     if (activeSession) {
       await supabase
         .from('sala_espera')
         .update({ status: 'finalizado' })
         .eq('agendamento_id', activeSession.id)
       setWaitingMap((prev) => ({ ...prev, [activeSession.id]: 'finalizado' }))
-      setActiveSession(null)
-      toast({ title: 'Sessão encerrada com sucesso' })
     }
+    setActiveSession(null)
+    setIsScheduleModalOpen(false)
+    toast({
+      title: 'Sessão finalizada com sucesso',
+      description: 'Redirecionando para o painel...',
+    })
+    navigate('/')
+  }
+
+  const handleEndSessionClick = () => {
+    if (activeSession) setIsScheduleModalOpen(true)
+  }
+
+  const handleConfirmSchedule = async () => {
+    if (!selectedDate || !selectedTime || !activeSession || !user) return
+
+    const [hour, minute] = selectedTime.split(':').map(Number)
+    const dataHora = new Date(selectedDate)
+    dataHora.setHours(hour, minute, 0, 0)
+
+    const { error } = await supabase.from('agendamentos').insert({
+      usuario_id: user.id,
+      paciente_id: activeSession.paciente_id,
+      data_hora: dataHora.toISOString(),
+      is_online: sessionType === 'online',
+      status: 'agendado',
+      tipo_pagamento: activeSession.tipo_pagamento || 'particular',
+      valor_total: activeSession.valor_total || 0,
+    })
+
+    if (!error) {
+      const d = new Date(dataHora)
+      const dateStr = d.toLocaleDateString('pt-BR')
+      const msg = `Olá ${activeSession.pacientes?.nome || 'Paciente'}, sua próxima consulta foi agendada para ${dateStr} às ${selectedTime}! Acesse o portal do paciente: ${window.location.origin}/portal/${activeSession.pacientes?.hash_anamnese || ''}`
+
+      if (activeSession.pacientes?.telefone) {
+        const link = generateWhatsAppLink(activeSession.pacientes.telefone, msg)
+        window.open(link, '_blank')
+      }
+      toast({ title: 'Próxima sessão agendada!' })
+    } else {
+      toast({ title: 'Erro ao agendar', variant: 'destructive' })
+    }
+    await finishProcess()
   }
 
   const roomName = activeSession ? `PsicManager_${activeSession.id.replace(/-/g, '')}` : ''
@@ -264,9 +493,10 @@ export default function VirtualRoom() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Waiting Room List */}
         <div className="lg:col-span-1 space-y-4">
           <h2 className="font-bold text-xl text-slate-800 flex items-center gap-2 px-1">
-            <Users className="w-5 h-5 text-primary" /> Sala de Espera / Agendados
+            <Users className="w-5 h-5 text-primary" /> Sala de Espera
           </h2>
 
           {loading ? (
@@ -386,7 +616,7 @@ export default function VirtualRoom() {
                         ) : (
                           <Link2 className="w-4 h-4 mr-2" />
                         )}
-                        Gerar Link Seguro e Copiar
+                        Gerar Link e Copiar
                       </Button>
                     </CardContent>
                   </Card>
@@ -396,9 +626,10 @@ export default function VirtualRoom() {
           )}
         </div>
 
+        {/* Video Area */}
         <div className="lg:col-span-2">
           <Card className="shadow-xl border-slate-200 h-[600px] lg:h-[800px] overflow-hidden flex flex-col rounded-2xl ring-1 ring-slate-900/5">
-            <CardHeader className="bg-slate-900 text-white p-5 flex flex-row items-center justify-between border-b border-slate-800 z-20">
+            <CardHeader className="bg-slate-900 text-white p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 z-20 gap-4">
               <CardTitle className="text-xl font-bold flex items-center gap-3">
                 <div className="p-2 bg-emerald-500/20 rounded-lg ring-1 ring-emerald-500/30">
                   <Video className="w-5 h-5 text-emerald-400" />
@@ -406,13 +637,22 @@ export default function VirtualRoom() {
                 {activeSession ? `Sessão: ${activeSession.pacientes?.nome}` : 'Videoconferência'}
               </CardTitle>
               {activeSession && (
-                <Button
-                  variant="destructive"
-                  onClick={handleEndSession}
-                  className="rounded-xl font-bold px-6 shadow-lg shadow-red-500/20 hover:shadow-red-500/40 gap-2"
-                >
-                  <LogOut className="w-4 h-4" /> Encerrar Sessão
-                </Button>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsNotesOpen(true)}
+                    className="gap-2 border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white w-full sm:w-auto"
+                  >
+                    <FileText className="w-4 h-4" /> Notas da Sessão
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleEndSessionClick}
+                    className="rounded-xl font-bold px-6 shadow-lg shadow-red-500/20 hover:shadow-red-500/40 gap-2 w-full sm:w-auto"
+                  >
+                    <LogOut className="w-4 h-4" /> Finalizar Sessão
+                  </Button>
+                </div>
               )}
             </CardHeader>
             <div className="flex-1 bg-slate-950 relative flex items-center justify-center overflow-hidden z-10">
@@ -451,7 +691,7 @@ export default function VirtualRoom() {
                         </h3>
                         <p className="text-slate-300 max-w-md mx-auto text-center text-lg leading-relaxed">
                           Tudo certo com seu áudio e vídeo. Acompanhe a lista ao lado e aguarde a
-                          chegada do paciente para iniciar a sessão.
+                          chegada do paciente.
                         </p>
                       </div>
                     </>
@@ -463,7 +703,7 @@ export default function VirtualRoom() {
                       <h3 className="text-2xl font-bold text-white mb-3">Preparando Sala...</h3>
                       <p className="text-slate-400 max-w-md mx-auto text-lg">
                         Solicitando permissão de câmera e microfone para garantir que tudo esteja
-                        perfeito antes de iniciar.
+                        perfeito.
                       </p>
                     </div>
                   )}
@@ -480,6 +720,160 @@ export default function VirtualRoom() {
           </Card>
         </div>
       </div>
+
+      {/* Notas Drawer */}
+      <Sheet open={isNotesOpen} onOpenChange={setIsNotesOpen}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-md flex flex-col h-full bg-white p-0 shadow-2xl"
+        >
+          <SheetHeader className="p-6 border-b border-slate-100 bg-slate-50/50">
+            <SheetTitle className="flex items-center gap-2 text-xl">
+              <FileText className="w-5 h-5 text-primary" />
+              Notas da Sessão
+            </SheetTitle>
+            <SheetDescription>Anotações são salvas automaticamente.</SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 p-6 overflow-hidden flex flex-col">
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Comece a digitar as notas do atendimento aqui..."
+              className="flex-1 resize-none border-slate-200 focus-visible:ring-primary/20 text-base leading-relaxed p-4 h-full"
+            />
+          </div>
+          <SheetFooter className="p-6 border-t border-slate-100 bg-slate-50/50">
+            <Button
+              onClick={() => {
+                saveNotes(notes)
+                setIsNotesOpen(false)
+              }}
+              className="w-full sm:w-auto"
+            >
+              <Check className="w-4 h-4 mr-2" /> Salvar e Fechar
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      {/* Schedule Next Session Modal */}
+      <Dialog open={isScheduleModalOpen} onOpenChange={setIsScheduleModalOpen}>
+        <DialogContent className="sm:max-w-md bg-white rounded-2xl overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="text-2xl font-bold">Agendar Próxima Sessão</DialogTitle>
+            <DialogDescription className="text-base mt-2">
+              A sessão com {activeSession?.pacientes?.nome} foi finalizada. Deseja já deixar o
+              próximo encontro agendado?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="px-6 py-4 space-y-6">
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-slate-700">Selecione a Data</label>
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50 flex justify-center p-2">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  disabled={(date) => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    return date < today
+                  }}
+                  className="bg-transparent"
+                />
+              </div>
+            </div>
+
+            {selectedDate && (
+              <div className="space-y-3 animate-fade-in">
+                <label className="text-sm font-semibold text-slate-700">Horários Disponíveis</label>
+                {availableSlots.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-2">
+                    {availableSlots.map((time) => (
+                      <button
+                        key={time}
+                        onClick={() => setSelectedTime(time)}
+                        className={cn(
+                          'px-3 py-2 text-sm font-medium rounded-lg border transition-all',
+                          selectedTime === time
+                            ? 'bg-primary text-white border-primary shadow-md'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50 hover:bg-slate-50',
+                        )}
+                      >
+                        {time}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+                    Nenhum horário disponível nesta data.
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-slate-700">Tipo de Sessão</label>
+              <div className="flex gap-4">
+                <label
+                  className={cn(
+                    'flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all',
+                    sessionType === 'online'
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                      : 'border-slate-200 hover:bg-slate-50',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="tipo"
+                    value="online"
+                    checked={sessionType === 'online'}
+                    onChange={() => setSessionType('online')}
+                    className="accent-primary w-4 h-4"
+                  />
+                  <span className="font-medium text-slate-700">Online</span>
+                </label>
+                <label
+                  className={cn(
+                    'flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all',
+                    sessionType === 'presencial'
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                      : 'border-slate-200 hover:bg-slate-50',
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="tipo"
+                    value="presencial"
+                    checked={sessionType === 'presencial'}
+                    onChange={() => setSessionType('presencial')}
+                    className="accent-primary w-4 h-4"
+                  />
+                  <span className="font-medium text-slate-700">Presencial</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="p-6 bg-slate-50/80 border-t border-slate-100 flex flex-col sm:flex-row gap-3">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto border-slate-300"
+              onClick={finishProcess}
+            >
+              Pular
+            </Button>
+            <Button
+              className="w-full sm:w-auto gap-2"
+              disabled={!selectedDate || !selectedTime}
+              onClick={handleConfirmSchedule}
+            >
+              <Check className="w-4 h-4" /> Confirmar Agendamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
