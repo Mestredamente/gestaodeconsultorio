@@ -42,11 +42,11 @@ import {
   CheckCircle,
   CalendarPlus,
   Clock,
-  Play,
   Settings,
   ArrowLeft,
   RefreshCcw,
   Volume2,
+  AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -72,6 +72,10 @@ export default function VirtualRoom() {
   // Media controls
   const [micOn, setMicOn] = useState(true)
   const [camOn, setCamOn] = useState(true)
+
+  // Iframe state
+  const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [iframeError, setIframeError] = useState(false)
 
   // Notes state
   const [isNotesOpen, setIsNotesOpen] = useState(false)
@@ -165,12 +169,12 @@ export default function VirtualRoom() {
     }
   }
 
-  // Effect para aquisição do stream
+  // Effect para aquisição do stream no teste
   useEffect(() => {
     let activeStream: MediaStream | null = null
 
     const acquireStream = async () => {
-      if (!activeSession || deviceError) return
+      if (!activeSession || deviceError || !inDeviceTest) return
 
       // Aguarda a definição dos dispositivos padrão caso existam na lista
       if (!selectedVideo && videoDevices.length > 0) return
@@ -199,7 +203,7 @@ export default function VirtualRoom() {
         activeStream.getTracks().forEach((t) => t.stop())
       }
     }
-  }, [activeSession, selectedVideo, selectedAudio])
+  }, [activeSession, selectedVideo, selectedAudio, inDeviceTest])
 
   // Effect para o medidor de áudio em tempo real
   useEffect(() => {
@@ -249,13 +253,24 @@ export default function VirtualRoom() {
     }
   }, [stream, inDeviceTest, micOn])
 
-  // Effect para alternar estado das faixas de mídia (camOn / micOn)
+  // Effect para alternar estado das faixas de mídia no teste
   useEffect(() => {
-    if (stream) {
+    if (stream && inDeviceTest) {
       stream.getVideoTracks().forEach((track) => (track.enabled = camOn))
       stream.getAudioTracks().forEach((track) => (track.enabled = micOn))
     }
-  }, [camOn, micOn, stream])
+  }, [camOn, micOn, stream, inDeviceTest])
+
+  // Effect para timeout de carregamento do Jitsi iframe
+  useEffect(() => {
+    let timeout: NodeJS.Timeout
+    if (!inDeviceTest && activeSession && !iframeLoaded && !iframeError) {
+      timeout = setTimeout(() => {
+        setIframeError(true)
+      }, 15000)
+    }
+    return () => clearTimeout(timeout)
+  }, [inDeviceTest, activeSession, iframeLoaded, iframeError])
 
   const playTestSound = () => {
     try {
@@ -429,7 +444,7 @@ export default function VirtualRoom() {
         window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank')
       }
 
-      endSessionCleanup()
+      await endSessionCleanup()
     } catch (err: any) {
       toast({ title: 'Erro ao agendar', description: err.message, variant: 'destructive' })
     } finally {
@@ -441,12 +456,42 @@ export default function VirtualRoom() {
     if (!activeSession) return
     await supabase.from('agendamentos').update({ status: 'compareceu' }).eq('id', activeSession.id)
     toast({ title: 'Sessão finalizada com sucesso.' })
-    endSessionCleanup()
+    await endSessionCleanup()
   }
 
-  const endSessionCleanup = () => {
-    if (stream) stream.getTracks().forEach((track) => track.stop())
-    setStream(null)
+  const endSessionCleanup = async () => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
+      setStream(null)
+    }
+
+    // Auto compile notes if there are unsaved notes
+    if (notes.trim() && activeSession) {
+      try {
+        const { data: pront } = await supabase
+          .from('prontuarios')
+          .select('historico_sessoes')
+          .eq('paciente_id', activeSession.paciente_id)
+          .single()
+        const history = Array.isArray(pront?.historico_sessoes) ? pront.historico_sessoes : []
+        const newEntry = {
+          data: new Date().toISOString(),
+          tipo: 'Evolução Clínica',
+          descricao: notes,
+        }
+        await supabase
+          .from('prontuarios')
+          .update({
+            historico_sessoes: [newEntry, ...history],
+            nova_nota: '',
+          })
+          .eq('paciente_id', activeSession.paciente_id)
+        toast({ title: 'Notas salvas automaticamente.' })
+      } catch (err) {
+        console.error('Erro ao salvar notas automáticas', err)
+      }
+    }
+
     setActiveSession(null)
     setInDeviceTest(false)
     setIsFinishModalOpen(false)
@@ -454,7 +499,13 @@ export default function VirtualRoom() {
   }
 
   const joinLiveSession = () => {
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop())
+      setStream(null)
+    }
     setInDeviceTest(false)
+    setIframeLoaded(false)
+    setIframeError(false)
   }
 
   if (loading)
@@ -713,7 +764,7 @@ export default function VirtualRoom() {
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 animate-fade-in relative mt-2 mb-6 max-w-[1600px] mx-auto">
       {/* Header Room */}
-      <div className="h-16 px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 absolute top-0 w-full z-10">
+      <div className="h-16 px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 absolute top-0 w-full z-20">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400">
             <Video className="w-4 h-4" />
@@ -735,7 +786,7 @@ export default function VirtualRoom() {
               <FileText className="w-4 h-4" /> Notas da Sessão
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-md border-l border-slate-200 flex flex-col bg-white">
+          <SheetContent className="w-full sm:max-w-md border-l border-slate-200 flex flex-col bg-white z-[100]">
             <SheetHeader className="pb-4 border-b border-slate-100 shrink-0">
               <SheetTitle className="text-xl font-bold flex items-center justify-between">
                 <span className="flex items-center gap-2">
@@ -775,155 +826,147 @@ export default function VirtualRoom() {
         </Sheet>
       </div>
 
-      {/* Main Video Area (Mock) */}
-      <div className="flex-1 relative flex items-center justify-center bg-slate-900">
-        {/* Remote Video Mock */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <img
-            src={`https://img.usecurling.com/ppl/large?gender=female&seed=${activeSession.id}`}
-            alt="Patient"
-            className="w-full h-full object-cover opacity-60 mix-blend-luminosity"
-          />
-          <div className="absolute bottom-24 left-6 text-white bg-black/40 px-3 py-1.5 rounded-lg backdrop-blur-sm text-sm">
-            {patient?.nome}
-          </div>
-        </div>
-
-        {/* Local Video - Real Stream from WebRTC */}
-        <div className="absolute bottom-24 right-6 w-48 h-64 bg-slate-800 rounded-2xl border-2 border-slate-700 overflow-hidden shadow-xl">
-          <video
-            autoPlay
-            playsInline
-            muted
-            className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
-            ref={(node) => {
-              if (node && stream && node.srcObject !== stream) {
-                node.srcObject = stream
-              }
-            }}
-          />
-          {!camOn && (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-500">
-              <VideoOff className="w-8 h-8 mb-2" />
+      {/* Main Video Area (Jitsi Iframe) */}
+      <div className="flex-1 relative flex items-center justify-center bg-slate-900 w-full h-full pt-16 pb-24">
+        {iframeError ? (
+          <div className="text-center space-y-4 animate-fade-in p-8 bg-slate-800 rounded-3xl border border-slate-700 max-w-md w-full mx-4 shadow-2xl z-10">
+            <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2">
+              <AlertCircle className="w-10 h-10" />
             </div>
-          )}
-          <div className="absolute bottom-2 left-2 text-white bg-black/40 px-2 py-1 rounded text-xs backdrop-blur-sm">
-            Você
+            <h3 className="text-2xl font-bold text-white">Erro de Conexão</h3>
+            <p className="text-slate-400 text-lg">
+              Não foi possível carregar a sala virtual de forma segura. Verifique sua conexão ou
+              tente recarregar.
+            </p>
+            <Button
+              onClick={() => {
+                setIframeError(false)
+                setIframeLoaded(false)
+              }}
+              className="mt-6 gap-2 w-full h-12 text-lg"
+            >
+              <RefreshCcw className="w-5 h-5" /> Tentar Novamente
+            </Button>
           </div>
-        </div>
+        ) : (
+          <>
+            {!iframeLoaded && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 z-10 space-y-6">
+                <div className="relative">
+                  <div className="w-20 h-20 border-4 border-primary/20 rounded-full animate-pulse"></div>
+                  <div className="w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin absolute inset-0"></div>
+                </div>
+                <p className="text-slate-300 font-medium text-lg">Conectando à sala segura...</p>
+              </div>
+            )}
+            <iframe
+              src={`https://meet.jit.si/PsicManager_${activeSession.id.replace(/-/g, '')}?jwt=${activeSession.sala_virtual_token || ''}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}&config.enableAudioLevels=true&config.prejoinPageEnabled=false`}
+              allow="camera; microphone; fullscreen; display-capture; autoplay"
+              className={`w-full h-full border-0 absolute inset-0 pt-16 pb-24 z-0 ${!iframeLoaded ? 'opacity-0' : 'opacity-100 transition-opacity duration-1000'}`}
+              onLoad={() => setIframeLoaded(true)}
+            />
+          </>
+        )}
       </div>
 
       {/* Footer Controls */}
-      <div className="h-20 bg-slate-950 flex items-center justify-center gap-4 px-6 border-t border-slate-800">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setMicOn(!micOn)}
-          className={cn(
-            'w-12 h-12 rounded-full border-0',
-            micOn
-              ? 'bg-slate-800 text-white hover:bg-slate-700'
-              : 'bg-red-500 text-white hover:bg-red-600',
-          )}
-        >
-          {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setCamOn(!camOn)}
-          className={cn(
-            'w-12 h-12 rounded-full border-0',
-            camOn
-              ? 'bg-slate-800 text-white hover:bg-slate-700'
-              : 'bg-red-500 text-white hover:bg-red-600',
-          )}
-        >
-          {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-        </Button>
+      <div className="h-24 bg-slate-950 flex items-center justify-between px-6 border-t border-slate-800 absolute bottom-0 w-full z-20">
+        <div className="flex-1 hidden md:flex items-center text-slate-500 text-sm font-medium gap-2">
+          <Video className="w-4 h-4" />
+          Controles de áudio e vídeo disponíveis no painel da chamada
+        </div>
 
-        <Dialog open={isFinishModalOpen} onOpenChange={setIsFinishModalOpen}>
-          <DialogTrigger asChild>
-            <Button variant="destructive" className="h-12 px-6 rounded-full font-bold gap-2 ml-4">
-              <PhoneOff className="w-4 h-4" /> Finalizar Sessão
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md rounded-[2rem]">
-            <DialogHeader className="p-6 pb-2">
-              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                <CalendarPlus className="w-6 h-6 text-primary" /> Agendar Próxima Sessão
-              </DialogTitle>
-              <DialogDescription className="text-base mt-1">
-                Gostaria de já deixar o próximo horário reservado para {patient?.nome}?
-              </DialogDescription>
-            </DialogHeader>
-            <div className="p-6 pt-2 space-y-4">
-              <div className="space-y-2">
-                <Label>Data da próxima sessão</Label>
-                <Input
-                  type="date"
-                  value={nextDate}
-                  onChange={(e) => setNextDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="bg-slate-50 h-12 rounded-xl text-base"
-                />
-              </div>
+        <div className="flex-none ml-auto md:ml-0">
+          <Dialog open={isFinishModalOpen} onOpenChange={setIsFinishModalOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="destructive"
+                className="h-14 px-8 rounded-full font-bold text-lg gap-3 shadow-lg shadow-red-500/20 hover:shadow-red-500/40 transition-all"
+              >
+                <PhoneOff className="w-5 h-5" /> Finalizar Sessão
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md rounded-[2rem]">
+              <DialogHeader className="p-6 pb-2">
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  <CalendarPlus className="w-6 h-6 text-primary" /> Agendar Próxima Sessão
+                </DialogTitle>
+                <DialogDescription className="text-base mt-1">
+                  Gostaria de já deixar o próximo horário reservado para {patient?.nome}?
+                </DialogDescription>
+              </DialogHeader>
+              <div className="p-6 pt-2 space-y-4">
+                <div className="space-y-2">
+                  <Label>Data da próxima sessão</Label>
+                  <Input
+                    type="date"
+                    value={nextDate}
+                    onChange={(e) => setNextDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="bg-slate-50 h-12 rounded-xl text-base"
+                  />
+                </div>
 
-              {nextDate && (
-                <div className="space-y-2 animate-fade-in">
-                  <Label>Horário (Disponíveis)</Label>
-                  <Select value={nextTime} onValueChange={setNextTime}>
-                    <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
-                      <SelectValue placeholder="Selecione um horário" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl max-h-48">
-                      {availableTimes.length === 0 ? (
-                        <SelectItem value="none" disabled>
-                          Nenhum horário disponível
-                        </SelectItem>
-                      ) : (
-                        availableTimes.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t}
+                {nextDate && (
+                  <div className="space-y-2 animate-fade-in">
+                    <Label>Horário (Disponíveis)</Label>
+                    <Select value={nextTime} onValueChange={setNextTime}>
+                      <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
+                        <SelectValue placeholder="Selecione um horário" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl max-h-48">
+                        {availableTimes.length === 0 ? (
+                          <SelectItem value="none" disabled>
+                            Nenhum horário disponível
                           </SelectItem>
-                        ))
-                      )}
+                        ) : (
+                          availableTimes.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Modalidade</Label>
+                  <Select value={nextType} onValueChange={setNextType}>
+                    <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      <SelectItem value="online">Online</SelectItem>
+                      <SelectItem value="presencial">Presencial</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Modalidade</Label>
-                <Select value={nextType} onValueChange={setNextType}>
-                  <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="online">Online</SelectItem>
-                    <SelectItem value="presencial">Presencial</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-            </div>
-            <div className="p-6 pt-2 flex flex-col sm:flex-row gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 h-12 rounded-xl text-base"
-                onClick={skipScheduling}
-              >
-                Pular
-              </Button>
-              <Button
-                className="flex-1 h-12 rounded-xl text-base gap-2"
-                onClick={confirmNextSession}
-                disabled={!nextDate || !nextTime || isScheduling}
-              >
-                {isScheduling ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirmar e Enviar'}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+              <div className="p-6 pt-2 flex flex-col sm:flex-row gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 rounded-xl text-base"
+                  onClick={skipScheduling}
+                >
+                  Pular
+                </Button>
+                <Button
+                  className="flex-1 h-12 rounded-xl text-base gap-2"
+                  onClick={confirmNextSession}
+                  disabled={!nextDate || !nextTime || isScheduling}
+                >
+                  {isScheduling ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Confirmar e Enviar'
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
     </div>
   )

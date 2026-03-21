@@ -14,7 +14,7 @@
     "sugerir_horario_ia": 2,
     "criar_checkout_stripe": 5,
     "stripe_webhook": 2,
-    "gerar_link_sala_virtual": 3,
+    "gerar_link_sala_virtual": 4,
     "enviar_mensagem_whatsapp": 3
   }
 }
