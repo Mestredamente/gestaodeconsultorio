@@ -4,12 +4,40 @@ import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { Search, Plus, FileText, ChevronRight, UserCircle, Phone, CalendarDays, Loader2 } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  FileText,
+  ChevronRight,
+  UserCircle,
+  Phone,
+  CalendarDays,
+  Loader2,
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 
@@ -17,18 +45,18 @@ export default function Patients() {
   const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
-  
+
   const [patients, setPatients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
     email: '',
-    valor_sessao: ''
+    valor_sessao: '',
   })
 
   const fetchPatients = async () => {
@@ -39,7 +67,7 @@ export default function Patients() {
       .select('id, nome, telefone, email, data_criacao, recorrencia, status:id')
       .eq('usuario_id', user.id)
       .order('nome')
-    
+
     if (data) setPatients(data)
     setLoading(false)
   }
@@ -52,23 +80,27 @@ export default function Patients() {
     e.preventDefault()
     if (!user) return
     setIsSubmitting(true)
-    
+
     try {
-      const { data, error } = await supabase.from('pacientes').insert({
-        usuario_id: user.id,
-        nome: formData.nome,
-        telefone: formData.telefone,
-        email: formData.email,
-        valor_sessao: formData.valor_sessao ? Number(formData.valor_sessao) : null
-      }).select().single()
-      
+      const { data, error } = await supabase
+        .from('pacientes')
+        .insert({
+          usuario_id: user.id,
+          nome: formData.nome,
+          telefone: formData.telefone,
+          email: formData.email,
+          valor_sessao: formData.valor_sessao ? Number(formData.valor_sessao) : null,
+        })
+        .select()
+        .single()
+
       if (error) throw error
-      
+
       toast({ title: 'Paciente cadastrado com sucesso!' })
       setIsModalOpen(false)
       setFormData({ nome: '', telefone: '', email: '', valor_sessao: '' })
       fetchPatients()
-      
+
       // Navigate to detailed view
       if (data) navigate(`/pacientes/${data.id}`)
     } catch (err: any) {
@@ -78,9 +110,10 @@ export default function Patients() {
     }
   }
 
-  const filteredPatients = patients.filter(p => 
-    p.nome.toLowerCase().includes(search.toLowerCase()) || 
-    (p.telefone && p.telefone.includes(search))
+  const filteredPatients = patients.filter(
+    (p) =>
+      p.nome.toLowerCase().includes(search.toLowerCase()) ||
+      (p.telefone && p.telefone.includes(search)),
   )
 
   return (
@@ -90,7 +123,7 @@ export default function Patients() {
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Pacientes</h1>
           <p className="text-slate-500 mt-1 text-base">Gerencie os cadastros e prontuários</p>
         </div>
-        
+
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogTrigger asChild>
             <Button className="h-12 sm:h-11 px-6 rounded-xl gap-2 shadow-sm w-full md:w-auto">
@@ -106,22 +139,50 @@ export default function Patients() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="space-y-2">
                 <Label className="font-bold text-slate-700">Nome Completo</Label>
-                <Input value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} required className="bg-slate-50 h-12 rounded-xl" placeholder="Ex: João da Silva" />
+                <Input
+                  value={formData.nome}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  required
+                  className="bg-slate-50 h-12 rounded-xl"
+                  placeholder="Ex: João da Silva"
+                />
               </div>
               <div className="space-y-2">
                 <Label className="font-bold text-slate-700">Telefone (WhatsApp)</Label>
-                <Input value={formData.telefone} onChange={e => setFormData({...formData, telefone: e.target.value})} className="bg-slate-50 h-12 rounded-xl" placeholder="(00) 00000-0000" />
+                <Input
+                  value={formData.telefone}
+                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                  className="bg-slate-50 h-12 rounded-xl"
+                  placeholder="(00) 00000-0000"
+                />
               </div>
               <div className="space-y-2">
                 <Label className="font-bold text-slate-700">E-mail</Label>
-                <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="bg-slate-50 h-12 rounded-xl" placeholder="joao@email.com" />
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="bg-slate-50 h-12 rounded-xl"
+                  placeholder="joao@email.com"
+                />
               </div>
               <div className="space-y-2">
                 <Label className="font-bold text-slate-700">Valor da Sessão Padrão (R$)</Label>
-                <Input type="number" step="0.01" value={formData.valor_sessao} onChange={e => setFormData({...formData, valor_sessao: e.target.value})} className="bg-slate-50 h-12 rounded-xl" placeholder="150.00" />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.valor_sessao}
+                  onChange={(e) => setFormData({ ...formData, valor_sessao: e.target.value })}
+                  className="bg-slate-50 h-12 rounded-xl"
+                  placeholder="150.00"
+                />
               </div>
               <Button type="submit" className="w-full h-12 rounded-xl mt-4" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Salvar e Ver Perfil'}
+                {isSubmitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  'Salvar e Ver Perfil'
+                )}
               </Button>
             </form>
           </DialogContent>
@@ -132,15 +193,15 @@ export default function Patients() {
         <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50">
           <div className="relative max-w-md">
             <Search className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
-            <Input 
-              placeholder="Buscar por nome ou telefone..." 
+            <Input
+              placeholder="Buscar por nome ou telefone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10 h-12 rounded-xl bg-white border-slate-200 shadow-sm"
             />
           </div>
         </div>
-        
+
         {loading ? (
           <div className="h-64 flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -165,7 +226,11 @@ export default function Patients() {
                 </TableHeader>
                 <TableBody>
                   {filteredPatients.map((p) => (
-                    <TableRow key={p.id} className="cursor-pointer hover:bg-slate-50 group" onClick={() => navigate(`/pacientes/${p.id}`)}>
+                    <TableRow
+                      key={p.id}
+                      className="cursor-pointer hover:bg-slate-50 group"
+                      onClick={() => navigate(`/pacientes/${p.id}`)}
+                    >
                       <TableCell className="pl-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
@@ -180,10 +245,16 @@ export default function Patients() {
                         </div>
                       </TableCell>
                       <TableCell className="py-4 text-sm text-slate-500">
-                        {p.data_criacao ? new Date(p.data_criacao).toLocaleDateString('pt-BR') : '-'}
+                        {p.data_criacao
+                          ? new Date(p.data_criacao).toLocaleDateString('pt-BR')
+                          : '-'}
                       </TableCell>
                       <TableCell className="pr-6 text-right py-4">
-                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 text-primary">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="opacity-0 group-hover:opacity-100 text-primary"
+                        >
                           <ChevronRight className="w-5 h-5" />
                         </Button>
                       </TableCell>
@@ -196,7 +267,11 @@ export default function Patients() {
             {/* Mobile Card View */}
             <div className="md:hidden divide-y divide-slate-100">
               {filteredPatients.map((p) => (
-                <div key={p.id} className="p-4 flex items-center justify-between active:bg-slate-50 transition-colors" onClick={() => navigate(`/pacientes/${p.id}`)}>
+                <div
+                  key={p.id}
+                  className="p-4 flex items-center justify-between active:bg-slate-50 transition-colors"
+                  onClick={() => navigate(`/pacientes/${p.id}`)}
+                >
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg shrink-0">
                       {p.nome.charAt(0).toUpperCase()}

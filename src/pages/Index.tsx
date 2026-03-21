@@ -19,9 +19,23 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, XAxis, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { formatBRL, cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetDescription,
+} from '@/components/ui/sheet'
 
 const DEFAULT_ORDER = ['kpis', 'upcoming', 'inadimplentes', 'finances', 'alerts', 'shortcuts']
 
@@ -37,7 +51,7 @@ export default function Index() {
   const [alerts, setAlerts] = useState<any[]>([])
   const [inadimplentes, setInadimplentes] = useState<any[]>([])
   const [chartData, setChartData] = useState<any[]>([])
-  
+
   const [notifications, setNotifications] = useState<any[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
 
@@ -48,7 +62,7 @@ export default function Index() {
         const parsed = JSON.parse(saved)
         // Ensure new widgets are present if recovering old state
         const merged = Array.from(new Set([...parsed, ...DEFAULT_ORDER]))
-        setWidgetOrder(merged.filter(w => DEFAULT_ORDER.includes(w)))
+        setWidgetOrder(merged.filter((w) => DEFAULT_ORDER.includes(w)))
       } catch (e) {
         setWidgetOrder(DEFAULT_ORDER)
       }
@@ -90,13 +104,19 @@ export default function Index() {
           .from('financeiro')
           .select('*, pacientes(nome, telefone)')
           .eq('usuario_id', user.id)
-          .gt('valor_a_receber', 0)
+          .gt('valor_a_receber', 0),
       ])
 
       const todayApts = aptRes.data || []
       setStats({
         sessoesHoje: todayApts.length,
-        saldoMes: (finRes.data || []).filter((f) => f.mes === month).reduce((acc, curr) => acc + Number(curr.valor_recebido), 0) - (despRes.data || []).filter((d) => new Date(d.data).getMonth() + 1 === month).reduce((acc, curr) => acc + Number(curr.valor), 0),
+        saldoMes:
+          (finRes.data || [])
+            .filter((f) => f.mes === month)
+            .reduce((acc, curr) => acc + Number(curr.valor_recebido), 0) -
+          (despRes.data || [])
+            .filter((d) => new Date(d.data).getMonth() + 1 === month)
+            .reduce((acc, curr) => acc + Number(curr.valor), 0),
         pacientesAtivos: patRes.count || 0,
       })
 
@@ -104,12 +124,15 @@ export default function Index() {
       setAlerts(alertRes.data || [])
 
       const nowTime = new Date().getTime()
-      const inadimplentesFiltered = (allFinRes.data || []).map(f => {
-        const diffTime = Math.abs(nowTime - new Date(f.data_atualizacao).getTime())
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-        return { ...f, diffDays }
-      }).filter(f => f.diffDays > 30).sort((a, b) => b.diffDays - a.diffDays)
-      
+      const inadimplentesFiltered = (allFinRes.data || [])
+        .map((f) => {
+          const diffTime = Math.abs(nowTime - new Date(f.data_atualizacao).getTime())
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+          return { ...f, diffDays }
+        })
+        .filter((f) => f.diffDays > 30)
+        .sort((a, b) => b.diffDays - a.diffDays)
+
       setInadimplentes(inadimplentesFiltered)
 
       const monthsData = []
@@ -121,8 +144,14 @@ export default function Index() {
 
         monthsData.push({
           name: d.toLocaleDateString('pt-BR', { month: 'short' }),
-          receitas: (finRes.data || []).filter((f) => f.mes === m && f.ano === y).reduce((acc, curr) => acc + Number(curr.valor_recebido), 0),
-          despesas: (despRes.data || []).filter((f) => new Date(f.data).getMonth() + 1 === m && new Date(f.data).getFullYear() === y).reduce((acc, curr) => acc + Number(curr.valor), 0),
+          receitas: (finRes.data || [])
+            .filter((f) => f.mes === m && f.ano === y)
+            .reduce((acc, curr) => acc + Number(curr.valor_recebido), 0),
+          despesas: (despRes.data || [])
+            .filter(
+              (f) => new Date(f.data).getMonth() + 1 === m && new Date(f.data).getFullYear() === y,
+            )
+            .reduce((acc, curr) => acc + Number(curr.valor), 0),
         })
       }
       setChartData(monthsData)
@@ -139,7 +168,7 @@ export default function Index() {
         .limit(20)
       if (data) {
         setNotifications(data)
-        setUnreadCount(data.filter(n => !n.lida).length)
+        setUnreadCount(data.filter((n) => !n.lida).length)
       }
     }
 
@@ -149,11 +178,22 @@ export default function Index() {
     if (user) {
       const sub = supabase
         .channel('dashboard_notifs')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'notificacoes', filter: `usuario_id=eq.${user.id}` }, () => {
-          fetchNotifs()
-        })
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notificacoes',
+            filter: `usuario_id=eq.${user.id}`,
+          },
+          () => {
+            fetchNotifs()
+          },
+        )
         .subscribe()
-      return () => { supabase.removeChannel(sub) }
+      return () => {
+        supabase.removeChannel(sub)
+      }
     }
   }, [user])
 
@@ -198,8 +238,9 @@ export default function Index() {
       onDragEnd={handleDragEnd}
       className={cn(
         'bg-white rounded-[2rem] shadow-sm border p-6 sm:p-8 flex flex-col gap-4 transition-all relative group h-full',
-        id !== 'kpis' && 'cursor-grab active:cursor-grabbing hover:shadow-md hover:border-slate-300',
-        draggedId === id ? 'opacity-40 border-dashed border-primary/50' : 'border-slate-100/60'
+        id !== 'kpis' &&
+          'cursor-grab active:cursor-grabbing hover:shadow-md hover:border-slate-300',
+        draggedId === id ? 'opacity-40 border-dashed border-primary/50' : 'border-slate-100/60',
       )}
     >
       {id !== 'kpis' && (
@@ -262,7 +303,7 @@ export default function Index() {
         return (
           <WidgetWrapper key={id} id={id} title="Pacientes Inadimplentes">
             {inadimplentes.length === 0 ? (
-               <div className="h-full flex flex-col items-center justify-center text-center py-10">
+              <div className="h-full flex flex-col items-center justify-center text-center py-10">
                 <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mb-3">
                   <TrendingUp className="w-5 h-5 text-emerald-500" />
                 </div>
@@ -280,24 +321,39 @@ export default function Index() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inadimplentes.slice(0, 5).map(item => {
-                       const p = Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes
-                       const isCritical = item.diffDays > 60
-                       return (
-                         <TableRow key={item.id} className={isCritical ? 'bg-red-50/50' : ''}>
-                           <TableCell className="font-medium text-slate-900">{p?.nome}</TableCell>
-                           <TableCell className={isCritical ? 'text-red-700 font-bold' : 'text-amber-700 font-bold'}>{formatBRL(item.valor_a_receber)}</TableCell>
-                           <TableCell className={isCritical ? 'text-red-600' : 'text-slate-500'}>{item.diffDays} dias</TableCell>
-                           <TableCell className="text-right">
-                             <WhatsAppBillingDialog pacienteId={item.paciente_id} patientName={p?.nome || ''} />
-                           </TableCell>
-                         </TableRow>
-                       )
+                    {inadimplentes.slice(0, 5).map((item) => {
+                      const p = Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes
+                      const isCritical = item.diffDays > 60
+                      return (
+                        <TableRow key={item.id} className={isCritical ? 'bg-red-50/50' : ''}>
+                          <TableCell className="font-medium text-slate-900">{p?.nome}</TableCell>
+                          <TableCell
+                            className={
+                              isCritical ? 'text-red-700 font-bold' : 'text-amber-700 font-bold'
+                            }
+                          >
+                            {formatBRL(item.valor_a_receber)}
+                          </TableCell>
+                          <TableCell className={isCritical ? 'text-red-600' : 'text-slate-500'}>
+                            {item.diffDays} dias
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <WhatsAppBillingDialog
+                              pacienteId={item.paciente_id}
+                              patientName={p?.nome || ''}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )
                     })}
                   </TableBody>
                 </Table>
                 {inadimplentes.length > 5 && (
-                  <Button variant="ghost" className="w-full text-slate-500 mt-2 rounded-xl" onClick={() => navigate('/carteira')}>
+                  <Button
+                    variant="ghost"
+                    className="w-full text-slate-500 mt-2 rounded-xl"
+                    onClick={() => navigate('/carteira')}
+                  >
                     Ver todas pendências (+{inadimplentes.length - 5})
                   </Button>
                 )}
@@ -338,9 +394,19 @@ export default function Index() {
                           <p className="font-bold text-slate-800 line-clamp-1">{p?.nome}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {apt.is_online ? (
-                              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 py-0 h-4">Online</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 py-0 h-4"
+                              >
+                                Online
+                              </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-600 border-slate-200 py-0 h-4">Presencial</Badge>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] bg-slate-100 text-slate-600 border-slate-200 py-0 h-4"
+                              >
+                                Presencial
+                              </Badge>
                             )}
                           </div>
                         </div>
@@ -350,7 +416,11 @@ export default function Index() {
                   )
                 })}
                 {upcoming.length > 4 && (
-                  <Button variant="ghost" className="w-full text-slate-500 mt-2 rounded-xl" onClick={() => navigate('/agenda')}>
+                  <Button
+                    variant="ghost"
+                    className="w-full text-slate-500 mt-2 rounded-xl"
+                    onClick={() => navigate('/agenda')}
+                  >
                     Ver todas (+{upcoming.length - 4})
                   </Button>
                 )}
@@ -362,14 +432,36 @@ export default function Index() {
         return (
           <WidgetWrapper key={id} id={id} title="Fluxo Financeiro (6 Meses)">
             <div className="h-[250px] w-full mt-4">
-              <ChartContainer config={{ receitas: { label: 'Receitas', color: '#10b981' }, despesas: { label: 'Despesas', color: '#f43f5e' } }} className="w-full h-full">
+              <ChartContainer
+                config={{
+                  receitas: { label: 'Receitas', color: '#10b981' },
+                  despesas: { label: 'Despesas', color: '#f43f5e' },
+                }}
+                className="w-full h-full"
+              >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }} dy={10} />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
+                      dy={10}
+                    />
                     <ChartTooltip content={<ChartTooltipContent />} cursor={{ fill: '#f8fafc' }} />
-                    <Bar dataKey="receitas" fill="var(--color-receitas)" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                    <Bar dataKey="despesas" fill="var(--color-despesas)" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                    <Bar
+                      dataKey="receitas"
+                      fill="var(--color-receitas)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={30}
+                    />
+                    <Bar
+                      dataKey="despesas"
+                      fill="var(--color-despesas)"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={30}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -391,17 +483,28 @@ export default function Index() {
                 {alerts.slice(0, 4).map((al) => {
                   const p = Array.isArray(al.pacientes) ? al.pacientes[0] : al.pacientes
                   return (
-                    <div key={al.id} className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex justify-between items-center">
+                    <div
+                      key={al.id}
+                      className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex justify-between items-center"
+                    >
                       <div>
                         <p className="font-bold text-amber-900 line-clamp-1">{p?.nome}</p>
-                        <p className="text-xs text-amber-700 mt-0.5">Ref: {String(al.mes).padStart(2, '0')}/{al.ano}</p>
+                        <p className="text-xs text-amber-700 mt-0.5">
+                          Ref: {String(al.mes).padStart(2, '0')}/{al.ano}
+                        </p>
                       </div>
-                      <span className="font-extrabold text-amber-700">{formatBRL(al.valor_a_receber)}</span>
+                      <span className="font-extrabold text-amber-700">
+                        {formatBRL(al.valor_a_receber)}
+                      </span>
                     </div>
                   )
                 })}
                 {alerts.length > 4 && (
-                  <Button variant="ghost" className="w-full text-amber-700 mt-2 rounded-xl hover:bg-amber-100" onClick={() => navigate('/carteira')}>
+                  <Button
+                    variant="ghost"
+                    className="w-full text-amber-700 mt-2 rounded-xl hover:bg-amber-100"
+                    onClick={() => navigate('/carteira')}
+                  >
                     Ver todas (+{alerts.length - 4})
                   </Button>
                 )}
@@ -413,20 +516,44 @@ export default function Index() {
         return (
           <WidgetWrapper key={id} id={id} title="Acesso Rápido">
             <div className="grid grid-cols-2 gap-3 h-full pb-4">
-              <Button variant="outline" className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-primary/30 hover:bg-primary/5 transition-all" onClick={() => navigate('/agenda')}>
-                <div className="p-3 bg-primary/10 rounded-full text-primary"><Plus className="w-5 h-5" /></div>
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-primary/30 hover:bg-primary/5 transition-all"
+                onClick={() => navigate('/agenda')}
+              >
+                <div className="p-3 bg-primary/10 rounded-full text-primary">
+                  <Plus className="w-5 h-5" />
+                </div>
                 <span className="font-semibold text-slate-700">Novo Agendamento</span>
               </Button>
-              <Button variant="outline" className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-indigo-500/30 hover:bg-indigo-50 transition-all" onClick={() => navigate('/pacientes/novo')}>
-                <div className="p-3 bg-indigo-100 rounded-full text-indigo-600"><Users className="w-5 h-5" /></div>
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-indigo-500/30 hover:bg-indigo-50 transition-all"
+                onClick={() => navigate('/pacientes/novo')}
+              >
+                <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
+                  <Users className="w-5 h-5" />
+                </div>
                 <span className="font-semibold text-slate-700">Novo Paciente</span>
               </Button>
-              <Button variant="outline" className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-emerald-500/30 hover:bg-emerald-50 transition-all" onClick={() => navigate('/carteira')}>
-                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600"><Wallet className="w-5 h-5" /></div>
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-emerald-500/30 hover:bg-emerald-50 transition-all"
+                onClick={() => navigate('/carteira')}
+              >
+                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
+                  <Wallet className="w-5 h-5" />
+                </div>
                 <span className="font-semibold text-slate-700">Receber Pagamento</span>
               </Button>
-              <Button variant="outline" className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-rose-500/30 hover:bg-rose-50 transition-all" onClick={() => navigate('/carteira')}>
-                <div className="p-3 bg-rose-100 rounded-full text-rose-600"><FileText className="w-5 h-5" /></div>
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex flex-col gap-3 rounded-2xl border-slate-200 hover:border-rose-500/30 hover:bg-rose-50 transition-all"
+                onClick={() => navigate('/carteira')}
+              >
+                <div className="p-3 bg-rose-100 rounded-full text-rose-600">
+                  <FileText className="w-5 h-5" />
+                </div>
                 <span className="font-semibold text-slate-700">Nova Despesa</span>
               </Button>
             </div>
@@ -448,10 +575,13 @@ export default function Index() {
             Aqui está o resumo do seu consultório hoje.
           </p>
         </div>
-        
+
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="outline" className="rounded-xl gap-2 relative border-slate-200 text-slate-600 hover:text-primary hover:bg-primary/5 shadow-sm h-11 px-5">
+            <Button
+              variant="outline"
+              className="rounded-xl gap-2 relative border-slate-200 text-slate-600 hover:text-primary hover:bg-primary/5 shadow-sm h-11 px-5"
+            >
               <Bell className="w-5 h-5" />
               <span className="hidden sm:inline font-medium">Notificações</span>
               {unreadCount > 0 && (
@@ -469,22 +599,37 @@ export default function Index() {
               <SheetTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <Bell className="w-5 h-5 text-primary" /> Central de Alertas
               </SheetTitle>
-              <SheetDescription>
-                Acompanhe lembretes, pagamentos e atualizações.
-              </SheetDescription>
+              <SheetDescription>Acompanhe lembretes, pagamentos e atualizações.</SheetDescription>
             </SheetHeader>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
               {notifications.length === 0 ? (
                 <div className="text-center py-10 text-slate-500">Nenhuma notificação recente.</div>
               ) : (
-                notifications.map(n => (
-                  <div key={n.id} className={cn("p-4 rounded-xl border transition-colors", n.lida ? "bg-slate-50 border-slate-100" : "bg-primary/5 border-primary/20")}>
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className={cn(
+                      'p-4 rounded-xl border transition-colors',
+                      n.lida ? 'bg-slate-50 border-slate-100' : 'bg-primary/5 border-primary/20',
+                    )}
+                  >
                     <div className="flex gap-3">
-                      {!n.lida && <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />}
+                      {!n.lida && (
+                        <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                      )}
                       <div>
-                        <h4 className={cn("text-sm font-bold", n.lida ? "text-slate-700" : "text-slate-900")}>{n.titulo}</h4>
+                        <h4
+                          className={cn(
+                            'text-sm font-bold',
+                            n.lida ? 'text-slate-700' : 'text-slate-900',
+                          )}
+                        >
+                          {n.titulo}
+                        </h4>
                         <p className="text-sm text-slate-600 mt-1 leading-relaxed">{n.mensagem}</p>
-                        <p className="text-xs text-slate-400 mt-2 font-medium">{new Date(n.data_criacao).toLocaleString('pt-BR')}</p>
+                        <p className="text-xs text-slate-400 mt-2 font-medium">
+                          {new Date(n.data_criacao).toLocaleString('pt-BR')}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -492,7 +637,13 @@ export default function Index() {
               )}
             </div>
             <div className="p-6 border-t border-slate-100 shrink-0">
-              <Button variant="outline" className="w-full" onClick={() => navigate('/notificacoes')}>Ver todas as notificações</Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate('/notificacoes')}
+              >
+                Ver todas as notificações
+              </Button>
             </div>
           </SheetContent>
         </Sheet>

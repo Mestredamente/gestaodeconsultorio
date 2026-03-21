@@ -9,11 +9,15 @@ export default function Reports() {
           <BarChart3 className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">Desempenho e Métricas</h1>
-          <p className="text-slate-500 mt-1 text-sm md:text-base">Análise avançada de crescimento, retenção e financeiro.</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
+            Desempenho e Métricas
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm md:text-base">
+            Análise avançada de crescimento, retenção e financeiro.
+          </p>
         </div>
       </div>
-      
+
       {/* Container with overflow-x-hidden to prevent horizontal scroll issues on mobile charts */}
       <div className="overflow-x-hidden">
         <PerformanceDashboard />

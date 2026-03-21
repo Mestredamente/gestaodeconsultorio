@@ -81,7 +81,12 @@ export default function Sidebar() {
                       )}
                       title={item.label}
                     >
-                      <Icon className={cn('w-5 h-5 lg:mr-3 shrink-0', isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600')} />
+                      <Icon
+                        className={cn(
+                          'w-5 h-5 lg:mr-3 shrink-0',
+                          isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600',
+                        )}
+                      />
                       <span className="hidden lg:block truncate">{item.label}</span>
                       {item.badge && (
                         <span className="hidden lg:flex absolute right-3 items-center justify-center px-1.5 h-5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-md">
@@ -115,7 +120,12 @@ export default function Sidebar() {
                       )}
                       title={item.label}
                     >
-                      <Icon className={cn('w-5 h-5 lg:mr-3 shrink-0', isActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-600')} />
+                      <Icon
+                        className={cn(
+                          'w-5 h-5 lg:mr-3 shrink-0',
+                          isActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-600',
+                        )}
+                      />
                       <span className="hidden lg:block truncate">{item.label}</span>
                     </Button>
                   </Link>
@@ -144,7 +154,12 @@ export default function Sidebar() {
                       )}
                       title={item.label}
                     >
-                      <Icon className={cn('w-5 h-5 lg:mr-3 shrink-0', isActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-600')} />
+                      <Icon
+                        className={cn(
+                          'w-5 h-5 lg:mr-3 shrink-0',
+                          isActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-600',
+                        )}
+                      />
                       <span className="hidden lg:block truncate">{item.label}</span>
                     </Button>
                   </Link>
@@ -165,7 +180,9 @@ export default function Sidebar() {
             <span className="hidden lg:flex items-center gap-2 truncate">
               <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span> Plano Pro
             </span>
-            <span className="lg:hidden text-indigo-500"><ChevronRight className="w-5 h-5" /></span>
+            <span className="lg:hidden text-indigo-500">
+              <ChevronRight className="w-5 h-5" />
+            </span>
             <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 hidden lg:block shrink-0" />
           </Button>
         </Link>
