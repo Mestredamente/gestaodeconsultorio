@@ -19,6 +19,7 @@ import {
   FileText,
   ExternalLink,
   Info,
+  AlertCircle,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { formatBRL } from '@/lib/utils'
