@@ -130,7 +130,7 @@ export default function Plans() {
     setLoadingPlan(planId)
     try {
       const return_url = `${window.location.origin}/planos?success=true&plan=${planId}`
-      const { data, error } = await supabase.functions.invoke('criar_assinatura', {
+      const { data, error } = await supabase.functions.invoke('criar_checkout_stripe', {
         body: { plan: planId, return_url },
       })
       if (error) throw error
