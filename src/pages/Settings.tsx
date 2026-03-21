@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { BillingSettings } from '@/components/settings/BillingSettings'
 import {
   Shield,
   Landmark,
@@ -17,6 +18,7 @@ import {
   ExternalLink,
   Palette,
   Image as ImageIcon,
+  CreditCard,
 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -82,9 +84,12 @@ export default function Settings() {
     chave_pix: '',
     logo_url: '',
     preferencias_dashboard: {} as any,
+    plano: 'gratuito',
+    data_proxima_cobranca: null as string | null,
+    cartao_final: '',
+    cartao_bandeira: '',
   })
 
-  // Local state for visually tracking which secrets the user claims they configured
   const [configuredSecrets, setConfiguredSecrets] = useState<Record<string, boolean>>({})
 
   const [bankInfo, setBankInfo] = useState({
@@ -107,6 +112,10 @@ export default function Settings() {
           chave_pix: data.chave_pix || '',
           logo_url: data.logo_url || '',
           preferencias_dashboard: data.preferencias_dashboard || {},
+          plano: data.plano || 'gratuito',
+          data_proxima_cobranca: data.data_proxima_cobranca || null,
+          cartao_final: (data as any).cartao_final || '',
+          cartao_bandeira: (data as any).cartao_bandeira || '',
         })
         if (data.preferencias_dashboard?.bankInfo) {
           setBankInfo(data.preferencias_dashboard.bankInfo)
@@ -188,7 +197,7 @@ export default function Settings() {
           Configurações Gerais
         </h1>
         <p className="text-slate-500 mt-1 text-base">
-          Gerencie seu perfil, conta bancária e integrações do sistema.
+          Gerencie seu perfil, conta bancária, assinatura e integrações do sistema.
         </p>
       </div>
 
@@ -202,6 +211,9 @@ export default function Settings() {
           </TabsTrigger>
           <TabsTrigger value="financeiro" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
             <Landmark className="w-4 h-4" /> Financeiro
+          </TabsTrigger>
+          <TabsTrigger value="assinatura" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
+            <CreditCard className="w-4 h-4" /> Plano & Faturamento
           </TabsTrigger>
           <TabsTrigger value="seguranca" className="rounded-xl px-6 py-2.5 font-semibold gap-2">
             <Shield className="w-4 h-4" /> Segurança
@@ -501,6 +513,10 @@ export default function Settings() {
             </Button>
           </div>
         </form>
+
+        <TabsContent value="assinatura" className="space-y-6">
+          <BillingSettings user={user} formData={formData} setFormData={setFormData} />
+        </TabsContent>
 
         <TabsContent value="seguranca" className="space-y-6">
           <Card className="rounded-[2rem] shadow-sm border-slate-100">
