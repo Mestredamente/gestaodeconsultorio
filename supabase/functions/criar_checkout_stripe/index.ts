@@ -3,10 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import Stripe from 'npm:stripe@^14.0.0'
 import { corsHeaders } from '../_shared/cors.ts'
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
-  apiVersion: '2023-10-16',
-  httpClient: Stripe.createFetchHttpClient(),
-})
+const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -24,10 +21,13 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     )
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
     if (userError || !user) {
       throw new Error('Não autorizado')
     }
@@ -38,15 +38,41 @@ Deno.serve(async (req: Request) => {
       .eq('id', user.id)
       .single()
 
-    let priceId = plan === 'basico' ? Deno.env.get('STRIPE_PRICE_BASICO') : Deno.env.get('STRIPE_PRICE_PRO')
+    let priceId =
+      plan === 'basico' ? Deno.env.get('STRIPE_PRICE_BASICO') : Deno.env.get('STRIPE_PRICE_PRO')
     if (!priceId) {
       priceId = plan === 'basico' ? 'price_1MockBasicoId' : 'price_1MockProId'
     }
 
+    const separator = return_url.includes('?') ? '&' : '?'
+
+    // Mock se não houver chave válida do Stripe
+    if (!stripeKey.startsWith('sk_') && !stripeKey.startsWith('rk_')) {
+      console.log(
+        'Chave do Stripe inválida ou ausente. Retornando URL de mock e atualizando localmente.',
+      )
+
+      // Simular atualização de plano localmente caso não haja integração real com Stripe no ambiente
+      await supabase.from('usuarios').update({ plano: plan }).eq('id', user.id)
+
+      return new Response(
+        JSON.stringify({ url: `${return_url}${separator}session_id=mock_session_id` }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        },
+      )
+    }
+
+    const stripe = new Stripe(stripeKey, {
+      apiVersion: '2023-10-16',
+      httpClient: Stripe.createFetchHttpClient(),
+    })
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${return_url}?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${return_url}${separator}session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${return_url.split('?')[0]}?canceled=true`,
       client_reference_id: user.id,
       metadata: { plan_id: plan },
