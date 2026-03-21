@@ -40,21 +40,31 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
 
   useEffect(() => {
     const fetchData = async () => {
-      const { count } = await supabase
-        .from('pacientes')
-        .select('*', { count: 'exact', head: true })
-        .eq('usuario_id', user.id)
-      setPatientCount(count || 0)
-      const { data } = await supabase
-        .from('faturas')
-        .select('*')
-        .eq('usuario_id', user.id)
-        .order('data_vencimento', { ascending: false })
-        .limit(12)
-      setFaturas(data || [])
+      try {
+        const { count } = await supabase
+          .from('pacientes')
+          .select('id', { count: 'exact' })
+          .eq('usuario_id', user.id)
+
+        setPatientCount(count || 0)
+
+        const { data } = await supabase
+          .from('faturas')
+          .select('*')
+          .eq('usuario_id', user.id)
+          .order('data_vencimento', { ascending: false })
+          .limit(12)
+
+        setFaturas(data || [])
+      } catch (error) {
+        console.error('Erro ao buscar dados de faturamento:', error)
+      }
     }
-    fetchData()
-  }, [user.id])
+
+    if (user?.id) {
+      fetchData()
+    }
+  }, [user?.id])
 
   const getPlanLimit = (plano: string) => {
     if (plano === 'pro') return 'Ilimitado'

@@ -14,14 +14,14 @@ Deno.serve(async (req: Request) => {
     const tomorrowStart = new Date()
     tomorrowStart.setDate(tomorrowStart.getDate() + 1)
     tomorrowStart.setHours(0, 0, 0, 0)
-    
+
     const tomorrowEnd = new Date(tomorrowStart)
     tomorrowEnd.setHours(23, 59, 59, 999)
 
     const { data: agendamentos, error } = await supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, usuario_id, paciente_id, pacientes (id, nome, telefone), usuarios (id, lembrete_whatsapp_ativo)`
+        `id, data_hora, status, usuario_id, paciente_id, pacientes (id, nome, telefone), usuarios (id, lembrete_whatsapp_ativo)`,
       )
       .in('status', ['agendado', 'confirmado'])
       .gte('data_hora', tomorrowStart.toISOString())
@@ -38,21 +38,25 @@ Deno.serve(async (req: Request) => {
 
       if (p?.telefone && u?.lembrete_whatsapp_ativo === true) {
         const d = new Date(apt.data_hora)
-        const timeStr = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
-        
+        const timeStr = d.toLocaleTimeString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+
         const message = `Olá ${p.nome}, lembrando da sua sessão amanhã às ${timeStr}. Qualquer dúvida, entre em contato.`
         const cleanPhone = p.telefone.replace(/[^\d]/g, '')
         const encodedMessage = encodeURIComponent(message)
         const deepLink = `https://wa.me/${cleanPhone}?text=${encodedMessage}`
 
         sentMessages.push({ patient: p.nome, phone: p.telefone, time: timeStr, deepLink })
-        
+
         historyLogs.push({
           usuario_id: apt.usuario_id,
           paciente_id: apt.paciente_id,
           tipo: 'lembrete_whatsapp',
           conteudo: deepLink,
-          status_envio: 'gerado'
+          status_envio: 'gerado',
         })
       }
     }
@@ -63,7 +67,7 @@ Deno.serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({ success: true, processed: sentMessages.length, details: sentMessages }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
