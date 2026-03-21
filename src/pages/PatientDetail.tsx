@@ -361,4 +361,6 @@ export default function PatientDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-  
+    </div>
+  )
+}
