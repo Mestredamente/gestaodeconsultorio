@@ -39,7 +39,9 @@ export default function Index() {
     if (saved) {
       try {
         setWidgetOrder(JSON.parse(saved))
-      } catch (e) {}
+      } catch (e) {
+        // ignore parse error and use default order
+      }
     }
   }, [])
 
@@ -255,7 +257,7 @@ export default function Index() {
                                 variant="outline"
                                 className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 py-0 h-4"
                               >
-                                <Video className="w-3 h-3 mr-1" /> Online
+                                Online
                               </Badge>
                             ) : (
                               <Badge
