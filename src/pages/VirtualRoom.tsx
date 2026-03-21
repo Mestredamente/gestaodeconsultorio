@@ -45,6 +45,8 @@ import {
   Play,
   Settings,
   ArrowLeft,
+  RefreshCcw,
+  Volume2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -65,10 +67,6 @@ export default function VirtualRoom() {
   const [selectedAudio, setSelectedAudio] = useState<string>('')
   const [audioLevel, setAudioLevel] = useState(0)
   const [deviceError, setDeviceError] = useState<string | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const animationFrameRef = useRef<number | null>(null)
-  const localVideoRef = useRef<HTMLVideoElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
 
   // Media controls
@@ -115,14 +113,15 @@ export default function VirtualRoom() {
     setLoading(false)
   }
 
-  // Handle preparing a session
   const prepareSession = async (apt: any) => {
     setActiveSession(apt)
     setInDeviceTest(true)
+    setDeviceError(null)
 
-    // Setup devices
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      // Pedir permissão inicial para garantir que enumerateDevices retorne os rótulos reais
+      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+
       const devices = await navigator.mediaDevices.enumerateDevices()
       const videoInput = devices.filter((device) => device.kind === 'videoinput')
       const audioInput = devices.filter((device) => device.kind === 'audioinput')
@@ -132,15 +131,19 @@ export default function VirtualRoom() {
 
       if (videoInput.length > 0) setSelectedVideo(videoInput[0].deviceId)
       if (audioInput.length > 0) setSelectedAudio(audioInput[0].deviceId)
+
+      // Libera a câmera do stream temporário
+      tempStream.getTracks().forEach((t) => t.stop())
     } catch (err: any) {
+      console.error('Permissão de dispositivos negada', err)
       setDeviceError(
-        'Permissão negada ou dispositivos não encontrados. Por favor, libere o acesso à câmera e ao microfone no seu navegador.',
+        'Acesso à câmera ou microfone negado. Por favor, libere as permissões no seu navegador ou sistema operacional e tente novamente.',
       )
       setCamOn(false)
       setMicOn(false)
     }
 
-    // Ensure prontuario exists and load notes
+    // Carregar prontuário
     let { data: pront } = await supabase
       .from('prontuarios')
       .select('id, nova_nota')
@@ -162,99 +165,127 @@ export default function VirtualRoom() {
     }
   }
 
+  // Effect para aquisição do stream
   useEffect(() => {
     let activeStream: MediaStream | null = null
 
-    const initMedia = async () => {
-      if (deviceError || (!inDeviceTest && !activeSession)) return
-      try {
-        if (activeStream) {
-          activeStream.getTracks().forEach((t) => t.stop())
-        }
+    const acquireStream = async () => {
+      if (!activeSession || deviceError) return
 
-        const constraints = {
+      // Aguarda a definição dos dispositivos padrão caso existam na lista
+      if (!selectedVideo && videoDevices.length > 0) return
+      if (!selectedAudio && audioDevices.length > 0) return
+
+      try {
+        const constraints: MediaStreamConstraints = {
           video: selectedVideo ? { deviceId: { exact: selectedVideo } } : true,
           audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true,
         }
 
         activeStream = await navigator.mediaDevices.getUserMedia(constraints)
         setStream(activeStream)
-
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = activeStream
-        }
-
-        // Setup audio level meter
-        if (inDeviceTest && activeStream.getAudioTracks().length > 0) {
-          if (!audioContextRef.current) {
-            audioContextRef.current = new (
-              window.AudioContext || (window as any).webkitAudioContext
-            )()
-          }
-          if (audioContextRef.current.state === 'suspended') {
-            await audioContextRef.current.resume()
-          }
-
-          const source = audioContextRef.current.createMediaStreamSource(activeStream)
-          analyserRef.current = audioContextRef.current.createAnalyser()
-          analyserRef.current.fftSize = 256
-          source.connect(analyserRef.current)
-
-          const bufferLength = analyserRef.current.frequencyBinCount
-          const dataArray = new Uint8Array(bufferLength)
-
-          const updateVolume = () => {
-            if (!analyserRef.current) return
-            analyserRef.current.getByteFrequencyData(dataArray)
-            let sum = 0
-            for (let i = 0; i < bufferLength; i++) {
-              sum += dataArray[i]
-            }
-            const average = sum / bufferLength
-            setAudioLevel(Math.min(100, Math.round((average / 255) * 100 * 1.5)))
-            animationFrameRef.current = requestAnimationFrame(updateVolume)
-          }
-          updateVolume()
-        }
-      } catch (err) {
-        console.error('Error starting media', err)
+      } catch (err: any) {
+        console.error('Erro ao acessar a mídia', err)
+        setDeviceError(
+          'Não foi possível acessar a câmera e o microfone. Verifique as permissões do dispositivo.',
+        )
       }
     }
 
-    initMedia()
+    acquireStream()
 
     return () => {
       if (activeStream) {
         activeStream.getTracks().forEach((t) => t.stop())
       }
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
     }
-  }, [selectedVideo, selectedAudio, inDeviceTest, activeSession, deviceError])
+  }, [activeSession, selectedVideo, selectedAudio])
 
+  // Effect para o medidor de áudio em tempo real
+  useEffect(() => {
+    let localAudioContext: AudioContext | null = null
+    let localAnalyser: AnalyserNode | null = null
+    let animationFrame: number | null = null
+
+    if (inDeviceTest && stream && stream.getAudioTracks().length > 0 && micOn) {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      if (AudioContextClass) {
+        localAudioContext = new AudioContextClass()
+        localAudioContext
+          .resume()
+          .then(() => {
+            const source = localAudioContext!.createMediaStreamSource(stream)
+            localAnalyser = localAudioContext!.createAnalyser()
+            localAnalyser.fftSize = 256
+            source.connect(localAnalyser)
+
+            const bufferLength = localAnalyser.frequencyBinCount
+            const dataArray = new Uint8Array(bufferLength)
+
+            const updateVolume = () => {
+              if (!localAnalyser) return
+              localAnalyser.getByteFrequencyData(dataArray)
+              let sum = 0
+              for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i]
+              }
+              const average = sum / bufferLength
+              setAudioLevel(Math.min(100, Math.round((average / 255) * 100 * 1.5)))
+              animationFrame = requestAnimationFrame(updateVolume)
+            }
+            updateVolume()
+          })
+          .catch(console.error)
+      }
+    } else {
+      setAudioLevel(0)
+    }
+
+    return () => {
+      if (animationFrame) cancelAnimationFrame(animationFrame)
+      if (localAudioContext && localAudioContext.state !== 'closed') {
+        localAudioContext.close().catch(console.error)
+      }
+    }
+  }, [stream, inDeviceTest, micOn])
+
+  // Effect para alternar estado das faixas de mídia (camOn / micOn)
   useEffect(() => {
     if (stream) {
-      const videoTrack = stream.getVideoTracks()[0]
-      if (videoTrack) videoTrack.enabled = camOn
-      const audioTrack = stream.getAudioTracks()[0]
-      if (audioTrack) audioTrack.enabled = micOn
+      stream.getVideoTracks().forEach((track) => (track.enabled = camOn))
+      stream.getAudioTracks().forEach((track) => (track.enabled = micOn))
     }
   }, [camOn, micOn, stream])
 
   const playTestSound = () => {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext
-    if (!AudioContext) return
-    const ctx = new AudioContext()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.type = 'sine'
-    osc.frequency.setValueAtTime(440, ctx.currentTime)
-    gain.gain.setValueAtTime(0, ctx.currentTime)
-    gain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.1)
-    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 1)
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioContextClass) {
+        toast({
+          title: 'Áudio não suportado',
+          description: 'Seu navegador não suporta a reprodução de áudio de teste.',
+          variant: 'destructive',
+        })
+        return
+      }
+      const ctx = new AudioContextClass()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(440, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1)
+
+      gain.gain.setValueAtTime(0, ctx.currentTime)
+      gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + 0.5)
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   // Real-time and Debounce for notes
@@ -371,23 +402,18 @@ export default function VirtualRoom() {
         ? activeSession.pacientes[0]
         : activeSession.pacientes
 
-      const { data: newApt, error } = await supabase
-        .from('agendamentos')
-        .insert({
-          usuario_id: user.id,
-          paciente_id: activeSession.paciente_id,
-          data_hora: dt.toISOString(),
-          is_online: nextType === 'online',
-          status: 'agendado',
-          tipo_pagamento: activeSession.tipo_pagamento || 'particular',
-          valor_total: activeSession.valor_total || 0,
-        })
-        .select()
-        .single()
+      const { error } = await supabase.from('agendamentos').insert({
+        usuario_id: user.id,
+        paciente_id: activeSession.paciente_id,
+        data_hora: dt.toISOString(),
+        is_online: nextType === 'online',
+        status: 'agendado',
+        tipo_pagamento: activeSession.tipo_pagamento || 'particular',
+        valor_total: activeSession.valor_total || 0,
+      })
 
       if (error) throw error
 
-      // Atualiza status da atual
       await supabase
         .from('agendamentos')
         .update({ status: 'compareceu' })
@@ -408,7 +434,6 @@ export default function VirtualRoom() {
       toast({ title: 'Erro ao agendar', description: err.message, variant: 'destructive' })
     } finally {
       setIsScheduling(false)
-      setIsFinishModalOpen(false)
     }
   }
 
@@ -421,6 +446,7 @@ export default function VirtualRoom() {
 
   const endSessionCleanup = () => {
     if (stream) stream.getTracks().forEach((track) => track.stop())
+    setStream(null)
     setActiveSession(null)
     setInDeviceTest(false)
     setIsFinishModalOpen(false)
@@ -428,7 +454,6 @@ export default function VirtualRoom() {
   }
 
   const joinLiveSession = () => {
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
     setInDeviceTest(false)
   }
 
@@ -518,6 +543,7 @@ export default function VirtualRoom() {
             variant="ghost"
             onClick={() => {
               if (stream) stream.getTracks().forEach((t) => t.stop())
+              setStream(null)
               setActiveSession(null)
               setInDeviceTest(false)
             }}
@@ -529,10 +555,10 @@ export default function VirtualRoom() {
             <div className="p-2 bg-primary/10 rounded-xl text-primary">
               <Settings className="w-6 h-6" />
             </div>
-            Teste de Dispositivos e Preparação
+            Teste de Dispositivos
           </h1>
           <p className="text-slate-500 mt-2 text-lg">
-            Configure seu áudio e vídeo antes de iniciar a sessão com {patient?.nome}.
+            Configure e teste sua câmera e microfone antes de iniciar a sessão com {patient?.nome}.
           </p>
         </div>
 
@@ -540,23 +566,40 @@ export default function VirtualRoom() {
           <Card className="shadow-sm border-slate-200 bg-white">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Video className="w-5 h-5 text-primary" /> Preview de Câmera
+                <Video className="w-5 h-5 text-primary" /> Visualização e Níveis
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               {deviceError ? (
-                <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 text-sm font-medium">
-                  {deviceError}
+                <div className="bg-red-50 text-red-700 p-8 rounded-2xl border border-red-200 flex flex-col items-center justify-center text-center gap-4">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-500">
+                    <VideoOff className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold">Permissão de Acesso Necessária</h3>
+                    <p className="mt-1 max-w-md mx-auto text-sm">{deviceError}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => prepareSession(activeSession)}
+                    className="mt-2 bg-white gap-2"
+                  >
+                    <RefreshCcw className="w-4 h-4" /> Tentar Novamente
+                  </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="aspect-video bg-slate-900 rounded-2xl overflow-hidden relative flex items-center justify-center border-4 border-slate-100 shadow-inner">
                     <video
-                      ref={localVideoRef}
                       autoPlay
                       playsInline
                       muted
                       className={`w-full h-full object-cover transition-all duration-300 ${!camOn ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+                      ref={(node) => {
+                        if (node && node.srcObject !== stream) {
+                          node.srcObject = stream
+                        }
+                      }}
                     />
                     {!camOn && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-900">
@@ -568,14 +611,14 @@ export default function VirtualRoom() {
 
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <Label className="font-bold text-slate-700">Selecione a Câmera</Label>
+                      <Label className="font-bold text-slate-700">Câmera de Vídeo</Label>
                       <Select
                         value={selectedVideo}
                         onValueChange={setSelectedVideo}
                         disabled={videoDevices.length === 0 || !camOn}
                       >
                         <SelectTrigger className="bg-slate-50 h-11">
-                          <SelectValue placeholder="Câmera Padrão" />
+                          <SelectValue placeholder="Buscando câmeras..." />
                         </SelectTrigger>
                         <SelectContent>
                           {videoDevices.map((device) => (
@@ -588,14 +631,14 @@ export default function VirtualRoom() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="font-bold text-slate-700">Selecione o Microfone</Label>
+                      <Label className="font-bold text-slate-700">Microfone</Label>
                       <Select
                         value={selectedAudio}
                         onValueChange={setSelectedAudio}
                         disabled={audioDevices.length === 0 || !micOn}
                       >
                         <SelectTrigger className="bg-slate-50 h-11">
-                          <SelectValue placeholder="Microfone Padrão" />
+                          <SelectValue placeholder="Buscando microfones..." />
                         </SelectTrigger>
                         <SelectContent>
                           {audioDevices.map((device) => (
@@ -609,9 +652,9 @@ export default function VirtualRoom() {
 
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <Label className="font-bold text-slate-700">Nível do Microfone</Label>
+                        <Label className="font-bold text-slate-700">Nível de Captação</Label>
                         {micOn && (
-                          <span className="text-xs font-medium text-emerald-600">Captando...</span>
+                          <span className="text-xs font-medium text-emerald-600">Ouvindo...</span>
                         )}
                       </div>
                       <div className="h-3 bg-slate-100 rounded-full overflow-hidden flex items-center">
@@ -622,12 +665,12 @@ export default function VirtualRoom() {
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center gap-2 flex-wrap">
+                    <div className="flex justify-between items-center gap-2 flex-wrap pt-2">
                       <div className="flex gap-2">
                         <Button
                           variant={micOn ? 'outline' : 'destructive'}
                           onClick={() => setMicOn(!micOn)}
-                          className={`w-12 h-12 rounded-full p-0 ${micOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
+                          className={`w-12 h-12 rounded-full p-0 transition-colors ${micOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
                           title={micOn ? 'Desativar Microfone' : 'Ativar Microfone'}
                         >
                           {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
@@ -635,14 +678,18 @@ export default function VirtualRoom() {
                         <Button
                           variant={camOn ? 'outline' : 'destructive'}
                           onClick={() => setCamOn(!camOn)}
-                          className={`w-12 h-12 rounded-full p-0 ${camOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
+                          className={`w-12 h-12 rounded-full p-0 transition-colors ${camOn ? 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100' : ''}`}
                           title={camOn ? 'Desativar Câmera' : 'Ativar Câmera'}
                         >
                           {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                         </Button>
                       </div>
-                      <Button variant="secondary" onClick={playTestSound} className="gap-2">
-                        <Play className="w-4 h-4 text-slate-600" /> Testar Saída de Áudio
+                      <Button
+                        variant="secondary"
+                        onClick={playTestSound}
+                        className="gap-2 h-12 px-5 rounded-full border border-slate-200 hover:bg-slate-100"
+                      >
+                        <Volume2 className="w-4 h-4 text-slate-600" /> Testar Áudio
                       </Button>
                     </div>
                   </div>
@@ -652,10 +699,11 @@ export default function VirtualRoom() {
           </Card>
 
           <Button
-            className="w-full gap-2 text-lg h-14 bg-primary hover:bg-primary/90 text-white shadow-lg"
+            className="w-full gap-2 text-lg h-14 bg-primary hover:bg-primary/90 text-white shadow-lg disabled:opacity-50"
             onClick={joinLiveSession}
+            disabled={!!deviceError}
           >
-            <CheckCircle className="w-5 h-5" /> Confirmar e Continuar
+            <CheckCircle className="w-5 h-5" /> Entrar na Sessão
           </Button>
         </div>
       </div>
@@ -744,7 +792,6 @@ export default function VirtualRoom() {
         {/* Local Video - Real Stream from WebRTC */}
         <div className="absolute bottom-24 right-6 w-48 h-64 bg-slate-800 rounded-2xl border-2 border-slate-700 overflow-hidden shadow-xl">
           <video
-            ref={localVideoRef}
             autoPlay
             playsInline
             muted
