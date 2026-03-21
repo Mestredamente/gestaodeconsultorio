@@ -1,7 +1,7 @@
 {
   "_versions": {
-    "enviar_cobranca_whatsapp": 12,
-    "enviar_lembrete_consulta": 15,
+    "enviar_cobranca_whatsapp": 13,
+    "enviar_lembrete_consulta": 16,
     "emitir_nota_fiscal": 4,
     "enviar_comunicado_massa": 5,
     "transcrever_audio": 3,
@@ -14,6 +14,7 @@
     "sugerir_horario_ia": 2,
     "criar_checkout_stripe": 5,
     "stripe_webhook": 2,
-    "gerar_link_sala_virtual": 3
+    "gerar_link_sala_virtual": 3,
+    "enviar_mensagem_whatsapp": 1
   }
 }

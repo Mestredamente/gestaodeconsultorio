@@ -529,43 +529,51 @@ export default function Index() {
             <div className="grid grid-cols-2 gap-3 h-full pb-4 flex-1">
               <Button
                 variant="outline"
-                className="h-auto py-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-slate-200 hover:border-primary/30 hover:bg-primary/5 transition-all shadow-sm hover:shadow"
+                className="h-full w-full py-4 flex flex-col items-center justify-center gap-2 sm:gap-3 rounded-2xl border-slate-200 hover:border-primary/30 hover:bg-primary/5 transition-all shadow-sm hover:shadow whitespace-normal"
                 onClick={() => navigate('/agenda')}
               >
-                <div className="p-3 bg-primary/10 rounded-full text-primary">
+                <div className="flex items-center justify-center p-3 bg-primary/10 rounded-full text-primary shrink-0">
                   <Plus className="w-5 h-5" />
                 </div>
-                <span className="font-semibold text-slate-700 text-center">Novo Agendamento</span>
+                <span className="font-semibold text-slate-700 text-center text-sm leading-tight max-w-full">
+                  Novo Agendamento
+                </span>
               </Button>
               <Button
                 variant="outline"
-                className="h-auto py-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-slate-200 hover:border-indigo-500/30 hover:bg-indigo-50 transition-all shadow-sm hover:shadow"
+                className="h-full w-full py-4 flex flex-col items-center justify-center gap-2 sm:gap-3 rounded-2xl border-slate-200 hover:border-indigo-500/30 hover:bg-indigo-50 transition-all shadow-sm hover:shadow whitespace-normal"
                 onClick={() => navigate('/pacientes/novo')}
               >
-                <div className="p-3 bg-indigo-100 rounded-full text-indigo-600">
+                <div className="flex items-center justify-center p-3 bg-indigo-100 rounded-full text-indigo-600 shrink-0">
                   <Users className="w-5 h-5" />
                 </div>
-                <span className="font-semibold text-slate-700 text-center">Novo Paciente</span>
+                <span className="font-semibold text-slate-700 text-center text-sm leading-tight max-w-full">
+                  Novo Paciente
+                </span>
               </Button>
               <Button
                 variant="outline"
-                className="h-auto py-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-slate-200 hover:border-emerald-500/30 hover:bg-emerald-50 transition-all shadow-sm hover:shadow"
+                className="h-full w-full py-4 flex flex-col items-center justify-center gap-2 sm:gap-3 rounded-2xl border-slate-200 hover:border-emerald-500/30 hover:bg-emerald-50 transition-all shadow-sm hover:shadow whitespace-normal"
                 onClick={() => navigate('/carteira')}
               >
-                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
+                <div className="flex items-center justify-center p-3 bg-emerald-100 rounded-full text-emerald-600 shrink-0">
                   <Wallet className="w-5 h-5" />
                 </div>
-                <span className="font-semibold text-slate-700 text-center">Receber Pagamento</span>
+                <span className="font-semibold text-slate-700 text-center text-sm leading-tight max-w-full">
+                  Receber Pagamento
+                </span>
               </Button>
               <Button
                 variant="outline"
-                className="h-auto py-6 flex flex-col items-center justify-center gap-3 rounded-2xl border-slate-200 hover:border-rose-500/30 hover:bg-rose-50 transition-all shadow-sm hover:shadow"
+                className="h-full w-full py-4 flex flex-col items-center justify-center gap-2 sm:gap-3 rounded-2xl border-slate-200 hover:border-rose-500/30 hover:bg-rose-50 transition-all shadow-sm hover:shadow whitespace-normal"
                 onClick={() => navigate('/carteira')}
               >
-                <div className="p-3 bg-rose-100 rounded-full text-rose-600">
+                <div className="flex items-center justify-center p-3 bg-rose-100 rounded-full text-rose-600 shrink-0">
                   <FileText className="w-5 h-5" />
                 </div>
-                <span className="font-semibold text-slate-700 text-center">Nova Despesa</span>
+                <span className="font-semibold text-slate-700 text-center text-sm leading-tight max-w-full">
+                  Nova Despesa
+                </span>
               </Button>
             </div>
           </WidgetWrapper>
