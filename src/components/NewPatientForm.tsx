@@ -632,18 +632,17 @@ export default function NewPatientForm() {
         <DialogContent className="sm:max-w-md rounded-[2rem] p-8">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">Limite Atingido</DialogTitle>
-            <DialogDesc className="text-base">
-              Você atingiu o limite do seu plano ({planLimits.plan.toUpperCase()} -{' '}
-              {planLimits.count} pacientes).
+            <DialogDesc className="text-base mt-2">
+              Limite de {planLimits.plan === 'gratuito' ? 5 : 15} pacientes atingido. Faça upgrade
+              para o plano {planLimits.plan === 'gratuito' ? 'Básico' : 'Pro'}.
             </DialogDesc>
           </DialogHeader>
-          <div className="py-6 flex flex-col items-center justify-center text-center gap-4 bg-amber-50 rounded-2xl border border-amber-100 mt-2">
-            <div className="p-4 bg-amber-100 rounded-full">
-              <Crown className="w-10 h-10 text-amber-500" />
+          <div className="py-6 flex flex-col items-center justify-center text-center gap-4 bg-indigo-50 rounded-2xl border border-indigo-100 mt-2">
+            <div className="p-4 bg-indigo-100 rounded-full">
+              <Crown className="w-10 h-10 text-indigo-500" />
             </div>
             <p className="text-slate-700 font-medium px-4">
-              Faça o upgrade para o plano Pro para ter pacientes ilimitados e continuar crescendo
-              seu consultório!
+              Desbloqueie mais recursos e continue crescendo o seu consultório sem interrupções!
             </p>
           </div>
           <DialogFooter className="mt-4 gap-3 sm:gap-0">
@@ -652,13 +651,13 @@ export default function NewPatientForm() {
               onClick={() => setShowUpgradeModal(false)}
               className="rounded-xl h-12"
             >
-              Agora não
+              Cancelar
             </Button>
             <Button
               onClick={() => navigate('/planos')}
-              className="gap-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-12 px-6"
+              className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-6"
             >
-              <Crown className="w-4 h-4" /> Ver Planos
+              Fazer Upgrade Agora
             </Button>
           </DialogFooter>
         </DialogContent>

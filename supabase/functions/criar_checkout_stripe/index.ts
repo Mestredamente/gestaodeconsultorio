@@ -24,10 +24,13 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     )
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
     if (userError || !user) {
       throw new Error('Não autorizado')
     }
@@ -38,7 +41,8 @@ Deno.serve(async (req: Request) => {
       .eq('id', user.id)
       .single()
 
-    let priceId = plan === 'basico' ? Deno.env.get('STRIPE_PRICE_BASICO') : Deno.env.get('STRIPE_PRICE_PRO')
+    let priceId =
+      plan === 'basico' ? Deno.env.get('STRIPE_PRICE_BASICO') : Deno.env.get('STRIPE_PRICE_PRO')
     if (!priceId) {
       priceId = plan === 'basico' ? 'price_1MockBasicoId' : 'price_1MockProId'
     }
