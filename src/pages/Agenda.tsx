@@ -61,19 +61,12 @@ import {
   endOfMonth,
   startOfDay,
   endOfDay,
-  eachDayOfInterval,
-  isSameDay,
-  addMonths,
-  subMonths,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { generateWhatsAppLink, parseWhatsAppTemplate } from '@/lib/whatsapp'
-
-const DIAS_SEMANA = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
-const PERIODOS = ['manha', 'tarde', 'noite']
+import { generateWhatsAppLink } from '@/lib/whatsapp'
 
 export default function Agenda() {
   const navigate = useNavigate()
@@ -81,7 +74,6 @@ export default function Agenda() {
   const { user } = useAuth()
 
   const [appointments, setAppointments] = useState<any[]>([])
-  const [externalEvents, setExternalEvents] = useState<any[]>([])
   const [blocks, setBlocks] = useState<any[]>([])
   const [waitlist, setWaitlist] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,14 +84,10 @@ export default function Agenda() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
-  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false)
-  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false)
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
 
   const [patients, setPatients] = useState<any[]>([])
-  const [especialidades, setEspecialidades] = useState<string[]>([])
   const [convenios, setConvenios] = useState<any[]>([])
-  const [usrSettings, setUsrSettings] = useState<any>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [isSuggesting, setIsSuggesting] = useState(false)
@@ -123,13 +111,6 @@ export default function Agenda() {
     paciente_id: '',
     data_hora: '',
     patientName: '',
-  })
-
-  const [blockData, setBlockData] = useState({ data_inicio: '', data_fim: '', descricao: '' })
-  const [wlFormData, setWlFormData] = useState({
-    paciente_id: '',
-    dias_semana: [] as string[],
-    periodos: [] as string[],
   })
 
   const fetchAppointments = useCallback(async () => {
@@ -179,23 +160,18 @@ export default function Agenda() {
 
   const fetchInitialData = useCallback(async () => {
     if (!user) return
-    const [pts, usr, cvs] = await Promise.all([
+    const [pts, cvs] = await Promise.all([
       supabase
         .from('pacientes')
         .select('id, nome, valor_sessao, convenio_id')
         .eq('usuario_id', user.id)
         .order('nome'),
-      supabase.from('usuarios').select('*').eq('id', user.id).single(),
       supabase
         .from('convenios' as any)
         .select('*')
         .eq('usuario_id', user.id),
     ])
     if (pts.data) setPatients(pts.data)
-    if (usr.data) {
-      setEspecialidades(usr.data.especialidades_disponiveis || [])
-      setUsrSettings(usr.data)
-    }
     if (cvs.data) setConvenios(cvs.data)
   }, [user])
 
@@ -289,6 +265,52 @@ export default function Agenda() {
     }
   }
 
+  const updateStatus = async (id: string, status: string) => {
+    const { error } = await supabase.from('agendamentos').update({ status }).eq('id', id)
+    if (error) {
+      toast({ title: 'Erro ao atualizar', variant: 'destructive' })
+    } else {
+      toast({ title: 'Status atualizado para ' + status })
+      fetchAppointments()
+    }
+  }
+
+  const handleStartVirtualSession = async (apt: any) => {
+    try {
+      toast({ title: 'Gerando link seguro...', description: 'Aguarde um momento.' })
+
+      const { data, error } = await supabase.functions.invoke('gerar_link_sala_virtual', {
+        body: { agendamento_id: apt.id },
+      })
+
+      if (error) throw error
+
+      if (data?.link) {
+        const pacienteInfo = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+
+        if (pacienteInfo?.telefone) {
+          const message = `Olá ${pacienteInfo.nome || ''}, sua sessão virtual está pronta! Acesse aqui: ${data.link}. Você entrará em uma sala de espera até o psicólogo aprová-lo.`
+          const wpLink = generateWhatsAppLink(pacienteInfo.telefone, message)
+          window.open(wpLink, '_blank')
+        } else {
+          toast({
+            title: 'Sessão Iniciada',
+            description:
+              'Paciente sem telefone. O link foi gerado e você pode gerenciá-lo na Sala Virtual.',
+          })
+        }
+
+        navigate('/sala-virtual')
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao gerar link',
+        description: err.message || 'Tente novamente.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   const renderAppointmentCard = (apt: any) => {
     const timeStr = new Date(apt.data_hora).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
@@ -342,56 +364,87 @@ export default function Agenda() {
             </div>
           </div>
 
-          <div className="mt-auto pt-4 flex items-center gap-2 justify-between border-t border-slate-100">
-            <div className="flex items-center gap-1.5">
-              {apt.is_online && (
+          <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-slate-100">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-emerald-600 hover:bg-emerald-100"
+                  title="Confirmar"
+                  onClick={() => updateStatus(apt.id, 'confirmado')}
+                >
+                  <Check className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-red-600 hover:bg-red-100"
+                  title="Faltou"
+                  onClick={() => updateStatus(apt.id, 'faltou')}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-amber-600 hover:bg-amber-100"
+                  title="Desmarcou"
+                  onClick={() => updateStatus(apt.id, 'desmarcou')}
+                >
+                  <span className="font-bold text-sm">D</span>
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
                 <Button
                   size="icon"
                   variant="outline"
-                  className="h-8 w-8 bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg"
-                  onClick={() => navigate(`/sessao/${pacienteInfo.hash_anamnese}`)}
+                  className="h-8 w-8 text-slate-600 hover:bg-slate-50 border-slate-200 rounded-lg"
+                  onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
+                  title="Prontuário"
                 >
-                  <Video className="w-4 h-4" />
+                  <FileText className="w-4 h-4" />
                 </Button>
-              )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-slate-500 hover:bg-slate-50 hover:text-slate-800 rounded-lg"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40 rounded-xl">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setRescheduleData({
+                          id: apt.id,
+                          paciente_id: apt.paciente_id,
+                          data_hora: apt.data_hora.slice(0, 16),
+                          patientName,
+                        })
+                        setIsRescheduleModalOpen(true)
+                      }}
+                      className="rounded-lg"
+                    >
+                      <CalendarSync className="w-4 h-4 mr-2" /> Remarcar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            {apt.is_online && (
               <Button
-                size="icon"
-                variant="outline"
-                className="h-8 w-8 text-slate-600 hover:bg-slate-50 border-slate-200 rounded-lg"
-                onClick={() => navigate(`/pacientes/${apt.paciente_id}/prontuario`)}
+                size="sm"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl gap-2 h-9 shadow-sm"
+                onClick={() => handleStartVirtualSession(apt)}
               >
-                <FileText className="w-4 h-4" />
+                <Video className="w-4 h-4" /> Iniciar Sessão Virtual
               </Button>
-            </div>
-            <div className="flex gap-1 bg-slate-50 p-1 rounded-lg border border-slate-100">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-slate-500 hover:text-slate-800 rounded-md"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40 rounded-xl">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setRescheduleData({
-                        id: apt.id,
-                        paciente_id: apt.paciente_id,
-                        data_hora: apt.data_hora.slice(0, 16),
-                        patientName,
-                      })
-                      setIsRescheduleModalOpen(true)
-                    }}
-                    className="rounded-lg"
-                  >
-                    <CalendarSync className="w-4 h-4 mr-2" /> Remarcar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
