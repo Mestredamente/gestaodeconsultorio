@@ -34,7 +34,7 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
   const [nextAppt, setNextAppt] = useState<any>(null)
   const [selectedTemplate, setSelectedTemplate] = useState('lembrete')
   const [message, setMessage] = useState('')
-  const [waType, setWaType] = useState<'personal' | 'business'>('personal')
+  const [waType, setWaType] = useState<'padrao' | 'business'>('padrao')
 
   useEffect(() => {
     if (open && user && patient?.id) {
@@ -48,7 +48,11 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
         .then(({ data }) => {
           if (data) {
             setTemplates(data)
-            setWaType((data.whatsapp_tipo as any) || 'personal')
+            setWaType(
+              (data.whatsapp_tipo as any) === 'personal'
+                ? 'padrao'
+                : (data.whatsapp_tipo as any) || 'padrao',
+            )
           }
         })
 
@@ -194,7 +198,7 @@ export function QuickMessageDialog({ patient }: { patient: any }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="personal">WhatsApp Pessoal</SelectItem>
+                <SelectItem value="padrao">WhatsApp Padrão</SelectItem>
                 <SelectItem value="business">WhatsApp Business</SelectItem>
               </SelectContent>
             </Select>

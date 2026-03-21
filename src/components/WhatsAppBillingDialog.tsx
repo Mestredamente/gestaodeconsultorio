@@ -35,7 +35,7 @@ export default function WhatsAppBillingDialog({
 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [whatsappTipo, setWhatsappTipo] = useState('personal')
+  const [whatsappTipo, setWhatsappTipo] = useState('padrao')
 
   const currentDate = new Date()
   const [mes, setMes] = useState(String(currentDate.getMonth() + 1))
@@ -53,7 +53,11 @@ export default function WhatsAppBillingDialog({
             .single()
             .then(({ data }) => {
               if (data && (data as any).whatsapp_tipo) {
-                setWhatsappTipo((data as any).whatsapp_tipo)
+                setWhatsappTipo(
+                  (data as any).whatsapp_tipo === 'personal'
+                    ? 'padrao'
+                    : (data as any).whatsapp_tipo,
+                )
               }
             })
         }
@@ -85,7 +89,7 @@ export default function WhatsAppBillingDialog({
         'enviar_mensagem_whatsapp',
         {
           body: {
-            tipo_whatsapp: whatsappTipo,
+            tipo_whatsapp: whatsappTipo === 'personal' ? 'padrao' : whatsappTipo,
             telefone: cleanPhone,
             mensagem: data.message,
             usuario_id: userResp.user?.id,
@@ -165,8 +169,8 @@ export default function WhatsAppBillingDialog({
                 className="flex flex-col gap-3"
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="personal" id="personal" />
-                  <Label htmlFor="personal" className="font-normal cursor-pointer text-slate-700">
+                  <RadioGroupItem value="padrao" id="padrao" />
+                  <Label htmlFor="padrao" className="font-normal cursor-pointer text-slate-700">
                     WhatsApp Padrão
                   </Label>
                 </div>

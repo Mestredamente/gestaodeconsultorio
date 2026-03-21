@@ -32,7 +32,7 @@ export default function Settings() {
     agendamento_publico_ativo: false,
     politica_cancelamento: '',
     texto_contrato: '',
-    whatsapp_tipo: 'personal',
+    whatsapp_tipo: 'padrao',
     whatsapp_api_key: '',
     whatsapp_business_phone_id: '',
     whatsapp_business_account_id: '',
@@ -57,7 +57,8 @@ export default function Settings() {
           agendamento_publico_ativo: data.agendamento_publico_ativo || false,
           politica_cancelamento: data.politica_cancelamento || '',
           texto_contrato: data.texto_contrato || '',
-          whatsapp_tipo: data.whatsapp_tipo || 'personal',
+          whatsapp_tipo:
+            data.whatsapp_tipo === 'personal' ? 'padrao' : data.whatsapp_tipo || 'padrao',
           whatsapp_api_key: data.whatsapp_api_key || '',
           whatsapp_business_phone_id: data.whatsapp_business_phone_id || '',
           whatsapp_business_account_id: data.whatsapp_business_account_id || '',
@@ -195,14 +196,14 @@ export default function Settings() {
               <div className="space-y-4">
                 <Label>Tipo de Integração</Label>
                 <RadioGroup
-                  value={settings.whatsapp_tipo}
+                  value={settings.whatsapp_tipo === 'personal' ? 'padrao' : settings.whatsapp_tipo}
                   onValueChange={(v) => setSettings({ ...settings, whatsapp_tipo: v })}
                   className="flex flex-col sm:flex-row gap-4"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="personal" id="config_personal" />
+                    <RadioGroupItem value="padrao" id="config_padrao" />
                     <Label
-                      htmlFor="config_personal"
+                      htmlFor="config_padrao"
                       className="font-normal cursor-pointer text-slate-700"
                     >
                       WhatsApp Padrão

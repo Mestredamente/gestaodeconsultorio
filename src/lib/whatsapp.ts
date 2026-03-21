@@ -63,7 +63,7 @@ export function parseWhatsAppTemplate(
 export function generateWhatsAppLink(
   phone: string,
   message: string,
-  type: 'personal' | 'business' = 'personal',
+  type: 'padrao' | 'business' | 'personal' = 'padrao',
 ) {
   const cleanPhone = phone.replace(/\D/g, '')
   const encodedMsg = encodeURIComponent(message)
