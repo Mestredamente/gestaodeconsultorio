@@ -1,17 +1,10 @@
 {
   "_versions": {
-    "enviar_cobranca_whatsapp": 9,
-    "enviar_lembrete_consulta": 14,
-    "emitir_nota_fiscal": 3,
-    "enviar_comunicado_massa": 4,
-    "transcrever_audio": 2,
-    "processar_cobrancas_recorrentes": 4,
-    "functions": 5,
-    "lembrete_sessao": 4,
-    "criar_assinatura": 2,
-    "gerar_insights_paciente": 3,
-    "gerar_sugestao_evolucao": 1,
-    "processar_pagamento": 1,
-    "sugerir_horario_ia": 1
+    "enviar_cobranca_whatsapp": 6,
+    "enviar_lembrete_consulta": 10,
+    "emitir_nota_fiscal": 2,
+    "enviar_comunicado_massa": 1,
+    "functions": 1,
+    "transcrever_audio": 1
   }
 }
