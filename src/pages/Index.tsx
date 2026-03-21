@@ -14,6 +14,7 @@ import {
   FileText,
   ChevronRight,
   Bell,
+  AlertCircle,
 } from 'lucide-react'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -37,7 +38,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 
-const DEFAULT_ORDER = ['kpis', 'upcoming', 'inadimplentes', 'finances', 'alerts', 'shortcuts']
+const DEFAULT_ORDER = ['kpis', 'upcoming', 'finances', 'alerts', 'shortcuts']
 
 export default function Index() {
   const { user } = useAuth()
@@ -60,7 +61,7 @@ export default function Index() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        // Ensure new widgets are present if recovering old state
+        // Ensure new widgets are present if recovering old state, and remove deprecated ones like inadimplentes from grid
         const merged = Array.from(new Set([...parsed, ...DEFAULT_ORDER]))
         setWidgetOrder(merged.filter((w) => DEFAULT_ORDER.includes(w)))
       } catch (e) {
@@ -298,68 +299,6 @@ export default function Index() {
               <p className="text-4xl font-extrabold text-indigo-900">{stats.pacientesAtivos}</p>
             </div>
           </div>
-        )
-      case 'inadimplentes':
-        return (
-          <WidgetWrapper key={id} id={id} title="Pacientes Inadimplentes">
-            {inadimplentes.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center py-10">
-                <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mb-3">
-                  <TrendingUp className="w-5 h-5 text-emerald-500" />
-                </div>
-                <p className="text-slate-500 font-medium">Nenhum paciente inadimplente.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Valor em Aberto</TableHead>
-                      <TableHead>Dias</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {inadimplentes.slice(0, 5).map((item) => {
-                      const p = Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes
-                      const isCritical = item.diffDays > 60
-                      return (
-                        <TableRow key={item.id} className={isCritical ? 'bg-red-50/50' : ''}>
-                          <TableCell className="font-medium text-slate-900">{p?.nome}</TableCell>
-                          <TableCell
-                            className={
-                              isCritical ? 'text-red-700 font-bold' : 'text-amber-700 font-bold'
-                            }
-                          >
-                            {formatBRL(item.valor_a_receber)}
-                          </TableCell>
-                          <TableCell className={isCritical ? 'text-red-600' : 'text-slate-500'}>
-                            {item.diffDays} dias
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <WhatsAppBillingDialog
-                              pacienteId={item.paciente_id}
-                              patientName={p?.nome || ''}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-                {inadimplentes.length > 5 && (
-                  <Button
-                    variant="ghost"
-                    className="w-full text-slate-500 mt-2 rounded-xl"
-                    onClick={() => navigate('/carteira')}
-                  >
-                    Ver todas pendências (+{inadimplentes.length - 5})
-                  </Button>
-                )}
-              </div>
-            )}
-          </WidgetWrapper>
         )
       case 'upcoming':
         return (
@@ -652,9 +591,86 @@ export default function Index() {
       <div className="flex flex-col gap-6">
         {widgetOrder.includes('kpis') && renderWidget('kpis')}
 
+        {/* Fixed Full-Width Section for Inadimplentes */}
+        <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100/60 p-6 sm:p-8 flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-red-50 text-red-600 rounded-xl">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-slate-800 text-lg sm:text-xl tracking-tight">
+              Pacientes Inadimplentes
+            </h3>
+          </div>
+
+          {inadimplentes.length === 0 ? (
+            <div className="w-full flex flex-col items-center justify-center text-center py-10">
+              <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mb-3">
+                <TrendingUp className="w-5 h-5 text-emerald-500" />
+              </div>
+              <p className="text-slate-500 font-medium">Nenhum paciente inadimplente.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <Table>
+                <TableHeader className="bg-slate-50/80">
+                  <TableRow>
+                    <TableHead className="font-semibold text-slate-700">Nome</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Valor em Aberto</TableHead>
+                    <TableHead className="font-semibold text-slate-700">Dias em Aberto</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inadimplentes.slice(0, 10).map((item) => {
+                    const p = Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes
+                    const isCritical = item.diffDays > 60
+                    return (
+                      <TableRow
+                        key={item.id}
+                        className={
+                          isCritical ? 'bg-red-50/40 hover:bg-red-50/60' : 'hover:bg-slate-50/50'
+                        }
+                      >
+                        <TableCell className="font-medium text-slate-900">{p?.nome}</TableCell>
+                        <TableCell
+                          className={
+                            isCritical ? 'text-red-700 font-bold' : 'text-amber-700 font-bold'
+                          }
+                        >
+                          {formatBRL(item.valor_a_receber)}
+                        </TableCell>
+                        <TableCell
+                          className={isCritical ? 'text-red-600 font-medium' : 'text-slate-600'}
+                        >
+                          {item.diffDays} dias
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <WhatsAppBillingDialog
+                            pacienteId={item.paciente_id}
+                            patientName={p?.nome || ''}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          {inadimplentes.length > 10 && (
+            <Button
+              variant="outline"
+              className="w-full text-slate-600 mt-2 rounded-xl"
+              onClick={() => navigate('/carteira')}
+            >
+              Ver todos os {inadimplentes.length} pacientes em atraso na Carteira
+            </Button>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           {widgetOrder
-            .filter((id) => id !== 'kpis')
+            .filter((id) => id !== 'kpis' && id !== 'inadimplentes')
             .map((id) => (
               <div key={id} className="h-full">
                 {renderWidget(id)}

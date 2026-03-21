@@ -106,7 +106,7 @@ export default function WhatsAppBillingDialog({
           variant="outline"
           className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 flex-1 sm:flex-none"
         >
-          <MessageCircle className="w-4 h-4" /> Gerar Link WhatsApp
+          <MessageCircle className="w-4 h-4" /> Cobrar via WhatsApp
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
@@ -181,7 +181,7 @@ export default function WhatsAppBillingDialog({
             disabled={loading}
             className="bg-emerald-600 hover:bg-emerald-700 text-white"
           >
-            {loading ? 'Gerando...' : 'Gerar e Abrir WhatsApp'}
+            {loading ? 'Gerando...' : 'Enviar WhatsApp'}
           </Button>
         </DialogFooter>
       </DialogContent>
