@@ -32,6 +32,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Handler to safely clear corrupted sessions and handle Invalid Refresh Token error
+    const handleAuthError = (err: any) => {
+      const msg = err?.message || ''
+      if (
+        msg.toLowerCase().includes('refresh token') ||
+        msg.toLowerCase().includes('session missing')
+      ) {
+        console.warn('Invalid session detected, clearing local data...')
+        try {
+          const keysToRemove = []
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i)
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              keysToRemove.push(key)
+            }
+          }
+          keysToRemove.forEach((k) => localStorage.removeItem(k))
+          sessionStorage.clear()
+        } catch (e) {
+          console.error('Failed to clear storage:', e)
+        }
+
+        // Supabase signout to clear memory state
+        supabase.auth.signOut().catch(() => {})
+        setSession(null)
+        setUser(null)
+        setLoading(false)
+      }
+    }
+
+    // Global listener to capture the Unhandled Promise Rejection triggered by Supabase internal fetch
+    const unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
+      if (event.reason) {
+        const msg = event.reason.message || ''
+        if (
+          msg.toLowerCase().includes('refresh token') ||
+          msg.toLowerCase().includes('session missing')
+        ) {
+          event.preventDefault() // Prevents the runtime error from crashing the UI
+          handleAuthError(event.reason)
+        }
+      }
+    }
+
+    window.addEventListener('unhandledrejection', unhandledRejectionHandler)
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -45,38 +91,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false)
     })
 
-    // Handle session restoration carefully to catch invalid refresh tokens
+    // Handle session restoration carefully to catch invalid refresh tokens initially
     supabase.auth
       .getSession()
       .then(({ data: { session }, error }) => {
         if (error) {
-          console.error('Auth session error:', error.message)
-          // If the refresh token is invalid or missing, clear the stale session
-          if (
-            error.message.toLowerCase().includes('refresh token') ||
-            error.name.includes('AuthSessionMissingError')
-          ) {
-            supabase.auth.signOut().catch(() => {})
-          }
-          setSession(null)
-          setUser(null)
+          handleAuthError(error)
         } else {
           setSession(session)
           setUser(session?.user ?? null)
         }
       })
       .catch((err) => {
-        console.error('Unexpected auth error during getSession:', err)
-        // Fallback cleanup
-        supabase.auth.signOut().catch(() => {})
-        setSession(null)
-        setUser(null)
+        handleAuthError(err)
       })
       .finally(() => {
         setLoading(false)
       })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      window.removeEventListener('unhandledrejection', unhandledRejectionHandler)
+    }
   }, [])
 
   const signUp = async (email: string, password: string, clinicName?: string) => {
