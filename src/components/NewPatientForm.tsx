@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { maskCPF, maskPhone, maskCEP, fetchAddressByCEP } from '@/lib/utils'
-import { Crown } from 'lucide-react'
+import { Crown, Loader2, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   Select,
@@ -77,6 +77,7 @@ export default function NewPatientForm() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
+  const [fetchingCep, setFetchingCep] = useState(false)
   const [convenios, setConvenios] = useState<any[]>([])
 
   const [planLimits, setPlanLimits] = useState({ plan: 'gratuito', count: 0 })
@@ -155,7 +156,7 @@ export default function NewPatientForm() {
         bairro: values.bairro || null,
         cidade: values.cidade || null,
         estado: values.estado || null,
-        endereco: `${values.rua}, ${values.numero} - ${values.bairro}, ${values.cidade}/${values.estado}`,
+        endereco: values.rua ? `${values.rua}, ${values.numero} - ${values.bairro}, ${values.cidade}/${values.estado}` : null,
         contato_emergencia_nome: values.contato_emergencia_nome || null,
         contato_emergencia_telefone: values.contato_emergencia_telefone || null,
         valor_sessao: values.valor_sessao,
@@ -182,111 +183,241 @@ export default function NewPatientForm() {
   const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
     const masked = maskCEP(e.target.value)
     field.onChange(masked)
+    
     if (masked.length === 9) {
-      const address = await fetchAddressByCEP(masked)
-      if (address) {
-        form.setValue('rua', address.rua)
-        form.setValue('bairro', address.bairro)
-        form.setValue('cidade', address.cidade)
-        form.setValue('estado', address.estado)
+      setFetchingCep(true)
+      try {
+        const address = await fetchAddressByCEP(masked)
+        if (address) {
+          form.setValue('rua', address.rua)
+          form.setValue('bairro', address.bairro)
+          form.setValue('cidade', address.cidade)
+          form.setValue('estado', address.estado)
+          toast({ title: 'Endereço encontrado!' })
+        } else {
+          toast({ title: 'CEP não encontrado', variant: 'destructive' })
+        }
+      } catch (err) {
+        toast({ title: 'Erro ao buscar CEP', variant: 'destructive' })
+      } finally {
+        setFetchingCep(false)
       }
     }
   }
 
   return (
     <>
-      <Card className="shadow-sm border-slate-200">
-        <CardContent className="p-6">
+      <Card className="shadow-sm">
+        <CardContent className="p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="nome"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome Completo *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="João da Silva" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="data_nascimento"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data de Nascimento</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} value={field.value || ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="cpf"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CPF</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="000.000.000-00"
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => field.onChange(maskCPF(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="telefone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Telefone</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="(00) 00000-0000"
-                          {...field}
-                          value={field.value || ''}
-                          onChange={(e) => field.onChange(maskPhone(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>E-mail</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="joao@email.com"
-                          type="email"
-                          {...field}
-                          value={field.value || ''}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              
+              {/* Dados Pessoais */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Dados Pessoais</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="nome"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Completo *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="João da Silva" {...field} value={field.value || ''} className="bg-slate-50/50" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="data_nascimento"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Data de Nascimento</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} value={field.value || ''} className="bg-slate-50/50" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="cpf"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CPF</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="000.000.000-00"
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(maskCPF(e.target.value))}
+                            className="bg-slate-50/50"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="telefone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Telefone</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="(00) 00000-0000"
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                            className="bg-slate-50/50"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>E-mail</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="joao@email.com"
+                            type="email"
+                            {...field}
+                            value={field.value || ''}
+                            className="bg-slate-50/50"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">
-                  Contato de Emergência
+              {/* Endereço */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary" /> Endereço Completo
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 bg-slate-50/50 rounded-xl border border-slate-100">
+                  <FormField
+                    control={form.control}
+                    name="cep"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CEP</FormLabel>
+                        <div className="relative">
+                          <FormControl>
+                            <Input
+                              placeholder="00000-000"
+                              {...field}
+                              value={field.value || ''}
+                              onChange={(e) => handleCepChange(e, field)}
+                              className="bg-white pr-10"
+                            />
+                          </FormControl>
+                          {fetchingCep && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin" />
+                          )}
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="md:col-span-3">
+                    <FormField
+                      control={form.control}
+                      name="rua"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Rua / Logradouro</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} className="bg-white" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="numero"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Número</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} className="bg-white" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="complemento"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Complemento</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} className="bg-white" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="bairro"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bairro</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} className="bg-white" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="cidade"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cidade</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} className="bg-white" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="estado"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Estado</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} className="bg-white" />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contato de Emergência */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Contato de Emergência</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-slate-50/50 rounded-xl border border-slate-100">
                   <FormField
                     control={form.control}
                     name="contato_emergencia_nome"
@@ -294,11 +425,7 @@ export default function NewPatientForm() {
                       <FormItem>
                         <FormLabel>Nome do Contato *</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="Ex: Maria da Silva"
-                            {...field}
-                            value={field.value || ''}
-                          />
+                          <Input placeholder="Ex: Maria da Silva" {...field} value={field.value || ''} className="bg-white" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -316,6 +443,7 @@ export default function NewPatientForm() {
                             {...field}
                             value={field.value || ''}
                             onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                            className="bg-white"
                           />
                         </FormControl>
                         <FormMessage />
@@ -325,11 +453,10 @@ export default function NewPatientForm() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">
-                  Pagamento e Convênio
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Pagamento e Convênio */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Pagamento e Convênio</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-5 bg-indigo-50/30 rounded-xl border border-indigo-100/50">
                   <FormField
                     control={form.control}
                     name="valor_sessao"
@@ -337,7 +464,7 @@ export default function NewPatientForm() {
                       <FormItem>
                         <FormLabel>Valor Base Sessão (R$)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" {...field} value={field.value || ''} />
+                          <Input type="number" step="0.01" {...field} value={field.value || ''} className="bg-white" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -379,6 +506,7 @@ export default function NewPatientForm() {
                             placeholder="Ex: 5"
                             {...field}
                             value={field.value || ''}
+                            className="bg-white"
                           />
                         </FormControl>
                         <FormMessage />
@@ -422,6 +550,7 @@ export default function NewPatientForm() {
                                 placeholder="Código do paciente"
                                 {...field}
                                 value={field.value || ''}
+                                className="bg-white"
                               />
                             </FormControl>
                             <FormMessage />
@@ -433,123 +562,21 @@ export default function NewPatientForm() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-medium text-slate-800 pb-2 mb-4">Endereço Completo</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="cep"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CEP</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="00000-000"
-                            {...field}
-                            value={field.value || ''}
-                            onChange={(e) => handleCepChange(e, field)}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <div className="md:col-span-3">
-                    <FormField
-                      control={form.control}
-                      name="rua"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Rua / Logradouro</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value || ''} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <FormField
-                    control={form.control}
-                    name="numero"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Número</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ''} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="complemento"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Complemento</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={field.value || ''} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="bairro"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bairro</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value || ''} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="cidade"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Cidade</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value || ''} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="estado"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Estado</FormLabel>
-                          <FormControl>
-                            <Input {...field} value={field.value || ''} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100">
+              {/* Consentimento */}
+              <div className="pt-2">
                 <FormField
                   control={form.control}
                   name="consentimento_lgpd"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-slate-50/80">
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border p-5 bg-slate-50 shadow-sm">
                       <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" />
                       </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel className="text-slate-800">
+                      <div className="space-y-1.5 leading-none">
+                        <FormLabel className="text-slate-800 font-semibold text-base">
                           Consentimento de Tratamento de Dados (LGPD)
                         </FormLabel>
-                        <FormDescription className="text-slate-500">
+                        <FormDescription className="text-slate-500 text-sm leading-relaxed">
                           Confirmo que o paciente autorizou expressamente o tratamento de seus dados
                           pessoais sensíveis em conformidade com a Lei Geral de Proteção de Dados,
                           para fins de saúde e gestão clínica.
@@ -560,10 +587,10 @@ export default function NewPatientForm() {
                 />
               </div>
 
-              <div className="flex justify-end gap-4 pt-4 border-t border-slate-100">
-                <Button type="submit" disabled={loading} className="w-full sm:w-auto px-8 gap-2">
+              <div className="flex justify-end gap-4 pt-6 border-t border-slate-100">
+                <Button type="submit" disabled={loading} className="w-full sm:w-auto px-10 rounded-xl gap-2 h-12 text-base">
                   {loading && (
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   )}
                   {loading ? 'Salvando...' : 'Salvar Paciente'}
                 </Button>
@@ -574,7 +601,7 @@ export default function NewPatientForm() {
       </Card>
 
       <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Limite de Pacientes Atingido</DialogTitle>
             <DialogDesc>
@@ -582,7 +609,7 @@ export default function NewPatientForm() {
               {planLimits.count} pacientes).
             </DialogDesc>
           </DialogHeader>
-          <div className="py-6 flex flex-col items-center justify-center text-center gap-4 bg-amber-50 rounded-lg border border-amber-100 mt-2">
+          <div className="py-6 flex flex-col items-center justify-center text-center gap-4 bg-amber-50 rounded-xl border border-amber-100 mt-2">
             <div className="p-4 bg-amber-100 rounded-full">
               <Crown className="w-10 h-10 text-amber-500" />
             </div>
@@ -592,12 +619,12 @@ export default function NewPatientForm() {
             </p>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setShowUpgradeModal(false)}>
+            <Button variant="outline" onClick={() => setShowUpgradeModal(false)} className="rounded-xl">
               Agora não
             </Button>
             <Button
               onClick={() => navigate('/planos')}
-              className="gap-2 bg-amber-500 hover:bg-amber-600 text-white"
+              className="gap-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl"
             >
               <Crown className="w-4 h-4" /> Ver Planos
             </Button>
@@ -607,3 +634,4 @@ export default function NewPatientForm() {
     </>
   )
 }
+

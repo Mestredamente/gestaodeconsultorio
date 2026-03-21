@@ -1,0 +1,12 @@
+ALTER TABLE public.usuarios
+ADD COLUMN IF NOT EXISTS banco TEXT,
+ADD COLUMN IF NOT EXISTS agencia TEXT,
+ADD COLUMN IF NOT EXISTS conta_bancaria TEXT,
+ADD COLUMN IF NOT EXISTS mercado_pago_token TEXT,
+ADD COLUMN IF NOT EXISTS whatsapp_api_key TEXT,
+ADD COLUMN IF NOT EXISTS stripe_secret_key TEXT,
+ADD COLUMN IF NOT EXISTS pagseguro_token TEXT,
+ADD COLUMN IF NOT EXISTS gemini_api_key TEXT,
+ADD COLUMN IF NOT EXISTS zoom_client_id TEXT,
+ADD COLUMN IF NOT EXISTS zoom_client_secret TEXT;
+

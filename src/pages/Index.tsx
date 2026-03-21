@@ -13,6 +13,7 @@ import {
   ArrowUp,
   ArrowDown,
   AlertTriangle,
+  RotateCcw,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
@@ -248,21 +249,53 @@ export default function Index() {
     savePrefs(reordered)
   }
 
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', index.toString())
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    const dragIndexStr = e.dataTransfer.getData('text/plain')
+    if (!dragIndexStr) return
+    const dragIndex = parseInt(dragIndexStr, 10)
+    if (dragIndex === dropIndex) return
+
+    const visibleList = visibleWidgets
+    const [draggedItem] = visibleList.splice(dragIndex, 1)
+    visibleList.splice(dropIndex, 0, draggedItem)
+
+    const newWidgets = widgets.map((w) => {
+      const indexInVisible = visibleList.findIndex((v) => v.id === w.id)
+      if (indexInVisible !== -1) {
+        return { ...w, order: indexInVisible }
+      }
+      return w
+    })
+
+    savePrefs(newWidgets)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
   const renderWidget = (id: string) => {
     switch (id) {
       case 'dashboard':
         return <PerformanceDashboard key="dashboard" />
       case 'indicators':
         return (
-          <div key="indicators" className="w-full lg:w-1/2">
+          <div key="indicators" className="w-full">
             <MentalHealthIndicators />
           </div>
         )
       case 'agenda':
         return (
-          <Card key="agenda" className="shadow-sm border-slate-200 w-full lg:w-2/3 h-fit">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
+          <Card key="agenda" className="shadow-sm border-slate-200 w-full h-fit rounded-2xl">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between rounded-t-2xl">
+              <CardTitle className="text-lg flex items-center gap-2 text-slate-800">
                 <Calendar className="w-5 h-5 text-primary" /> Sessões de Hoje
               </CardTitle>
             </CardHeader>
@@ -287,7 +320,7 @@ export default function Index() {
                         className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-colors"
                       >
                         <div className="flex gap-4 items-center">
-                          <div className="w-14 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-primary font-bold shadow-sm">
+                          <div className="w-14 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-primary font-bold shadow-sm">
                             {time}
                           </div>
                           <div>
@@ -316,7 +349,7 @@ export default function Index() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-emerald-600 hover:bg-emerald-50"
+                            className="text-emerald-600 hover:bg-emerald-50 rounded-lg"
                             onClick={() => updateStatus(apt.id, 'compareceu')}
                           >
                             <Check className="w-4 h-4 mr-1" /> Comp.
@@ -324,7 +357,7 @@ export default function Index() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-red-600 hover:bg-red-50"
+                            className="text-red-600 hover:bg-red-50 rounded-lg"
                             onClick={() => updateStatus(apt.id, 'faltou')}
                           >
                             <X className="w-4 h-4 mr-1" /> Faltou
@@ -340,15 +373,15 @@ export default function Index() {
         )
       case 'goals':
         return (
-          <div key="goals" className="space-y-6 w-full lg:w-1/3">
+          <div key="goals" className="space-y-6 w-full">
             <ServiceGoalTracker />
             <Card
-              className="shadow-sm border-slate-200 cursor-pointer hover:border-primary/50 transition-colors"
+              className="shadow-sm border-slate-200 cursor-pointer hover:border-primary/50 transition-colors rounded-2xl"
               onClick={() => navigate('/supervisao')}
             >
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                     <Users className="w-5 h-5" />
                   </div>
                   <div>
@@ -361,7 +394,7 @@ export default function Index() {
             </Card>
 
             {lowStockItems.length > 0 && (
-              <Card className="shadow-sm border-red-200">
+              <Card className="shadow-sm border-red-200 rounded-2xl overflow-hidden">
                 <CardHeader className="border-b border-red-100 bg-red-50/50 pb-4 flex flex-row items-center justify-between">
                   <CardTitle className="text-sm font-semibold text-red-800 flex items-center gap-2 uppercase tracking-wide">
                     <AlertTriangle className="w-4 h-4 text-red-600" /> Estoque Baixo
@@ -393,7 +426,7 @@ export default function Index() {
               </Card>
             )}
 
-            <Card className="shadow-sm border-slate-200">
+            <Card className="shadow-sm border-slate-200 rounded-2xl overflow-hidden">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2 uppercase tracking-wide">
                   <Users className="w-4 h-4 text-primary" /> Fila de Espera
@@ -482,19 +515,19 @@ export default function Index() {
         <div className="flex gap-2">
           <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Settings2 className="w-5 h-5" />
+              <Button variant="outline" className="gap-2 rounded-xl shadow-sm">
+                <Settings2 className="w-4 h-4" /> Organizar Painel
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md rounded-2xl">
               <DialogHeader>
-                <DialogTitle>Configurar Dashboard</DialogTitle>
+                <DialogTitle>Personalizar Dashboard</DialogTitle>
               </DialogHeader>
               <div className="space-y-2 py-4">
                 {widgets.map((w, index) => (
                   <div
                     key={w.id}
-                    className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-100"
+                    className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100"
                   >
                     <div className="flex items-center gap-3">
                       <GripVertical className="w-4 h-4 text-slate-400 cursor-grab" />
@@ -523,6 +556,13 @@ export default function Index() {
                     </div>
                   </div>
                 ))}
+                <Button 
+                  variant="ghost" 
+                  onClick={() => savePrefs(DEFAULT_WIDGETS)} 
+                  className="w-full mt-4 text-slate-500 hover:text-slate-800"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" /> Restaurar Padrão
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -530,7 +570,7 @@ export default function Index() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-slate-200 rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Atendimentos do Dia
@@ -540,7 +580,7 @@ export default function Index() {
             <div className="text-3xl font-bold text-slate-900">{kpis.atendimentosHoje}</div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-slate-200 rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Pacientes Novos (30d)
@@ -550,7 +590,7 @@ export default function Index() {
             <div className="text-3xl font-bold text-slate-900">{kpis.pacientesNovos}</div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-slate-200 rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
               Pacientes Ativos
@@ -560,7 +600,7 @@ export default function Index() {
             <div className="text-3xl font-bold text-slate-900">{kpis.pacientesAtivos}</div>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-red-200 bg-red-50/30">
+        <Card className="shadow-sm border-red-200 bg-red-50/30 rounded-2xl">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-red-600 uppercase tracking-wide">
               Alertas Financeiros
@@ -580,9 +620,24 @@ export default function Index() {
         </Card>
       </div>
 
-      <div className="flex flex-wrap gap-6 items-start">
-        {visibleWidgets.map((w) => renderWidget(w.id))}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {visibleWidgets.map((w, index) => (
+          <div
+            key={w.id}
+            draggable
+            onDragStart={(e) => handleDragStart(e, index)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, index)}
+            className={cn(
+              "transition-all cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 rounded-2xl",
+              w.id === 'dashboard' ? 'lg:col-span-3' : 'lg:col-span-1'
+            )}
+          >
+            {renderWidget(w.id)}
+          </div>
+        ))}
       </div>
     </div>
   )
 }
+
