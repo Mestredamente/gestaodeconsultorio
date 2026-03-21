@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
-import { Copy, Check, X, Video, Users, Loader2 } from 'lucide-react'
+import { Copy, Check, X, Video, Users, Loader2, Link2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 export default function VirtualRoom() {
@@ -14,6 +14,7 @@ export default function VirtualRoom() {
   const [appointments, setAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeSession, setActiveSession] = useState<any | null>(null)
+  const [generatingLinkFor, setGeneratingLinkFor] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user) return
@@ -47,14 +48,38 @@ export default function VirtualRoom() {
     toast({ title: 'Link de acesso geral copiado!' })
   }
 
-  const copySpecificLink = (hash: string) => {
-    if (!hash) {
-      toast({ title: 'Erro', description: 'Paciente sem link de portal.', variant: 'destructive' })
-      return
+  const generateAndCopySpecificLink = async (appointmentId: string) => {
+    setGeneratingLinkFor(appointmentId)
+    try {
+      const { data, error } = await supabase.functions.invoke('gerar_link_sala_virtual', {
+        body: { agendamento_id: appointmentId },
+      })
+
+      if (error) throw error
+
+      if (data?.link) {
+        navigator.clipboard.writeText(data.link)
+        toast({
+          title: 'Link seguro copiado!',
+          description: 'O link expirará automaticamente após a sessão.',
+        })
+
+        // Update local state to reflect the new link just in case
+        setAppointments((prev) =>
+          prev.map((apt) =>
+            apt.id === appointmentId ? { ...apt, link_sala_virtual: data.link } : apt,
+          ),
+        )
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao gerar link',
+        description: err.message || 'Tente novamente mais tarde.',
+        variant: 'destructive',
+      })
+    } finally {
+      setGeneratingLinkFor(null)
     }
-    const link = `${window.location.origin}/sessao/${hash}`
-    navigator.clipboard.writeText(link)
-    toast({ title: 'Link direto da sessão copiado!' })
   }
 
   const handleApprove = (apt: any) => {
@@ -106,7 +131,7 @@ export default function VirtualRoom() {
           className="gap-2 shadow-sm h-12 px-6 rounded-xl"
           variant="outline"
         >
-          <Copy className="w-4 h-4" /> Gerar Link de Acesso
+          <Copy className="w-4 h-4" /> Link do Portal Geral
         </Button>
       </div>
 
@@ -137,6 +162,7 @@ export default function VirtualRoom() {
                   minute: '2-digit',
                 })
                 const isSelected = activeSession?.id === apt.id
+                const isGenerating = generatingLinkFor === apt.id
 
                 return (
                   <Card
@@ -184,10 +210,16 @@ export default function VirtualRoom() {
                       </div>
                       <Button
                         variant="ghost"
-                        className="w-full mt-3 text-sm h-9 text-slate-500 hover:text-primary rounded-xl"
-                        onClick={() => copySpecificLink(apt.pacientes?.hash_anamnese)}
+                        className="w-full mt-3 text-sm h-9 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-700 rounded-xl font-medium transition-colors"
+                        onClick={() => generateAndCopySpecificLink(apt.id)}
+                        disabled={isGenerating}
                       >
-                        <Copy className="w-4 h-4 mr-2" /> Copiar link do paciente
+                        {isGenerating ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Link2 className="w-4 h-4 mr-2" />
+                        )}
+                        Gerar Link Seguro e Copiar
                       </Button>
                     </CardContent>
                   </Card>

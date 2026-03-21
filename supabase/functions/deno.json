@@ -13,6 +13,7 @@
     "processar_pagamento": 1,
     "sugerir_horario_ia": 1,
     "criar_checkout_stripe": 3,
-    "stripe_webhook": 1
+    "stripe_webhook": 1,
+    "gerar_link_sala_virtual": 1
   }
 }

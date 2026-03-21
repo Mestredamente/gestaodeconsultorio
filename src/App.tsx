@@ -24,6 +24,7 @@ import PublicAnamnesis from './pages/PublicAnamnesis'
 import PublicPortal from './pages/PublicPortal'
 import PublicPrescription from './pages/PublicPrescription'
 import PublicConfirmation from './pages/PublicConfirmation'
+import PublicVirtualRoom from './pages/PublicVirtualRoom'
 import NotFound from './pages/NotFound'
 import Auth from './pages/Auth'
 import ResetPassword from './pages/ResetPassword'
@@ -56,6 +57,7 @@ const AppRoutes = () => (
     <Route path="/anamnese/:hash" element={<PublicAnamnesis />} />
     <Route path="/portal/:hash" element={<PublicPortal />} />
     <Route path="/sessao/:hash" element={<PublicTelehealth />} />
+    <Route path="/sala-virtual/:id/:token" element={<PublicVirtualRoom />} />
     <Route path="/validar-prescricao/:hash" element={<PublicPrescription />} />
     <Route path="/confirmar/:hash/:appointmentId" element={<PublicConfirmation />} />
 
