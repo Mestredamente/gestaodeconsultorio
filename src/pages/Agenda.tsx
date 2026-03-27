@@ -10,19 +10,11 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -46,6 +38,7 @@ import {
   Video,
   Loader2,
   Trash2,
+  Ban,
 } from 'lucide-react'
 import {
   startOfWeek,
@@ -88,9 +81,10 @@ export default function Agenda() {
     valor_total: '',
   })
 
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [appointmentToDelete, setAppointmentToDelete] = useState<any>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
+  const [appointmentToCancel, setAppointmentToCancel] = useState<any>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [isCanceling, setIsCanceling] = useState(false)
 
   const fetchAgenda = async () => {
     if (!user) return
@@ -202,18 +196,18 @@ export default function Agenda() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!appointmentToDelete || !user) return
-    setIsDeleting(true)
+  const handleCancel = async () => {
+    if (!appointmentToCancel || !user || !cancelReason.trim()) return
+    setIsCanceling(true)
 
     try {
-      const p = Array.isArray(appointmentToDelete.pacientes)
-        ? appointmentToDelete.pacientes[0]
-        : appointmentToDelete.pacientes
+      const p = Array.isArray(appointmentToCancel.pacientes)
+        ? appointmentToCancel.pacientes[0]
+        : appointmentToCancel.pacientes
 
       if (p?.telefone) {
-        const dateStr = format(new Date(appointmentToDelete.data_hora), 'dd/MM/yyyy')
-        const timeStr = format(new Date(appointmentToDelete.data_hora), 'HH:mm')
+        const dateStr = format(new Date(appointmentToCancel.data_hora), 'dd/MM/yyyy')
+        const timeStr = format(new Date(appointmentToCancel.data_hora), 'HH:mm')
         const message = `Olá ${p.nome}, informamos que o seu agendamento para o dia ${dateStr} às ${timeStr} foi cancelado. Em caso de dúvidas, entre em contato.`
         const cleanPhone = p.telefone.replace(/\D/g, '')
 
@@ -238,19 +232,24 @@ export default function Agenda() {
 
       const { error } = await supabase
         .from('agendamentos')
-        .delete()
-        .eq('id', appointmentToDelete.id)
+        .update({
+          status: 'desmarcou',
+          motivo_cancelamento: cancelReason,
+          justificativa_falta: cancelReason, // Mantendo para compatibilidade com outros fluxos
+        })
+        .eq('id', appointmentToCancel.id)
 
       if (error) throw error
 
-      toast({ title: 'Agendamento cancelado e excluído com sucesso!' })
+      toast({ title: 'Agendamento cancelado com sucesso!' })
       fetchAgenda()
     } catch (err: any) {
       toast({ title: 'Erro ao cancelar', description: err.message, variant: 'destructive' })
     } finally {
-      setIsDeleting(false)
-      setIsDeleteDialogOpen(false)
-      setAppointmentToDelete(null)
+      setIsCanceling(false)
+      setIsCancelDialogOpen(false)
+      setAppointmentToCancel(null)
+      setCancelReason('')
     }
   }
 
@@ -279,8 +278,8 @@ export default function Agenda() {
 
   const renderDayView = () => {
     const hours = Array.from({ length: 14 }, (_, i) => i + 8) // 8h to 21h
-    const dayAppointments = appointments.filter((a) =>
-      isSameDay(new Date(a.data_hora), currentDate),
+    const dayAppointments = appointments.filter(
+      (a) => isSameDay(new Date(a.data_hora), currentDate) && a.status !== 'desmarcou',
     )
 
     return (
@@ -396,10 +395,11 @@ export default function Agenda() {
                                 className="h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-700"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setAppointmentToDelete(apt)
-                                  setIsDeleteDialogOpen(true)
+                                  setAppointmentToCancel(apt)
+                                  setCancelReason('')
+                                  setIsCancelDialogOpen(true)
                                 }}
-                                title="Deletar"
+                                title="Cancelar Agendamento"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -426,7 +426,9 @@ export default function Agenda() {
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="grid grid-cols-1 sm:grid-cols-7 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
           {days.map((day, idx) => {
-            const dayApts = appointments.filter((a) => isSameDay(new Date(a.data_hora), day))
+            const dayApts = appointments.filter(
+              (a) => isSameDay(new Date(a.data_hora), day) && a.status !== 'desmarcou',
+            )
             const isTdy = isToday(day)
             return (
               <div
@@ -486,10 +488,11 @@ export default function Agenda() {
                                 className="h-6 w-6 text-slate-400 hover:text-red-600 opacity-100 sm:opacity-0 sm:group-hover/weekcard:opacity-100 transition-opacity p-0"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setAppointmentToDelete(apt)
-                                  setIsDeleteDialogOpen(true)
+                                  setAppointmentToCancel(apt)
+                                  setCancelReason('')
+                                  setIsCancelDialogOpen(true)
                                 }}
-                                title="Deletar"
+                                title="Cancelar Agendamento"
                               >
                                 <Trash2 className="w-3 h-3" />
                               </Button>
@@ -533,7 +536,9 @@ export default function Agenda() {
         </div>
         <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 border-l border-slate-100">
           {days.map((day, idx) => {
-            const dayApts = appointments.filter((a) => isSameDay(new Date(a.data_hora), day))
+            const dayApts = appointments.filter(
+              (a) => isSameDay(new Date(a.data_hora), day) && a.status !== 'desmarcou',
+            )
             const isCurrMonth = isSameMonth(day, currentDate)
             const isTdy = isToday(day)
 
@@ -579,8 +584,9 @@ export default function Agenda() {
                           className="w-3 h-3 text-slate-400 hover:text-red-600 opacity-100 sm:opacity-0 sm:group-hover/monthchip:opacity-100 cursor-pointer shrink-0 ml-1"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setAppointmentToDelete(apt)
-                            setIsDeleteDialogOpen(true)
+                            setAppointmentToCancel(apt)
+                            setCancelReason('')
+                            setIsCancelDialogOpen(true)
                           }}
                         />
                       </div>
@@ -800,35 +806,50 @@ export default function Agenda() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-[2rem]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita. O
-              paciente será notificado via WhatsApp sobre o cancelamento.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Voltar</AlertDialogCancel>
-            <AlertDialogAction
+      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle>Cancelar Agendamento</DialogTitle>
+            <DialogDescription>
+              Informe o motivo do cancelamento. Esta ação alterará o status para "Desmarcou" e o
+              paciente será notificado via WhatsApp se aplicável.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="text-slate-700 font-bold mb-2 block">Motivo do Cancelamento</Label>
+            <Textarea
+              placeholder="Ex: Imprevisto pessoal, remarcação, etc..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="bg-slate-50 border-slate-200"
+            />
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsCancelDialogOpen(false)}
+              disabled={isCanceling}
+            >
+              Voltar
+            </Button>
+            <Button
               onClick={(e) => {
                 e.preventDefault()
-                handleDelete()
+                handleCancel()
               }}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              disabled={isCanceling || !cancelReason.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {isDeleting ? (
+              {isCanceling ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
+                <Ban className="w-4 h-4 mr-2" />
               )}
-              Sim, Cancelar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
