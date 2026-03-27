@@ -1,23 +1,7 @@
 {
-  "_versions": {
-    "enviar_cobranca_whatsapp": 6,
-    "enviar_lembrete_consulta": 10,
-    "emitir_nota_fiscal": 2,
-    "enviar_comunicado_massa": 1,
-    "functions": 1,
-    "transcrever_audio": 1
-  }
-}
-_recorrentes": 5,
-    "functions": 6,
-    "lembrete_sessao": 9,
-    "gerar_insights_paciente": 4,
-    "gerar_sugestao_evolucao": 2,
-    "processar_pagamento": 2,
-    "sugerir_horario_ia": 2,
-    "criar_checkout_stripe": 5,
-    "stripe_webhook": 2,
-    "gerar_link_sala_virtual": 4,
-    "enviar_mensagem_whatsapp": 7
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"],
+    "strict": true
   }
 }
