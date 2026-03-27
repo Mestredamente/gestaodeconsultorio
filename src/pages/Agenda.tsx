@@ -11,6 +11,16 @@ import {
   DialogTrigger,
   DialogDescription,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -35,6 +45,7 @@ import {
   AlertCircle,
   Video,
   Loader2,
+  Trash2,
 } from 'lucide-react'
 import {
   startOfWeek,
@@ -77,6 +88,10 @@ export default function Agenda() {
     valor_total: '',
   })
 
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [appointmentToDelete, setAppointmentToDelete] = useState<any>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const fetchAgenda = async () => {
     if (!user) return
     setLoading(true)
@@ -97,7 +112,7 @@ export default function Agenda() {
 
     const { data } = await supabase
       .from('agendamentos')
-      .select('*, pacientes(nome, valor_sessao)')
+      .select('*, pacientes(id, nome, valor_sessao, telefone)')
       .eq('usuario_id', user.id)
       .gte('data_hora', start.toISOString())
       .lte('data_hora', end.toISOString())
@@ -105,7 +120,7 @@ export default function Agenda() {
 
     const { data: pats } = await supabase
       .from('pacientes')
-      .select('id, nome, valor_sessao')
+      .select('id, nome, valor_sessao, telefone')
       .eq('usuario_id', user.id)
 
     if (data) setAppointments(data)
@@ -184,6 +199,58 @@ export default function Agenda() {
       toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!appointmentToDelete || !user) return
+    setIsDeleting(true)
+
+    try {
+      const p = Array.isArray(appointmentToDelete.pacientes)
+        ? appointmentToDelete.pacientes[0]
+        : appointmentToDelete.pacientes
+
+      if (p?.telefone) {
+        const dateStr = format(new Date(appointmentToDelete.data_hora), 'dd/MM/yyyy')
+        const timeStr = format(new Date(appointmentToDelete.data_hora), 'HH:mm')
+        const message = `Olá ${p.nome}, informamos que o seu agendamento para o dia ${dateStr} às ${timeStr} foi cancelado. Em caso de dúvidas, entre em contato.`
+        const cleanPhone = p.telefone.replace(/\D/g, '')
+
+        const { data: userConfig } = await supabase
+          .from('usuarios')
+          .select('whatsapp_tipo')
+          .eq('id', user.id)
+          .single()
+
+        await supabase.functions.invoke('enviar_mensagem_whatsapp', {
+          body: {
+            tipo_whatsapp:
+              userConfig?.whatsapp_tipo === 'personal'
+                ? 'padrao'
+                : userConfig?.whatsapp_tipo || 'padrao',
+            telefone: cleanPhone,
+            mensagem: message,
+            usuario_id: user.id,
+          },
+        })
+      }
+
+      const { error } = await supabase
+        .from('agendamentos')
+        .delete()
+        .eq('id', appointmentToDelete.id)
+
+      if (error) throw error
+
+      toast({ title: 'Agendamento cancelado e excluído com sucesso!' })
+      fetchAgenda()
+    } catch (err: any) {
+      toast({ title: 'Erro ao cancelar', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
+      setIsDeleteDialogOpen(false)
+      setAppointmentToDelete(null)
     }
   }
 
@@ -303,7 +370,10 @@ export default function Agenda() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                                onClick={() => updateStatus(apt.id, 'compareceu')}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  updateStatus(apt.id, 'compareceu')
+                                }}
                                 title="Compareceu"
                               >
                                 <CheckCircle2 className="w-4 h-4" />
@@ -311,11 +381,27 @@ export default function Agenda() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                onClick={() => updateStatus(apt.id, 'faltou')}
+                                className="h-8 w-8 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  updateStatus(apt.id, 'faltou')
+                                }}
                                 title="Faltou"
                               >
                                 <XCircle className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-700"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setAppointmentToDelete(apt)
+                                  setIsDeleteDialogOpen(true)
+                                }}
+                                title="Deletar"
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
@@ -384,7 +470,7 @@ export default function Agenda() {
                           key={apt.id}
                           onClick={() => openEditAppointment(apt)}
                           className={cn(
-                            'p-2.5 rounded-xl border text-left cursor-pointer hover:shadow-md transition-all flex flex-col',
+                            'p-2.5 rounded-xl border text-left cursor-pointer hover:shadow-md transition-all flex flex-col group/weekcard',
                             getStatusColor(apt.status),
                           )}
                         >
@@ -392,7 +478,22 @@ export default function Agenda() {
                             <p className="text-xs font-bold">
                               {format(new Date(apt.data_hora), 'HH:mm')}
                             </p>
-                            {apt.is_online && <Video className="w-3 h-3" />}
+                            <div className="flex items-center gap-1">
+                              {apt.is_online && <Video className="w-3 h-3" />}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-slate-400 hover:text-red-600 opacity-100 sm:opacity-0 sm:group-hover/weekcard:opacity-100 transition-opacity p-0"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setAppointmentToDelete(apt)
+                                  setIsDeleteDialogOpen(true)
+                                }}
+                                title="Deletar"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </div>
                           <p className="font-bold text-sm leading-tight line-clamp-2">{p?.nome}</p>
                           {apt.valor_total > 0 && (
@@ -466,12 +567,22 @@ export default function Agenda() {
                       <div
                         key={apt.id}
                         className={cn(
-                          'px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-medium truncate border',
+                          'px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-medium truncate border flex items-center justify-between group/monthchip',
                           getStatusColor(apt.status),
                         )}
                         title={p?.nome}
                       >
-                        {format(new Date(apt.data_hora), 'HH:mm')} {p?.nome?.split(' ')[0]}
+                        <span className="truncate">
+                          {format(new Date(apt.data_hora), 'HH:mm')} {p?.nome?.split(' ')[0]}
+                        </span>
+                        <Trash2
+                          className="w-3 h-3 text-slate-400 hover:text-red-600 opacity-100 sm:opacity-0 sm:group-hover/monthchip:opacity-100 cursor-pointer shrink-0 ml-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAppointmentToDelete(apt)
+                            setIsDeleteDialogOpen(true)
+                          }}
+                        />
                       </div>
                     )
                   })}
@@ -688,6 +799,36 @@ export default function Agenda() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita. O
+              paciente será notificado via WhatsApp sobre o cancelamento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Sim, Cancelar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
