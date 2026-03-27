@@ -18,6 +18,7 @@ import {
 } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { formatBRL } from '@/lib/utils'
 
 const growthConfig = { novos: { label: 'Novos Pacientes', color: '#6366f1' } }
 const financeConfig = {
@@ -255,10 +256,7 @@ export function PerformanceDashboard() {
             <div>
               <p className="text-sm font-medium text-slate-500">Receita (Mês)</p>
               <h3 className="text-2xl font-bold text-slate-900">
-                {metrics.monthlyRevenue.toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                })}
+                {formatBRL(metrics.monthlyRevenue)}
               </h3>
             </div>
           </CardContent>
@@ -324,7 +322,18 @@ export function PerformanceDashboard() {
                   tick={{ fontSize: 12, fill: '#64748b' }}
                   dy={10}
                 />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <YAxis
+                  tickFormatter={(value) => formatBRL(value)}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  width={80}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent formatter={(value) => formatBRL(value as number)} />
+                  }
+                />
                 <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
                 <Bar
                   dataKey="recebido"

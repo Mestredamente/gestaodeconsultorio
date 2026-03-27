@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { FileDown, RefreshCw, Calculator, Landmark } from 'lucide-react'
+import { formatBRL } from '@/lib/utils'
 
 export function AccountingTab({
   finances,
@@ -18,9 +19,6 @@ export function AccountingTab({
   const { toast } = useToast()
   const [taxRate, setTaxRate] = useState<number>(6.0) // Default 6% Simples Nacional
   const [isSyncing, setIsSyncing] = useState(false)
-
-  const formatBRL = (value: number) =>
-    value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   const { totalReceitas, totalDespesas, impostoEstimado, lucroLiquido } = useMemo(() => {
     const r = finances.reduce((sum, f) => sum + Number(f.valor_recebido || 0), 0)
@@ -46,14 +44,22 @@ export function AccountingTab({
         const desc = `Recebimento - Paciente: ${pInfo?.nome || 'Desconhecido'}`
         // Usando o último dia do mês de referência para a data
         const data = new Date(f.ano, f.mes, 0).toLocaleDateString('pt-BR')
-        csvData.push(`${data};RECEITA;"${desc}";${f.valor_recebido};${cpf}`)
+        const valRecebidoStr = Number(f.valor_recebido).toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+        csvData.push(`${data};RECEITA;"${desc}";${valRecebidoStr};${cpf}`)
       }
     })
 
     // Adiciona Despesas
     despesas.forEach((d) => {
       const data = new Date(d.data).toLocaleDateString('pt-BR')
-      csvData.push(`${data};DESPESA;"${d.descricao}";${d.valor};""`)
+      const valDespesaStr = Number(d.valor).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+      csvData.push(`${data};DESPESA;"${d.descricao}";${valDespesaStr};""`)
     })
 
     const blob = new Blob(['\uFEFF' + [headers.join(';'), ...csvData].join('\n')], {

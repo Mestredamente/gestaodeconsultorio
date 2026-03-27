@@ -5,8 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const formatBRL = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+export const formatBRL = (value: number | string | null | undefined) => {
+  if (value === null || value === undefined) return 'R$ 0,00'
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  if (isNaN(num)) return 'R$ 0,00'
+
+  return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
 export const maskCPF = (value: string) => {

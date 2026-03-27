@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Download, FileText, Package, DollarSign, ArrowDownCircle } from 'lucide-react'
+import { formatBRL } from '@/lib/utils'
 
 export function ConsumptionExpensesTab({
   month,
@@ -84,8 +85,12 @@ export function ConsumptionExpensesTab({
     ]
 
     expenses.forEach((e) => {
+      const valDespesaStr = Number(e.valor).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
       lines.push(
-        `Despesa;${new Date(e.data).toLocaleDateString('pt-BR')};${e.descricao};R$ ${Number(e.valor).toFixed(2)}`,
+        `Despesa;${new Date(e.data).toLocaleDateString('pt-BR')};${e.descricao};R$ ${valDespesaStr}`,
       )
     })
 
@@ -106,8 +111,6 @@ export function ConsumptionExpensesTab({
   const handleExportPDF = () => {
     window.print()
   }
-
-  const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   if (loading) {
     return (

@@ -51,7 +51,7 @@ import {
 import { ptBR } from 'date-fns/locale'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { cn } from '@/lib/utils'
+import { cn, formatBRL } from '@/lib/utils'
 
 export default function Agenda() {
   const { user } = useAuth()
@@ -165,7 +165,9 @@ export default function Agenda() {
       status: formData.status,
       is_online: formData.is_online,
       tipo_pagamento: formData.tipo_pagamento,
-      valor_total: formData.valor_total ? Number(formData.valor_total) : 0,
+      valor_total: formData.valor_total
+        ? Number(String(formData.valor_total).replace(',', '.'))
+        : 0,
     }
 
     try {
@@ -264,7 +266,7 @@ export default function Agenda() {
                               ></div>
                               <div>
                                 <p className="font-bold text-slate-800">{p?.nome}</p>
-                                <div className="flex items-center gap-2 mt-1">
+                                <div className="flex items-center flex-wrap gap-2 mt-1">
                                   <span className="text-xs text-slate-500 font-medium">
                                     {format(new Date(apt.data_hora), 'HH:mm')}
                                   </span>
@@ -283,6 +285,14 @@ export default function Agenda() {
                                       className="text-[10px] bg-blue-50 text-blue-700 py-0 h-4 gap-1"
                                     >
                                       <Video className="w-3 h-3" /> Online
+                                    </Badge>
+                                  )}
+                                  {apt.valor_total > 0 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] bg-emerald-50 text-emerald-700 py-0 h-4 border-emerald-200"
+                                    >
+                                      {formatBRL(apt.valor_total)}
                                     </Badge>
                                   )}
                                 </div>
@@ -374,15 +384,22 @@ export default function Agenda() {
                           key={apt.id}
                           onClick={() => openEditAppointment(apt)}
                           className={cn(
-                            'p-2.5 rounded-xl border text-left cursor-pointer hover:shadow-md transition-all',
+                            'p-2.5 rounded-xl border text-left cursor-pointer hover:shadow-md transition-all flex flex-col',
                             getStatusColor(apt.status),
                           )}
                         >
-                          <p className="text-xs font-bold mb-1 opacity-70">
-                            {format(new Date(apt.data_hora), 'HH:mm')}
-                          </p>
+                          <div className="flex items-center justify-between mb-1 opacity-70">
+                            <p className="text-xs font-bold">
+                              {format(new Date(apt.data_hora), 'HH:mm')}
+                            </p>
+                            {apt.is_online && <Video className="w-3 h-3" />}
+                          </div>
                           <p className="font-bold text-sm leading-tight line-clamp-2">{p?.nome}</p>
-                          {apt.is_online && <Video className="w-3 h-3 mt-1.5 opacity-60" />}
+                          {apt.valor_total > 0 && (
+                            <p className="text-[10px] opacity-80 font-bold mt-1.5">
+                              {formatBRL(apt.valor_total)}
+                            </p>
+                          )}
                         </div>
                       )
                     })
@@ -635,7 +652,7 @@ export default function Agenda() {
                   value={formData.valor_total}
                   onChange={(e) => setFormData({ ...formData, valor_total: e.target.value })}
                   className="bg-slate-50 h-12 rounded-xl"
-                  placeholder="0.00"
+                  placeholder="0,00"
                 />
               </div>
             </div>

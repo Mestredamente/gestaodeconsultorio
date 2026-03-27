@@ -20,26 +20,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import {
-  Search,
-  Plus,
-  FileText,
-  ChevronRight,
-  UserCircle,
-  Phone,
-  CalendarDays,
-  Loader2,
-} from 'lucide-react'
+import { Search, Plus, ChevronRight, UserCircle, Phone, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { cn } from '@/lib/utils'
 
 export default function Patients() {
   const { user } = useAuth()
@@ -89,7 +72,9 @@ export default function Patients() {
           nome: formData.nome,
           telefone: formData.telefone,
           email: formData.email,
-          valor_sessao: formData.valor_sessao ? Number(formData.valor_sessao) : null,
+          valor_sessao: formData.valor_sessao
+            ? Number(formData.valor_sessao.replace(',', '.'))
+            : null,
         })
         .select()
         .single()
@@ -174,7 +159,7 @@ export default function Patients() {
                   value={formData.valor_sessao}
                   onChange={(e) => setFormData({ ...formData, valor_sessao: e.target.value })}
                   className="bg-slate-50 h-12 rounded-xl"
-                  placeholder="150.00"
+                  placeholder="150,00"
                 />
               </div>
               <Button type="submit" className="w-full h-12 rounded-xl mt-4" disabled={isSubmitting}>

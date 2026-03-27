@@ -61,7 +61,7 @@ const formSchema = z.object({
   valor_sessao: z
     .string()
     .optional()
-    .transform((v) => (v ? Number(v) : null)),
+    .transform((v) => (v ? Number(v.replace(',', '.')) : null)),
   frequencia_pagamento: z.string().default('sessão'),
   dia_pagamento: z
     .string()
@@ -482,6 +482,7 @@ export default function NewPatientForm() {
                             step="0.01"
                             {...field}
                             value={field.value || ''}
+                            placeholder="150,00"
                             className="bg-white rounded-xl h-11"
                           />
                         </FormControl>

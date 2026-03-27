@@ -122,7 +122,9 @@ export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
         : null,
       contato_emergencia_nome: formData.contato_emergencia_nome,
       contato_emergencia_telefone: formData.contato_emergencia_telefone,
-      valor_sessao: formData.valor_sessao ? Number(formData.valor_sessao) : null,
+      valor_sessao: formData.valor_sessao
+        ? Number(String(formData.valor_sessao).replace(',', '.'))
+        : null,
       frequencia_pagamento: formData.frequencia_pagamento,
       dia_pagamento: formData.dia_pagamento ? Number(formData.dia_pagamento) : null,
       convenio_id: formData.convenio_id === 'none' ? null : formData.convenio_id,
@@ -306,6 +308,7 @@ export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
                   step="0.01"
                   value={formData.valor_sessao}
                   onChange={(e) => setFormData({ ...formData, valor_sessao: e.target.value })}
+                  placeholder="150,00"
                   className="bg-white rounded-xl h-11"
                 />
               </div>
