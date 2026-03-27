@@ -33,6 +33,7 @@ import Plans from './pages/Plans'
 import Onboarding from './pages/Onboarding'
 import HR from './pages/HR'
 import VirtualRoom from './pages/VirtualRoom'
+import Contacts from './pages/Contacts'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth()
@@ -122,6 +123,7 @@ const AppRoutes = () => (
       <Route path="/notificacoes" element={<Notifications />} />
       <Route path="/configuracoes" element={<Settings />} />
       <Route path="/perfil" element={<Navigate to="/configuracoes" replace />} />
+      <Route path="/contatos" element={<Contacts />} />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>

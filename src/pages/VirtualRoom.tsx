@@ -48,7 +48,6 @@ import {
   Volume2,
   AlertCircle,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 export default function VirtualRoom() {
   const { user } = useAuth()
@@ -123,8 +122,13 @@ export default function VirtualRoom() {
     setDeviceError(null)
 
     try {
-      // Pedir permissão inicial para garantir que enumerateDevices retorne os rótulos reais
-      const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      let tempStream: MediaStream | undefined
+      try {
+        tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      } catch (err) {
+        tempStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        setCamOn(false)
+      }
 
       const devices = await navigator.mediaDevices.enumerateDevices()
       const videoInput = devices.filter((device) => device.kind === 'videoinput')
@@ -136,8 +140,7 @@ export default function VirtualRoom() {
       if (videoInput.length > 0) setSelectedVideo(videoInput[0].deviceId)
       if (audioInput.length > 0) setSelectedAudio(audioInput[0].deviceId)
 
-      // Libera a câmera do stream temporário
-      tempStream.getTracks().forEach((t) => t.stop())
+      if (tempStream) tempStream.getTracks().forEach((t) => t.stop())
     } catch (err: any) {
       console.error('Permissão de dispositivos negada', err)
       setDeviceError(
@@ -181,12 +184,19 @@ export default function VirtualRoom() {
       if (!selectedAudio && audioDevices.length > 0) return
 
       try {
-        const constraints: MediaStreamConstraints = {
-          video: selectedVideo ? { deviceId: { exact: selectedVideo } } : true,
-          audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : true,
+        let constraints: MediaStreamConstraints = {
+          video: selectedVideo ? { deviceId: { exact: selectedVideo } } : camOn,
+          audio: selectedAudio ? { deviceId: { exact: selectedAudio } } : micOn,
         }
 
-        activeStream = await navigator.mediaDevices.getUserMedia(constraints)
+        try {
+          activeStream = await navigator.mediaDevices.getUserMedia(constraints)
+        } catch (e) {
+          constraints.video = false
+          setCamOn(false)
+          activeStream = await navigator.mediaDevices.getUserMedia(constraints)
+        }
+
         setStream(activeStream)
       } catch (err: any) {
         console.error('Erro ao acessar a mídia', err)
@@ -764,15 +774,15 @@ export default function VirtualRoom() {
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border border-slate-800 animate-fade-in relative mt-2 mb-6 max-w-[1600px] mx-auto">
       {/* Header Room */}
-      <div className="h-16 px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 absolute top-0 w-full z-20">
-        <div className="flex items-center gap-3">
+      <div className="h-16 px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 absolute top-0 w-full z-20 pointer-events-none">
+        <div className="flex items-center gap-3 pointer-events-auto">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400">
             <Video className="w-4 h-4" />
           </div>
           <span className="text-white font-medium">
             Sessão com <strong className="font-bold">{patient?.nome}</strong>
           </span>
-          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs flex items-center gap-1.5">
+          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-xs flex items-center gap-1.5 border border-slate-700">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Ao vivo
           </span>
         </div>
@@ -781,7 +791,7 @@ export default function VirtualRoom() {
           <SheetTrigger asChild>
             <Button
               variant="secondary"
-              className="gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border-0 h-9 rounded-full px-4"
+              className="gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border-0 h-9 rounded-full px-4 pointer-events-auto"
             >
               <FileText className="w-4 h-4" /> Notas da Sessão
             </Button>
@@ -870,13 +880,13 @@ export default function VirtualRoom() {
       </div>
 
       {/* Footer Controls */}
-      <div className="h-24 bg-slate-950 flex items-center justify-between px-6 border-t border-slate-800 absolute bottom-0 w-full z-20">
-        <div className="flex-1 hidden md:flex items-center text-slate-500 text-sm font-medium gap-2">
+      <div className="h-24 bg-slate-950 flex items-center justify-between px-6 border-t border-slate-800 absolute bottom-0 w-full z-20 pointer-events-none">
+        <div className="flex-1 hidden md:flex items-center text-slate-500 text-sm font-medium gap-2 pointer-events-auto">
           <Video className="w-4 h-4" />
           Controles de áudio e vídeo disponíveis no painel da chamada
         </div>
 
-        <div className="flex-none ml-auto md:ml-0">
+        <div className="flex-none ml-auto md:ml-0 pointer-events-auto">
           <Dialog open={isFinishModalOpen} onOpenChange={setIsFinishModalOpen}>
             <DialogTrigger asChild>
               <Button
