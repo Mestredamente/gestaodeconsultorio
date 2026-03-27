@@ -32,29 +32,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Handler to safely clear corrupted sessions and handle Invalid Refresh Token error
+    let mounted = true
+
+    const clearLocalData = () => {
+      try {
+        const keysToRemove = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach((k) => localStorage.removeItem(k))
+        sessionStorage.clear()
+      } catch (e) {
+        console.error('Failed to clear storage:', e)
+      }
+    }
+
     const handleAuthError = (err: any) => {
-      const msg = err?.message || ''
+      if (!mounted) return
+      const msg = err?.message || err?.error_description || String(err) || ''
       if (
         msg.toLowerCase().includes('refresh token') ||
-        msg.toLowerCase().includes('session missing')
+        msg.toLowerCase().includes('session missing') ||
+        msg.toLowerCase().includes('invalid token')
       ) {
         console.warn('Invalid session detected, clearing local data...')
-        try {
-          const keysToRemove = []
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i)
-            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-              keysToRemove.push(key)
-            }
-          }
-          keysToRemove.forEach((k) => localStorage.removeItem(k))
-          sessionStorage.clear()
-        } catch (e) {
-          console.error('Failed to clear storage:', e)
-        }
+        clearLocalData()
 
-        // Supabase signout to clear memory state
         supabase.auth.signOut().catch(() => {})
         setSession(null)
         setUser(null)
@@ -62,26 +68,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // Global listener to capture the Unhandled Promise Rejection triggered by Supabase internal fetch
     const unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
       if (event.reason) {
-        const msg = event.reason.message || ''
+        const msg =
+          event.reason.message || event.reason.error_description || String(event.reason) || ''
         if (
           msg.toLowerCase().includes('refresh token') ||
-          msg.toLowerCase().includes('session missing')
+          msg.toLowerCase().includes('session missing') ||
+          msg.toLowerCase().includes('invalid token')
         ) {
-          event.preventDefault() // Prevents the runtime error from crashing the UI
+          event.preventDefault()
+          event.stopPropagation()
           handleAuthError(event.reason)
         }
       }
     }
 
+    const errorHandler = (event: ErrorEvent) => {
+      const msg = event.message || event.error?.message || ''
+      if (
+        msg.toLowerCase().includes('refresh token') ||
+        msg.toLowerCase().includes('session missing') ||
+        msg.toLowerCase().includes('invalid token')
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        handleAuthError(event.error)
+      }
+    }
+
     window.addEventListener('unhandledrejection', unhandledRejectionHandler)
+    window.addEventListener('error', errorHandler)
+
+    // Override console.error temporarily to suppress unhandled library errors from crashing the UI overlay
+    const originalConsoleError = console.error
+    console.error = (...args: any[]) => {
+      const msg = args
+        .map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
+        .join(' ')
+        .toLowerCase()
+      if (
+        msg.includes('refresh token') ||
+        msg.includes('session missing') ||
+        msg.includes('invalid token')
+      ) {
+        handleAuthError(new Error('Suppressed Auth Error'))
+        return
+      }
+      originalConsoleError.apply(console, args)
+    }
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return
+
       if (event === 'SIGNED_OUT') {
+        clearLocalData()
         setSession(null)
         setUser(null)
       } else {
@@ -91,10 +134,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false)
     })
 
-    // Handle session restoration carefully to catch invalid refresh tokens initially
     supabase.auth
       .getSession()
       .then(({ data: { session }, error }) => {
+        if (!mounted) return
         if (error) {
           handleAuthError(error)
         } else {
@@ -103,15 +146,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       })
       .catch((err) => {
+        if (!mounted) return
         handleAuthError(err)
       })
       .finally(() => {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       })
 
     return () => {
+      mounted = false
       subscription.unsubscribe()
       window.removeEventListener('unhandledrejection', unhandledRejectionHandler)
+      window.removeEventListener('error', errorHandler)
+      console.error = originalConsoleError
     }
   }, [])
 
