@@ -34,6 +34,7 @@ import Onboarding from './pages/Onboarding'
 import HR from './pages/HR'
 import VirtualRoom from './pages/VirtualRoom'
 import Contacts from './pages/Contacts'
+import NewPatientForm from './components/NewPatientForm'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth()
@@ -95,7 +96,6 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-    import NewPatientForm from './components/NewPatientForm'
     <Route
       element={
         <ProtectedRoute>
