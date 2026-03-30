@@ -11,8 +11,9 @@ export default function PublicTelehealth() {
   const { toast } = useToast()
 
   const [data, setData] = useState<any>(null)
-  const [micOn, setMicOn] = useState(true)
-  const [camOn, setCamOn] = useState(true)
+  const [micOn, setMicOn] = useState(false)
+  const [camOn, setCamOn] = useState(false)
+  const [permissionError, setPermissionError] = useState<string | null>(null)
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
@@ -26,16 +27,29 @@ export default function PublicTelehealth() {
   useEffect(() => {
     let activeStream: MediaStream | null = null
     const initMedia = async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setPermissionError(
+          'Seu navegador não suporta acesso à câmera/microfone ou o site não está em HTTPS.',
+        )
+        return
+      }
       try {
         activeStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         setStream(activeStream)
+        setCamOn(true)
+        setMicOn(true)
+        setPermissionError(null)
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = activeStream
         }
-      } catch (err) {
+      } catch (err: any) {
+        let msg = 'Por favor, permita o acesso à câmera e ao microfone.'
+        if (err.name === 'NotAllowedError') msg = 'Acesso à câmera/microfone negado.'
+        if (err.name === 'NotFoundError') msg = 'Nenhuma câmera/microfone encontrado.'
+        setPermissionError(msg)
         toast({
           title: 'Permissão Necessária',
-          description: 'Por favor, permita o acesso à câmera e ao microfone no seu navegador.',
+          description: msg,
           variant: 'destructive',
         })
       }
@@ -80,29 +94,44 @@ export default function PublicTelehealth() {
         </Button>
       </header>
       <main className="flex-1 p-4 md:p-8 flex items-center justify-center relative">
-        <div className="w-full max-w-4xl aspect-video bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800 relative flex items-center justify-center shadow-2xl ring-1 ring-white/5">
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
-            <UserSquare className="w-32 h-32 text-slate-700 mb-4 animate-pulse" />
-            <p className="text-slate-400 font-medium">
-              Aguardando o profissional iniciar a câmera...
-            </p>
-            <p className="absolute bottom-4 left-4 font-bold text-slate-300 drop-shadow-md text-lg">
-              Dr(a). {data.consultorio}
-            </p>
-          </div>
+        <div className="w-full max-w-4xl flex flex-col gap-4">
+          {permissionError && (
+            <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-200 text-sm text-center">
+              ⚠️ {permissionError}
+            </div>
+          )}
 
-          <div className="absolute top-4 right-4 w-32 md:w-48 aspect-video bg-slate-800 rounded-xl overflow-hidden border-2 border-slate-700 shadow-xl flex items-center justify-center z-10 transition-all">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
-            />
-            {!camOn && <VideoOff className="w-8 h-8 text-slate-600 absolute" />}
-            <span className="absolute bottom-1 left-2 text-[10px] font-medium bg-black/60 px-1.5 rounded text-white backdrop-blur-sm z-20">
-              Você
-            </span>
+          <div className="w-full aspect-video bg-slate-900/80 rounded-2xl overflow-hidden border border-slate-800 relative flex items-center justify-center shadow-2xl ring-1 ring-white/5">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900">
+              <UserSquare className="w-32 h-32 text-slate-700 mb-4 animate-pulse" />
+              <p className="text-slate-400 font-medium">
+                Aguardando o profissional iniciar a câmera...
+              </p>
+              <p className="absolute bottom-4 left-4 font-bold text-slate-300 drop-shadow-md text-lg">
+                Dr(a). {data.consultorio}
+              </p>
+            </div>
+
+            <div className="absolute top-4 right-4 w-32 md:w-48 aspect-video bg-slate-800 rounded-xl overflow-hidden border-2 border-slate-700 shadow-xl flex items-center justify-center z-10 transition-all">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`w-full h-full object-cover ${!camOn ? 'hidden' : ''}`}
+              />
+              {!camOn && <VideoOff className="w-8 h-8 text-slate-600 absolute" />}
+
+              <div className="absolute bottom-1 left-2 flex items-center gap-1.5 bg-black/60 px-1.5 py-0.5 rounded backdrop-blur-sm z-20">
+                <span
+                  className={`w-2 h-2 rounded-full ${camOn ? 'bg-emerald-500' : 'bg-red-500'}`}
+                ></span>
+                <span
+                  className={`w-2 h-2 rounded-full ${micOn ? 'bg-emerald-500' : 'bg-red-500'}`}
+                ></span>
+                <span className="text-[10px] font-medium text-white ml-1">Você</span>
+              </div>
+            </div>
           </div>
         </div>
       </main>

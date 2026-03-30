@@ -20,6 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -34,6 +40,7 @@ import {
   Trash2,
   Ban,
   Share2,
+  MoreVertical,
 } from 'lucide-react'
 import {
   startOfWeek,
@@ -422,59 +429,121 @@ export default function Agenda() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 transition-opacity">
-                              {apt.is_online && (
+                            <div className="flex items-center gap-1">
+                              {/* Mobile Dropdown */}
+                              <div className="sm:hidden">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-slate-500"
+                                    >
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                                    {apt.is_online && (
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleShareLink(apt)
+                                        }}
+                                        className="py-2.5"
+                                      >
+                                        <Share2 className="w-4 h-4 mr-2 text-blue-600" />{' '}
+                                        Compartilhar Link
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        updateStatus(apt, 'compareceu')
+                                      }}
+                                      className="py-2.5"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600" />{' '}
+                                      Compareceu
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        updateStatus(apt, 'faltou')
+                                      }}
+                                      className="py-2.5"
+                                    >
+                                      <XCircle className="w-4 h-4 mr-2 text-amber-600" /> Faltou
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setAppointmentToCancel(apt)
+                                        setCancelReason('')
+                                        setIsCancelDialogOpen(true)
+                                      }}
+                                      className="text-red-600 focus:bg-red-50 py-2.5"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" /> Cancelar Sessão
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+
+                              {/* Desktop Actions */}
+                              <div className="hidden sm:flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                                {apt.is_online && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleShareLink(apt)
+                                    }}
+                                    title="Compartilhar Link"
+                                  >
+                                    <Share2 className="w-4 h-4" />
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                                  className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleShareLink(apt)
+                                    updateStatus(apt, 'compareceu')
                                   }}
-                                  title="Compartilhar Link"
+                                  title="Compareceu"
                                 >
-                                  <Share2 className="w-4 h-4" />
+                                  <CheckCircle2 className="w-4 h-4" />
                                 </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  updateStatus(apt, 'compareceu')
-                                }}
-                                title="Compareceu"
-                              >
-                                <CheckCircle2 className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-amber-600 hover:bg-amber-50"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  updateStatus(apt, 'faltou')
-                                }}
-                                title="Faltou"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setAppointmentToCancel(apt)
-                                  setCancelReason('')
-                                  setIsCancelDialogOpen(true)
-                                }}
-                                title="Deletar Agendamento"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-amber-600 hover:bg-amber-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    updateStatus(apt, 'faltou')
+                                  }}
+                                  title="Faltou"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setAppointmentToCancel(apt)
+                                    setCancelReason('')
+                                    setIsCancelDialogOpen(true)
+                                  }}
+                                  title="Deletar Agendamento"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         )

@@ -108,9 +108,11 @@ export default function Settings() {
     setTestingWhatsApp(true)
     try {
       const cleanPhone = testPhone.replace(/\D/g, '')
-      if (cleanPhone.length < 10) throw new Error('Número inválido. Use DDD + Número.')
+      if (cleanPhone.length < 10 || cleanPhone.length > 14) {
+        throw new Error('Número inválido. Use o formato: 55 + DDD + Número.')
+      }
 
-      const { error } = await supabase.functions.invoke('enviar_mensagem_whatsapp', {
+      const { data, error } = await supabase.functions.invoke('enviar_mensagem_whatsapp', {
         body: {
           tipo_whatsapp: settings.whatsapp_tipo,
           telefone: cleanPhone,
@@ -118,7 +120,9 @@ export default function Settings() {
           usuario_id: user?.id,
         },
       })
+
       if (error) throw error
+      if (data?.success === false) throw new Error(data.error || 'Erro desconhecido na API')
 
       await supabase.from('log_whatsapp').insert({
         telefone: cleanPhone,
@@ -127,18 +131,23 @@ export default function Settings() {
         usuario_id: user?.id,
       })
 
-      toast({ title: 'Sucesso!', description: 'Mensagem de teste enviada.' })
+      if (data?.fallback) {
+        toast({
+          title: 'Teste Simulado (Fallback)',
+          description: 'Credenciais ausentes. O sistema simulou o envio corretamente.',
+        })
+      } else {
+        toast({ title: 'Sucesso!', description: 'Mensagem de teste enviada com sucesso via API.' })
+      }
     } catch (err: any) {
       toast({ title: 'Falha no teste', description: err.message, variant: 'destructive' })
-      await supabase
-        .from('log_whatsapp')
-        .insert({
-          telefone: testPhone,
-          mensagem: 'Teste de Integração CRM',
-          status: 'erro',
-          erro: err.message,
-          usuario_id: user?.id,
-        })
+      await supabase.from('log_whatsapp').insert({
+        telefone: testPhone,
+        mensagem: 'Teste de Integração CRM',
+        status: 'erro',
+        erro: err.message,
+        usuario_id: user?.id,
+      })
     } finally {
       setTestingWhatsApp(false)
     }

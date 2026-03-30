@@ -34,6 +34,20 @@ export default function Index() {
     const fetchDashboardData = async () => {
       if (!user) return
 
+      const cacheKey = `dashboard_data_${user.id}`
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          setStats(parsed.stats)
+          setUpcoming(parsed.upcoming)
+          setAlerts(parsed.alerts)
+          setInadimplentes(parsed.inadimplentes)
+          setRiscoPacientes(parsed.riscoPacientes)
+          setLoading(false)
+        } catch (e) {}
+      }
+
       const today = new Date()
       const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString()
       const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString()
@@ -74,13 +88,10 @@ export default function Index() {
         0,
       )
 
-      setStats({
+      const newStats = {
         sessoesHoje: todayApts.length,
         saldoAReceber: saldoAReceber,
-      })
-
-      setUpcoming(upcomingApts)
-      setAlerts(alertRes.data || [])
+      }
 
       const nowTime = new Date().getTime()
       const inadimplentesFiltered = (allFinRes.data || [])
@@ -92,9 +103,6 @@ export default function Index() {
         .filter((f) => f.diffDays > 30)
         .sort((a, b) => b.diffDays - a.diffDays)
 
-      setInadimplentes(inadimplentesFiltered)
-
-      // Simulando pacientes em risco com base na coluna risco_cancelamento ou histórico
       const pacientesComRisco = allApts
         .filter((a) => a.risco_cancelamento === 'alto' || a.status === 'desmarcou')
         .reduce((acc: any[], curr) => {
@@ -106,6 +114,21 @@ export default function Index() {
         }, [])
         .slice(0, 5)
 
+      localStorage.setItem(
+        cacheKey,
+        JSON.stringify({
+          stats: newStats,
+          upcoming: upcomingApts,
+          alerts: alertRes.data || [],
+          inadimplentes: inadimplentesFiltered,
+          riscoPacientes: pacientesComRisco,
+        }),
+      )
+
+      setStats(newStats)
+      setUpcoming(upcomingApts)
+      setAlerts(alertRes.data || [])
+      setInadimplentes(inadimplentesFiltered)
       setRiscoPacientes(pacientesComRisco)
       setLoading(false)
     }
