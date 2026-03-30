@@ -45,7 +45,9 @@ export default function Index() {
           setInadimplentes(parsed.inadimplentes)
           setRiscoPacientes(parsed.riscoPacientes)
           setLoading(false)
-        } catch (e) {}
+        } catch (e) {
+          console.error('Failed to parse cached dashboard data', e)
+        }
       }
 
       const today = new Date()
