@@ -15,11 +15,13 @@ import {
   Briefcase,
   Megaphone,
   Video,
+  ChevronLeft,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
+import MobileNav from './layout/MobileNav'
 
 const removeThemes = () => {
   document.documentElement.classList.remove(
@@ -99,9 +101,6 @@ export default function Layout() {
     { path: '/supervisao', icon: BookOpenCheck, label: 'Supervisão' },
     { path: '/configuracoes', icon: SettingsIcon, label: 'Configurações' },
   ]
-
-  import { ChevronLeft } from 'lucide-react'
-  import MobileNav from './layout/MobileNav'
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row pb-16 md:pb-0">

@@ -19,6 +19,7 @@ import {
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { formatBRL } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 const growthConfig = { novos: { label: 'Novos Pacientes', color: '#6366f1' } }
 const financeConfig = {
@@ -43,6 +44,8 @@ const attendanceAnalyticsConfig = {
 export function PerformanceDashboard() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
+  const isMobile = useIsMobile()
+  const [viewTable, setViewTable] = useState(false)
   const [metrics, setMetrics] = useState({
     totalPatients: 0,
     monthlyRevenue: 0,
@@ -234,18 +237,7 @@ export function PerformanceDashboard() {
     )
   }
 
-  const { useIsMobile } = require('@/hooks/use-mobile') || {}
-  // Fallback if require fails or hook doesn't exist
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
   const chartHeight = isMobile ? 250 : 300
-
-  const [viewTable, setViewTable] = useState(false)
 
   return (
     <div className="space-y-6">
