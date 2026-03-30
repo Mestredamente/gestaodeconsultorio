@@ -234,8 +234,30 @@ export function PerformanceDashboard() {
     )
   }
 
+  const { useIsMobile } = require('@/hooks/use-mobile') || {}
+  // Fallback if require fails or hook doesn't exist
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  const chartHeight = isMobile ? 250 : 300
+
+  const [viewTable, setViewTable] = useState(false)
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-end mb-4 md:hidden">
+        <button
+          onClick={() => setViewTable(!viewTable)}
+          className="text-sm font-bold text-primary bg-primary/10 px-4 py-2 rounded-xl"
+        >
+          {viewTable ? 'Ver Gráficos' : 'Ver Tabelas de Dados'}
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-white shadow-sm border-slate-200">
           <CardContent className="p-6 flex items-center gap-4">
@@ -275,82 +297,130 @@ export function PerformanceDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-slate-200 rounded-[1.5rem]">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-800">
-              Crescimento de Pacientes (6 meses)
+            <CardTitle className="text-base font-bold text-slate-800">
+              Crescimento de Pacientes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={growthConfig} className="h-[200px] w-full">
-              <LineChart data={metrics.growthData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  dy={10}
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Line
-                  type="monotone"
-                  dataKey="novos"
-                  stroke="var(--color-novos)"
-                  strokeWidth={3}
-                  dot={{ r: 4 }}
-                />
-              </LineChart>
-            </ChartContainer>
+            {viewTable && isMobile ? (
+              <div className="space-y-2 mt-2">
+                {metrics.growthData.map((d, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center p-3 bg-slate-50 rounded-xl"
+                  >
+                    <span className="font-medium text-slate-600">{d.name}</span>
+                    <span className="font-bold text-indigo-600">{d.novos} novos</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <ChartContainer
+                config={growthConfig}
+                className={`h-[${chartHeight}px] w-full min-h-[200px]`}
+              >
+                <LineChart data={metrics.growthData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }}
+                    dy={10}
+                    interval={isMobile ? 'preserveStartEnd' : 0}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="novos"
+                    stroke="var(--color-novos)"
+                    strokeWidth={4}
+                    dot={{ r: 5, strokeWidth: 2, fill: '#fff' }}
+                    activeDot={{ r: 7 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-slate-200 rounded-[1.5rem]">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-800">
-              Crescimento Mensal da Receita
+            <CardTitle className="text-base font-bold text-slate-800">
+              Receita e Pendências
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={financeConfig} className="h-[200px] w-full">
-              <BarChart data={metrics.financeData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  dy={10}
-                />
-                <YAxis
-                  tickFormatter={(value) => formatBRL(value)}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: '#64748b' }}
-                  width={80}
-                />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent formatter={(value) => formatBRL(value as number)} />
-                  }
-                />
-                <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
-                <Bar
-                  dataKey="recebido"
-                  name="Recebido"
-                  fill="var(--color-recebido)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={20}
-                />
-                <Bar
-                  dataKey="a_receber"
-                  name="A Receber"
-                  fill="var(--color-a_receber)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={20}
-                />
-              </BarChart>
-            </ChartContainer>
+            {viewTable && isMobile ? (
+              <div className="space-y-2 mt-2">
+                {metrics.financeData.map((d, i) => (
+                  <div key={i} className="flex flex-col p-3 bg-slate-50 rounded-xl">
+                    <span className="font-bold text-slate-800 mb-1">{d.name}</span>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-emerald-600 font-semibold">
+                        Rec: {formatBRL(d.recebido)}
+                      </span>
+                      <span className="text-rose-500 font-semibold">
+                        Pend: {formatBRL(d.a_receber)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <ChartContainer
+                config={financeConfig}
+                className={`h-[${chartHeight}px] w-full min-h-[200px]`}
+              >
+                <BarChart data={metrics.financeData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }}
+                    dy={10}
+                    interval={isMobile ? 'preserveStartEnd' : 0}
+                  />
+                  {!isMobile && (
+                    <YAxis
+                      tickFormatter={(value) => formatBRL(value)}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 12, fill: '#64748b' }}
+                      width={80}
+                    />
+                  )}
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent formatter={(value) => formatBRL(value as number)} />
+                    }
+                    cursor={{ fill: '#f8fafc' }}
+                  />
+                  <Legend
+                    verticalAlign="top"
+                    height={36}
+                    wrapperStyle={{ fontSize: '13px', fontWeight: 500 }}
+                  />
+                  <Bar
+                    dataKey="recebido"
+                    name="Recebido"
+                    fill="var(--color-recebido)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={isMobile ? 12 : 20}
+                  />
+                  <Bar
+                    dataKey="a_receber"
+                    name="A Receber"
+                    fill="var(--color-a_receber)"
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={isMobile ? 12 : 20}
+                  />
+                </BarChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
 

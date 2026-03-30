@@ -98,6 +98,14 @@ export default function Settings() {
       </div>
     )
 
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (window.innerWidth < 768) {
+      setTimeout(() => {
+        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -108,38 +116,42 @@ export default function Settings() {
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="h-11 px-6 rounded-xl gap-2 shadow-sm w-full sm:w-auto"
+          className="h-14 md:h-11 px-6 rounded-xl gap-2 shadow-sm w-full sm:w-auto text-base md:text-sm font-bold"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {saving ? (
+            <Loader2 className="w-5 h-5 md:w-4 md:h-4 animate-spin" />
+          ) : (
+            <Save className="w-5 h-5 md:w-4 md:h-4" />
+          )}
           Salvar Alterações
         </Button>
       </div>
 
       <Tabs defaultValue="geral" className="w-full">
-        <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl [&::-webkit-scrollbar]:hidden scroll-smooth">
+        <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl scrollbar-hide scroll-smooth border border-slate-100">
           <TabsTrigger
             value="geral"
-            className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
+            className="px-5 py-3 md:py-2.5 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
           >
-            <Building2 className="w-4 h-4" /> Perfil e Clínica
+            <Building2 className="w-4 h-4" /> Perfil
           </TabsTrigger>
           <TabsTrigger
             value="comunicacao"
-            className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
+            className="px-5 py-3 md:py-2.5 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
           >
-            <MessageCircle className="w-4 h-4" /> WhatsApp & Avisos
+            <MessageCircle className="w-4 h-4" /> Mensagens
           </TabsTrigger>
           <TabsTrigger
             value="portal"
-            className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
+            className="px-5 py-3 md:py-2.5 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
           >
-            <LinkIcon className="w-4 h-4" /> Portal do Paciente
+            <LinkIcon className="w-4 h-4" /> Portal
           </TabsTrigger>
           <TabsTrigger
             value="legal"
-            className="px-6 py-3 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
+            className="px-5 py-3 md:py-2.5 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
           >
-            <Shield className="w-4 h-4" /> Documentos Legais
+            <Shield className="w-4 h-4" /> Legal
           </TabsTrigger>
         </TabsList>
 
@@ -151,40 +163,48 @@ export default function Settings() {
             <CardContent className="p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <Label>Nome do Consultório / Profissional</Label>
+                  <Label className="text-base md:text-sm">Nome do Consultório / Profissional</Label>
                   <Input
                     value={settings.nome_consultorio}
                     onChange={(e) => setSettings({ ...settings, nome_consultorio: e.target.value })}
-                    className="h-11 rounded-xl"
+                    onFocus={handleFocus}
+                    className="h-12 md:h-11 rounded-xl text-base md:text-sm"
+                    autoCapitalize="words"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Telefone Principal</Label>
+                  <Label className="text-base md:text-sm">Telefone Principal</Label>
                   <Input
                     value={settings.telefone_consultorio}
                     onChange={(e) =>
                       setSettings({ ...settings, telefone_consultorio: e.target.value })
                     }
-                    className="h-11 rounded-xl"
+                    onFocus={handleFocus}
+                    className="h-12 md:h-11 rounded-xl text-base md:text-sm"
+                    inputMode="tel"
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Endereço Completo</Label>
+                  <Label className="text-base md:text-sm">Endereço Completo</Label>
                   <Input
                     value={settings.endereco_consultorio}
                     onChange={(e) =>
                       setSettings({ ...settings, endereco_consultorio: e.target.value })
                     }
-                    className="h-11 rounded-xl"
+                    onFocus={handleFocus}
+                    className="h-12 md:h-11 rounded-xl text-base md:text-sm"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Chave PIX (Para cobranças)</Label>
+                  <Label className="text-base md:text-sm">Chave PIX (Para cobranças)</Label>
                   <Input
                     value={settings.chave_pix}
                     onChange={(e) => setSettings({ ...settings, chave_pix: e.target.value })}
-                    className="h-11 rounded-xl font-mono text-sm"
+                    onFocus={handleFocus}
+                    className="h-12 md:h-11 rounded-xl font-mono text-base md:text-sm"
                     placeholder="CPF, Email ou Telefone"
+                    autoCapitalize="none"
+                    autoCorrect="off"
                   />
                 </div>
               </div>
@@ -231,11 +251,12 @@ export default function Settings() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-100">
                 <div className="space-y-2 md:col-span-2">
-                  <Label>API Key</Label>
+                  <Label className="text-base md:text-sm">API Key</Label>
                   <Input
                     value={settings.whatsapp_api_key}
                     onChange={(e) => setSettings({ ...settings, whatsapp_api_key: e.target.value })}
-                    className="h-11 rounded-xl"
+                    onFocus={handleFocus}
+                    className="h-12 md:h-11 rounded-xl text-base md:text-sm"
                     placeholder="Token de Acesso (API Key)"
                     type="password"
                   />
@@ -243,25 +264,29 @@ export default function Settings() {
                 {settings.whatsapp_tipo === 'business' && (
                   <>
                     <div className="space-y-2">
-                      <Label>Phone ID</Label>
+                      <Label className="text-base md:text-sm">Phone ID</Label>
                       <Input
                         value={settings.whatsapp_business_phone_id}
                         onChange={(e) =>
                           setSettings({ ...settings, whatsapp_business_phone_id: e.target.value })
                         }
-                        className="h-11 rounded-xl"
+                        onFocus={handleFocus}
+                        className="h-12 md:h-11 rounded-xl text-base md:text-sm"
                         placeholder="Ex: 10492839281"
+                        inputMode="numeric"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Account ID</Label>
+                      <Label className="text-base md:text-sm">Account ID</Label>
                       <Input
                         value={settings.whatsapp_business_account_id}
                         onChange={(e) =>
                           setSettings({ ...settings, whatsapp_business_account_id: e.target.value })
                         }
-                        className="h-11 rounded-xl"
+                        onFocus={handleFocus}
+                        className="h-12 md:h-11 rounded-xl text-base md:text-sm"
                         placeholder="Ex: 192837465"
+                        inputMode="numeric"
                       />
                     </div>
                   </>
@@ -302,7 +327,8 @@ export default function Settings() {
                     onChange={(e) =>
                       setSettings({ ...settings, template_lembrete: e.target.value })
                     }
-                    className="min-h-[100px] rounded-xl text-sm"
+                    onFocus={handleFocus}
+                    className="min-h-[100px] rounded-xl text-base md:text-sm"
                     placeholder="Ex: Olá [Nome], lembrando da nossa sessão [data] às [hora]."
                   />
                 )}
@@ -315,7 +341,7 @@ export default function Settings() {
                     <Label className="text-base font-bold text-slate-800">
                       Confirmação de Agendamento
                     </Label>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-slate-500 pr-4">
                       Enviado no momento que você agenda o paciente.
                     </p>
                   </div>
@@ -332,7 +358,8 @@ export default function Settings() {
                     onChange={(e) =>
                       setSettings({ ...settings, template_confirmacao: e.target.value })
                     }
-                    className="min-h-[100px] rounded-xl text-sm"
+                    onFocus={handleFocus}
+                    className="min-h-[100px] rounded-xl text-base md:text-sm"
                   />
                 )}
               </div>
@@ -389,7 +416,8 @@ export default function Settings() {
                 <Textarea
                   value={settings.texto_contrato}
                   onChange={(e) => setSettings({ ...settings, texto_contrato: e.target.value })}
-                  className="min-h-[250px] rounded-xl text-sm font-mono"
+                  onFocus={handleFocus}
+                  className="min-h-[250px] rounded-xl text-base md:text-sm font-mono"
                   placeholder="Insira as cláusulas do seu contrato terapêutico..."
                 />
               </div>
@@ -403,7 +431,8 @@ export default function Settings() {
                   onChange={(e) =>
                     setSettings({ ...settings, politica_cancelamento: e.target.value })
                   }
-                  className="min-h-[100px] rounded-xl text-sm"
+                  onFocus={handleFocus}
+                  className="min-h-[100px] rounded-xl text-base md:text-sm"
                 />
               </div>
             </CardContent>

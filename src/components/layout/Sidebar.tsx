@@ -45,7 +45,7 @@ export default function Sidebar() {
   const { signOut } = useAuth()
 
   return (
-    <aside className="w-[80px] lg:w-[280px] bg-white border-r border-slate-200 flex flex-col transition-all duration-300 h-screen sticky top-0 shrink-0 z-50">
+    <aside className="w-[80px] lg:w-[260px] bg-white border-r border-slate-200 hidden md:flex flex-col transition-all duration-300 h-screen sticky top-0 shrink-0 z-50">
       <div className="h-16 px-4 flex items-center border-b border-slate-100 justify-center lg:justify-start shrink-0">
         <Link to="/" className="flex items-center gap-3 w-full hover:opacity-90 transition-opacity">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-sm shrink-0">

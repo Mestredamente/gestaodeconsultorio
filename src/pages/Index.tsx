@@ -782,66 +782,117 @@ export default function Index() {
               <p className="text-slate-500 font-medium">Nenhum paciente com faturas em atraso.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
-              <Table>
-                <TableHeader className="bg-slate-50">
-                  <TableRow className="hover:bg-slate-50 border-slate-200">
-                    <TableHead className="font-bold text-slate-700 py-4 h-auto">Paciente</TableHead>
-                    <TableHead className="font-bold text-slate-700 py-4 h-auto">
-                      Valor em Aberto
-                    </TableHead>
-                    <TableHead className="font-bold text-slate-700 py-4 h-auto">Atraso</TableHead>
-                    <TableHead className="text-right font-bold text-slate-700 py-4 h-auto">
-                      Ação
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="bg-white">
-                  {inadimplentes.slice(0, 10).map((item) => {
-                    const p = Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes
-                    const isCritical = item.diffDays > 60
-                    return (
-                      <TableRow
-                        key={item.id}
-                        className={cn(
-                          'transition-colors border-slate-100',
-                          isCritical ? 'bg-red-50/30 hover:bg-red-50/50' : 'hover:bg-slate-50/80',
-                        )}
-                      >
-                        <TableCell className="font-semibold text-slate-900 py-4">
-                          {p?.nome}
-                        </TableCell>
-                        <TableCell
-                          className={cn(
-                            'font-black tracking-tight py-4',
-                            isCritical ? 'text-red-700' : 'text-amber-700',
-                          )}
-                        >
-                          {formatBRL(item.valor_a_receber)}
-                        </TableCell>
-                        <TableCell className="py-4">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+              <div className="block md:hidden divide-y divide-slate-100">
+                {inadimplentes.slice(0, 10).map((item) => {
+                  const p = Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes
+                  const isCritical = item.diffDays > 60
+                  return (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        'p-4 flex flex-col gap-3',
+                        isCritical ? 'bg-red-50/30' : 'bg-white',
+                      )}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0 pr-3">
+                          <p className="font-bold text-slate-900 truncate">{p?.nome}</p>
                           <span
                             className={cn(
-                              'inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border shadow-sm',
+                              'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border mt-1',
                               isCritical
                                 ? 'bg-red-100 text-red-700 border-red-200'
                                 : 'bg-amber-100 text-amber-700 border-amber-200',
                             )}
                           >
-                            {item.diffDays} dias
+                            {item.diffDays} dias de atraso
                           </span>
-                        </TableCell>
-                        <TableCell className="text-right py-4">
-                          <WhatsAppBillingDialog
-                            pacienteId={item.paciente_id}
-                            patientName={p?.nome || ''}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p
+                            className={cn(
+                              'font-black tracking-tight',
+                              isCritical ? 'text-red-700' : 'text-amber-700',
+                            )}
+                          >
+                            {formatBRL(item.valor_a_receber)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-full pt-2 border-t border-slate-100/60 flex justify-end">
+                        <WhatsAppBillingDialog
+                          pacienteId={item.paciente_id}
+                          patientName={p?.nome || ''}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50">
+                    <TableRow className="hover:bg-slate-50 border-slate-200">
+                      <TableHead className="font-bold text-slate-700 py-4 h-auto">
+                        Paciente
+                      </TableHead>
+                      <TableHead className="font-bold text-slate-700 py-4 h-auto">
+                        Valor em Aberto
+                      </TableHead>
+                      <TableHead className="font-bold text-slate-700 py-4 h-auto">Atraso</TableHead>
+                      <TableHead className="text-right font-bold text-slate-700 py-4 h-auto">
+                        Ação
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="bg-white">
+                    {inadimplentes.slice(0, 10).map((item) => {
+                      const p = Array.isArray(item.pacientes) ? item.pacientes[0] : item.pacientes
+                      const isCritical = item.diffDays > 60
+                      return (
+                        <TableRow
+                          key={item.id}
+                          className={cn(
+                            'transition-colors border-slate-100',
+                            isCritical ? 'bg-red-50/30 hover:bg-red-50/50' : 'hover:bg-slate-50/80',
+                          )}
+                        >
+                          <TableCell className="font-semibold text-slate-900 py-4">
+                            {p?.nome}
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              'font-black tracking-tight py-4',
+                              isCritical ? 'text-red-700' : 'text-amber-700',
+                            )}
+                          >
+                            {formatBRL(item.valor_a_receber)}
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <span
+                              className={cn(
+                                'inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border shadow-sm',
+                                isCritical
+                                  ? 'bg-red-100 text-red-700 border-red-200'
+                                  : 'bg-amber-100 text-amber-700 border-amber-200',
+                              )}
+                            >
+                              {item.diffDays} dias
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right py-4">
+                            <WhatsAppBillingDialog
+                              pacienteId={item.paciente_id}
+                              patientName={p?.nome || ''}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
           {inadimplentes.length > 10 && (

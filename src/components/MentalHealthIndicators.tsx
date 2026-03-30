@@ -101,7 +101,10 @@ export function MentalHealthIndicators() {
             Nenhum dado no período.
           </div>
         ) : (
-          <ChartContainer config={chartConfig} className="h-[200px] w-full">
+          <ChartContainer
+            config={chartConfig}
+            className="h-[200px] md:h-[250px] w-full min-h-[200px]"
+          >
             <LineChart data={filteredData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
               <XAxis
@@ -110,6 +113,7 @@ export function MentalHealthIndicators() {
                 tickLine={false}
                 tick={{ fontSize: 12, fill: '#64748b' }}
                 dy={10}
+                interval="preserveStartEnd"
               />
               <YAxis domain={[1, 10]} hide />
               <ChartTooltip content={<ChartTooltipContent />} />

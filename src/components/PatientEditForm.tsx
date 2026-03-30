@@ -142,149 +142,181 @@ export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
     }
   }
 
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (window.innerWidth < 768) {
+      setTimeout(() => {
+        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+    }
+  }
+
   return (
-    <Card className="shadow-sm border-slate-100 rounded-3xl overflow-hidden">
-      <CardContent className="p-8">
+    <Card className="shadow-sm border-slate-100 rounded-[2rem] overflow-hidden">
+      <CardContent className="p-4 sm:p-8">
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Dados Pessoais</h3>
+            <h3 className="text-xl font-bold text-slate-800 border-b pb-2">Dados Pessoais</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <Label>Nome Completo *</Label>
+                <Label className="text-base sm:text-sm">Nome Completo *</Label>
                 <Input
                   required
                   value={formData.nome}
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  className="bg-slate-50/50 rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                  autoCapitalize="words"
                 />
               </div>
               <div className="space-y-2">
-                <Label>E-mail</Label>
+                <Label className="text-base sm:text-sm">E-mail</Label>
                 <Input
                   type="email"
+                  inputMode="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="bg-slate-50/50 rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Telefone</Label>
+                <Label className="text-base sm:text-sm">Telefone</Label>
                 <Input
+                  type="tel"
+                  inputMode="tel"
                   value={formData.telefone}
                   onChange={(e) =>
                     setFormData({ ...formData, telefone: maskPhone(e.target.value) })
                   }
-                  className="bg-slate-50/50 rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label>CPF</Label>
+                <Label className="text-base sm:text-sm">CPF</Label>
                 <Input
+                  inputMode="numeric"
                   value={formData.cpf}
                   onChange={(e) => setFormData({ ...formData, cpf: maskCPF(e.target.value) })}
-                  className="bg-slate-50/50 rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Data de Nascimento</Label>
+                <Label className="text-base sm:text-sm">Data de Nascimento</Label>
                 <Input
                   type="date"
                   value={formData.data_nascimento}
                   onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
-                  className="bg-slate-50/50 rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
+            <h3 className="text-xl font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
               <MapPin className="w-5 h-5 text-primary" /> Endereço Completo
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 sm:p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
               <div className="space-y-2 relative">
-                <Label>CEP</Label>
+                <Label className="text-base sm:text-sm">CEP</Label>
                 <Input
                   value={formData.cep}
+                  inputMode="numeric"
                   onChange={handleCepChange}
+                  onFocus={handleFocus}
                   placeholder="00000-000"
-                  className="bg-white rounded-xl h-11 pr-10"
+                  className="bg-white rounded-xl h-12 sm:h-11 pr-10 text-base sm:text-sm"
                 />
                 {fetchingCep && (
                   <Loader2 className="absolute right-3 top-9 w-4 h-4 text-slate-400 animate-spin" />
                 )}
               </div>
               <div className="space-y-2 md:col-span-3">
-                <Label>Rua / Logradouro</Label>
+                <Label className="text-base sm:text-sm">Rua / Logradouro</Label>
                 <Input
                   value={formData.rua}
                   onChange={(e) => setFormData({ ...formData, rua: e.target.value })}
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Número</Label>
+                <Label className="text-base sm:text-sm">Número</Label>
                 <Input
                   value={formData.numero}
                   onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Complemento</Label>
+                <Label className="text-base sm:text-sm">Complemento</Label>
                 <Input
                   value={formData.complemento}
                   onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Bairro</Label>
+                <Label className="text-base sm:text-sm">Bairro</Label>
                 <Input
                   value={formData.bairro}
                   onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Cidade</Label>
+                <Label className="text-base sm:text-sm">Cidade</Label>
                 <Input
                   value={formData.cidade}
                   onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Estado</Label>
+                <Label className="text-base sm:text-sm">Estado</Label>
                 <Input
                   value={formData.estado}
                   onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-800 border-b pb-2">
+            <h3 className="text-xl font-bold text-slate-800 border-b pb-2">
               Contato de Emergência
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-amber-50/50 rounded-2xl border border-amber-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 sm:p-5 bg-amber-50/50 rounded-2xl border border-amber-100">
               <div className="space-y-2">
-                <Label className="text-amber-900">Nome do Contato *</Label>
+                <Label className="text-amber-900 text-base sm:text-sm">Nome do Contato *</Label>
                 <Input
                   required
                   value={formData.contato_emergencia_nome}
                   onChange={(e) =>
                     setFormData({ ...formData, contato_emergencia_nome: e.target.value })
                   }
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                  autoCapitalize="words"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-amber-900">Telefone do Contato *</Label>
+                <Label className="text-amber-900 text-base sm:text-sm">Telefone do Contato *</Label>
                 <Input
                   required
+                  type="tel"
+                  inputMode="tel"
                   value={formData.contato_emergencia_telefone}
                   onChange={(e) =>
                     setFormData({
@@ -292,33 +324,36 @@ export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
                       contato_emergencia_telefone: maskPhone(e.target.value),
                     })
                   }
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Pagamento e Convênio</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100/50">
+            <h3 className="text-xl font-bold text-slate-800 border-b pb-2">Pagamento e Convênio</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 p-4 sm:p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100/50">
               <div className="space-y-2">
-                <Label>Valor Base Sessão (R$)</Label>
+                <Label className="text-base sm:text-sm">Valor Base Sessão (R$)</Label>
                 <Input
                   type="number"
                   step="0.01"
+                  inputMode="decimal"
                   value={formData.valor_sessao}
                   onChange={(e) => setFormData({ ...formData, valor_sessao: e.target.value })}
+                  onFocus={handleFocus}
                   placeholder="150,00"
-                  className="bg-white rounded-xl h-11"
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Frequência</Label>
+                <Label className="text-base sm:text-sm">Frequência</Label>
                 <Select
                   value={formData.frequencia_pagamento}
                   onValueChange={(v) => setFormData({ ...formData, frequencia_pagamento: v })}
                 >
-                  <SelectTrigger className="bg-white rounded-xl h-11">
+                  <SelectTrigger className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl">
@@ -329,25 +364,27 @@ export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Dia de Vencimento</Label>
+                <Label className="text-base sm:text-sm">Dia de Vencimento</Label>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   min="1"
                   max="31"
                   value={formData.dia_pagamento}
                   onChange={(e) => setFormData({ ...formData, dia_pagamento: e.target.value })}
-                  className="bg-white rounded-xl h-11"
+                  onFocus={handleFocus}
+                  className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                 />
               </div>
               {convenios.length > 0 && (
                 <>
                   <div className="space-y-2">
-                    <Label>Convênio</Label>
+                    <Label className="text-base sm:text-sm">Convênio</Label>
                     <Select
                       value={formData.convenio_id}
                       onValueChange={(v) => setFormData({ ...formData, convenio_id: v })}
                     >
-                      <SelectTrigger className="bg-white rounded-xl h-11">
+                      <SelectTrigger className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm">
                         <SelectValue placeholder="Opcional" />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
@@ -361,13 +398,14 @@ export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Nº da Carteirinha</Label>
+                    <Label className="text-base sm:text-sm">Nº da Carteirinha</Label>
                     <Input
                       value={formData.numero_carteira}
                       onChange={(e) =>
                         setFormData({ ...formData, numero_carteira: e.target.value })
                       }
-                      className="bg-white rounded-xl h-11"
+                      onFocus={handleFocus}
+                      className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                     />
                   </div>
                 </>
@@ -375,16 +413,20 @@ export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t border-slate-100">
             <Button
               type="button"
               variant="outline"
               onClick={onCancel}
-              className="rounded-xl h-12 px-6"
+              className="rounded-xl h-14 sm:h-12 px-6 text-base"
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="rounded-xl h-12 px-8 text-base">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="rounded-xl h-14 sm:h-12 px-8 text-base font-bold"
+            >
               {loading && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
               Salvar Alterações
             </Button>

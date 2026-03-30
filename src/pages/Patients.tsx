@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -21,26 +21,21 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { Search, Plus, ChevronRight, UserCircle, Phone, Loader2 } from 'lucide-react'
+import { Search, Plus, ChevronRight, UserCircle, Phone, Loader2, Mail, Filter } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { Skeleton } from '@/components/ui/skeleton'
+import NewPatientForm from '@/components/NewPatientForm'
 
 export default function Patients() {
   const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
 
   const [patients, setPatients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const [formData, setFormData] = useState({
-    nome: '',
-    telefone: '',
-    email: '',
-    valor_sessao: '',
-  })
 
   const fetchPatients = async () => {
     if (!user) return
@@ -59,42 +54,6 @@ export default function Patients() {
     fetchPatients()
   }, [user])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user) return
-    setIsSubmitting(true)
-
-    try {
-      const { data, error } = await supabase
-        .from('pacientes')
-        .insert({
-          usuario_id: user.id,
-          nome: formData.nome,
-          telefone: formData.telefone,
-          email: formData.email,
-          valor_sessao: formData.valor_sessao
-            ? Number(formData.valor_sessao.replace(',', '.'))
-            : null,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      toast({ title: 'Paciente cadastrado com sucesso!' })
-      setIsModalOpen(false)
-      setFormData({ nome: '', telefone: '', email: '', valor_sessao: '' })
-      fetchPatients()
-
-      // Navigate to detailed view
-      if (data) navigate(`/pacientes/${data.id}`)
-    } catch (err: any) {
-      toast({ title: 'Erro ao cadastrar', description: err.message, variant: 'destructive' })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   const filteredPatients = patients.filter(
     (p) =>
       p.nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -109,172 +68,140 @@ export default function Patients() {
           <p className="text-slate-500 mt-1 text-base">Gerencie os cadastros e prontuários</p>
         </div>
 
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogTrigger asChild>
-            <Button className="h-12 sm:h-11 px-6 rounded-xl gap-2 shadow-sm w-full md:w-auto">
-              <Plus className="w-5 h-5" /> Novo Paciente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md rounded-[2rem] p-0 overflow-hidden">
-            <DialogHeader className="p-6 pb-4 bg-slate-50 border-b border-slate-100">
-              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                <UserCircle className="w-6 h-6 text-primary" /> Cadastrar Paciente
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="space-y-2">
-                <Label className="font-bold text-slate-700">Nome Completo</Label>
-                <Input
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  required
-                  className="bg-slate-50 h-12 rounded-xl"
-                  placeholder="Ex: João da Silva"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="font-bold text-slate-700">Telefone (WhatsApp)</Label>
-                <Input
-                  value={formData.telefone}
-                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                  className="bg-slate-50 h-12 rounded-xl"
-                  placeholder="(00) 00000-0000"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="font-bold text-slate-700">E-mail</Label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="bg-slate-50 h-12 rounded-xl"
-                  placeholder="joao@email.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="font-bold text-slate-700">Valor da Sessão Padrão (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.valor_sessao}
-                  onChange={(e) => setFormData({ ...formData, valor_sessao: e.target.value })}
-                  className="bg-slate-50 h-12 rounded-xl"
-                  placeholder="150,00"
-                />
-              </div>
-              <Button type="submit" className="w-full h-12 rounded-xl mt-4" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  'Salvar e Ver Perfil'
-                )}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button
+          onClick={() => navigate('/pacientes/novo')}
+          className="h-12 md:h-11 px-6 rounded-xl gap-2 shadow-sm w-full md:w-auto text-base md:text-sm"
+        >
+          <Plus className="w-6 h-6 md:w-5 md:h-5" /> Novo Paciente
+        </Button>
       </div>
 
-      <Card className="rounded-[2rem] shadow-sm border-slate-200 overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
             <Input
               placeholder="Buscar por nome ou telefone..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-white border-slate-200 shadow-sm"
+              className="pl-10 h-12 md:h-10 rounded-xl bg-white border-slate-200 shadow-sm text-base md:text-sm"
             />
           </div>
+          {isMobile && (
+            <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl shrink-0">
+              <Filter className="w-5 h-5 text-slate-600" />
+            </Button>
+          )}
         </div>
 
         {loading ? (
-          <div className="h-64 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="p-6 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-[200px]" />
+                  <Skeleton className="h-4 w-[150px]" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredPatients.length === 0 ? (
           <div className="text-center py-20 text-slate-500">
             <UserCircle className="w-16 h-16 mx-auto text-slate-200 mb-4" />
             <p className="text-lg font-medium text-slate-600">Nenhum paciente encontrado.</p>
           </div>
-        ) : (
-          <div className="block">
-            {/* Desktop Table View */}
-            <div className="hidden md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-6 h-12 font-bold text-slate-600">Paciente</TableHead>
-                    <TableHead className="h-12 font-bold text-slate-600">Contato</TableHead>
-                    <TableHead className="h-12 font-bold text-slate-600">Cadastro</TableHead>
-                    <TableHead className="pr-6 text-right h-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPatients.map((p) => (
-                    <TableRow
-                      key={p.id}
-                      className="cursor-pointer hover:bg-slate-50 group"
-                      onClick={() => navigate(`/pacientes/${p.id}`)}
-                    >
-                      <TableCell className="pl-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
-                            {p.nome.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="font-bold text-slate-800">{p.nome}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4">
-                        <div className="text-sm text-slate-600 flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" /> {p.telefone || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4 text-sm text-slate-500">
-                        {p.data_criacao
-                          ? new Date(p.data_criacao).toLocaleDateString('pt-BR')
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="pr-6 text-right py-4">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="opacity-0 group-hover:opacity-100 text-primary"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Mobile Card View */}
-            <div className="md:hidden divide-y divide-slate-100">
-              {filteredPatients.map((p) => (
-                <div
-                  key={p.id}
-                  className="p-4 flex items-center justify-between active:bg-slate-50 transition-colors"
-                  onClick={() => navigate(`/pacientes/${p.id}`)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg shrink-0">
-                      {p.nome.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900 leading-tight">{p.nome}</p>
-                      <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1">
-                        <Phone className="w-3 h-3" /> {p.telefone || 'Sem telefone'}
-                      </p>
+        ) : isMobile ? (
+          // Mobile Card View
+          <div className="divide-y divide-slate-100">
+            {filteredPatients.map((p) => (
+              <div
+                key={p.id}
+                className="p-5 flex items-center justify-between active:bg-slate-50 transition-colors bg-white cursor-pointer"
+                onClick={() => navigate(`/pacientes/${p.id}`)}
+              >
+                <div className="flex items-start gap-4 flex-1 min-w-0">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg shrink-0">
+                    {p.nome.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <p className="font-bold text-slate-900 text-base leading-tight truncate">
+                      {p.nome}
+                    </p>
+                    <div className="flex flex-col gap-1 mt-1.5">
+                      {p.telefone && (
+                        <p className="text-sm text-slate-500 flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5" /> {p.telefone}
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
                 </div>
-              ))}
-            </div>
+                <ChevronRight className="w-6 h-6 text-slate-300 shrink-0 ml-2" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          // Desktop Table View
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="pl-6 h-12 font-bold text-slate-600">Paciente</TableHead>
+                  <TableHead className="h-12 font-bold text-slate-600">Contato</TableHead>
+                  <TableHead className="h-12 font-bold text-slate-600">Cadastro</TableHead>
+                  <TableHead className="pr-6 text-right h-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPatients.map((p) => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer hover:bg-slate-50/80 transition-colors group"
+                    onClick={() => navigate(`/pacientes/${p.id}`)}
+                  >
+                    <TableCell className="pl-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
+                          {p.nome.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-slate-800">{p.nome}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4">
+                      <div className="text-sm text-slate-600 flex flex-col gap-1">
+                        {p.telefone && (
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" /> {p.telefone}
+                          </span>
+                        )}
+                        {p.email && (
+                          <span className="flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-slate-400" /> {p.email}
+                          </span>
+                        )}
+                        {!p.telefone && !p.email && '-'}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-4 text-sm font-medium text-slate-500">
+                      {p.data_criacao ? new Date(p.data_criacao).toLocaleDateString('pt-BR') : '-'}
+                    </TableCell>
+                    <TableCell className="pr-6 text-right py-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 text-primary hover:bg-primary/5"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

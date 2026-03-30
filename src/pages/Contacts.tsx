@@ -6,13 +6,25 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Plus, Search, Trash2, Edit, UserCircle } from 'lucide-react'
+import {
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+  Edit,
+  UserCircle,
+  MoreVertical,
+  Phone,
+  Mail,
+  Filter,
+} from 'lucide-react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from '@/components/ui/dialog'
 import {
   Table,
@@ -22,10 +34,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useIsMobile } from '@/hooks/use-mobile'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function Contacts() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const isMobile = useIsMobile()
 
   const [contacts, setContacts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -156,6 +177,14 @@ export default function Contacts() {
       (c.telefone && c.telefone.includes(search)),
   )
 
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (isMobile) {
+      setTimeout(() => {
+        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -174,91 +203,188 @@ export default function Contacts() {
           }}
         >
           <DialogTrigger asChild>
-            <Button className="h-12 px-6 rounded-xl gap-2 shadow-sm">
-              <Plus className="w-5 h-5" /> Novo Contato
+            <Button className="h-12 md:h-11 px-6 rounded-xl gap-2 shadow-sm w-full md:w-auto text-base md:text-sm">
+              <Plus className="w-6 h-6 md:w-5 md:h-5" /> Novo Contato
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md rounded-[2rem] p-0 overflow-hidden">
-            <DialogHeader className="p-6 pb-4 bg-slate-50 border-b border-slate-100">
-              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+          <DialogContent className="w-[95vw] sm:max-w-md max-h-[90vh] h-[90vh] sm:h-auto rounded-[2rem] p-0 flex flex-col overflow-hidden">
+            <DialogHeader className="p-6 pb-4 bg-slate-50 border-b border-slate-100 shrink-0 sticky top-0 z-10">
+              <DialogTitle className="text-2xl font-bold flex items-center gap-2 pr-8">
                 <UserCircle className="w-6 h-6 text-primary" />{' '}
                 {editingId ? 'Editar Contato' : 'Cadastrar Contato'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div className="space-y-2">
-                <Label>Nome Completo</Label>
-                <Input
-                  required
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  placeholder="Ex: João Silva"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>E-mail</Label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="joao@email.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input
-                  value={formData.telefone}
-                  onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Cargo / Especialidade</Label>
-                <Input
-                  value={formData.cargo}
-                  onChange={(e) => setFormData({ ...formData, cargo: e.target.value })}
-                  placeholder="Psiquiatra"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>LinkedIn</Label>
-                <Input
-                  value={formData.linkedin}
-                  onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
-                  placeholder="URL do perfil"
-                />
-              </div>
-              <Button type="submit" className="w-full h-12 rounded-xl mt-4" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Salvar Contato'}
+            <div className="flex-1 overflow-y-auto">
+              <form id="contact-form" onSubmit={handleSubmit} className="p-6 space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-base md:text-sm">Nome Completo</Label>
+                  <Input
+                    required
+                    value={formData.nome}
+                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                    onFocus={handleFocus}
+                    placeholder="Ex: João Silva"
+                    className="h-12 md:h-10 text-base"
+                    autoCapitalize="words"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-base md:text-sm">E-mail</Label>
+                  <Input
+                    type="email"
+                    inputMode="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onFocus={handleFocus}
+                    placeholder="joao@email.com"
+                    className="h-12 md:h-10 text-base"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-base md:text-sm">Telefone</Label>
+                  <Input
+                    type="tel"
+                    inputMode="tel"
+                    value={formData.telefone}
+                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                    onFocus={handleFocus}
+                    placeholder="(11) 99999-9999"
+                    className="h-12 md:h-10 text-base"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-base md:text-sm">Cargo / Especialidade</Label>
+                  <Input
+                    value={formData.cargo}
+                    onChange={(e) => setFormData({ ...formData, cargo: e.target.value })}
+                    onFocus={handleFocus}
+                    placeholder="Psiquiatra"
+                    className="h-12 md:h-10 text-base"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-base md:text-sm">LinkedIn</Label>
+                  <Input
+                    type="url"
+                    inputMode="url"
+                    value={formData.linkedin}
+                    onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
+                    onFocus={handleFocus}
+                    placeholder="URL do perfil"
+                    className="h-12 md:h-10 text-base"
+                    autoCapitalize="none"
+                  />
+                </div>
+              </form>
+            </div>
+            <div className="p-4 bg-slate-50 border-t shrink-0">
+              <Button
+                type="submit"
+                form="contact-form"
+                className="w-full h-14 md:h-12 rounded-xl text-lg md:text-base font-bold"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : 'Salvar Contato'}
               </Button>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      <Card className="rounded-[2rem] shadow-sm border-slate-200 overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
+      <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
             <Input
               placeholder="Buscar contatos..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 h-12 rounded-xl bg-white border-slate-200"
+              className="pl-10 h-12 md:h-10 rounded-xl bg-white border-slate-200 text-base md:text-sm"
             />
           </div>
+          {isMobile && (
+            <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl shrink-0">
+              <Filter className="w-5 h-5 text-slate-600" />
+            </Button>
+          )}
         </div>
 
         {loading ? (
-          <div className="h-64 flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <div className="p-6 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-[200px]" />
+                  <Skeleton className="h-4 w-[150px]" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredContacts.length === 0 ? (
           <div className="text-center py-20 text-slate-500">
             <UserCircle className="w-16 h-16 mx-auto text-slate-200 mb-4" />
             <p className="text-lg font-medium text-slate-600">Nenhum contato encontrado.</p>
           </div>
+        ) : isMobile ? (
+          // Mobile View: Stacked Cards
+          <div className="divide-y divide-slate-100">
+            {filteredContacts.map((c) => (
+              <div
+                key={c.id}
+                className="p-5 bg-white active:bg-slate-50 transition-colors flex justify-between items-start gap-3"
+              >
+                <div className="flex gap-3 items-start flex-1 min-w-0">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg shrink-0">
+                    {c.nome.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <p className="font-bold text-slate-900 text-base truncate">{c.nome}</p>
+                    <p className="text-sm text-slate-500 truncate">{c.cargo || 'Sem cargo'}</p>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                      {c.telefone && (
+                        <span className="text-xs text-slate-600 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md">
+                          <Phone className="w-3 h-3" /> {c.telefone}
+                        </span>
+                      )}
+                      {c.email && (
+                        <span className="text-xs text-slate-600 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md truncate max-w-full">
+                          <Mail className="w-3 h-3 shrink-0" />{' '}
+                          <span className="truncate">{c.email}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 shrink-0 text-slate-400"
+                    >
+                      <MoreVertical className="w-5 h-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                    <DropdownMenuItem onClick={() => openEdit(c)} className="py-3 text-base">
+                      <Edit className="w-4 h-4 mr-2" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleDelete(c.id)}
+                      className="py-3 text-base text-red-600 focus:bg-red-50 focus:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" /> Excluir
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+          </div>
         ) : (
+          // Desktop View: Table
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -272,12 +398,29 @@ export default function Contacts() {
               <TableBody>
                 {filteredContacts.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell className="pl-6 font-medium text-slate-900">{c.nome}</TableCell>
+                    <TableCell className="pl-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
+                          {c.nome.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-semibold text-slate-900">{c.nome}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-slate-600">{c.cargo || '-'}</TableCell>
                     <TableCell className="text-slate-600">
-                      <div className="text-sm">
-                        {c.email && <div>{c.email}</div>}
-                        {c.telefone && <div>{c.telefone}</div>}
+                      <div className="text-sm space-y-1">
+                        {c.email && (
+                          <div className="flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-slate-400" />
+                            {c.email}
+                          </div>
+                        )}
+                        {c.telefone && (
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            {c.telefone}
+                          </div>
+                        )}
                         {!c.email && !c.telefone && '-'}
                       </div>
                     </TableCell>
@@ -287,7 +430,7 @@ export default function Contacts() {
                           variant="ghost"
                           size="icon"
                           onClick={() => openEdit(c)}
-                          className="text-slate-500 hover:text-primary"
+                          className="text-slate-500 hover:text-primary hover:bg-primary/5"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -295,7 +438,7 @@ export default function Contacts() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(c.id)}
-                          className="text-slate-500 hover:text-red-600"
+                          className="text-slate-500 hover:text-red-600 hover:bg-red-50"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -307,7 +450,7 @@ export default function Contacts() {
             </Table>
           </div>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

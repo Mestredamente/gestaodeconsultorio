@@ -61,7 +61,6 @@ const AppRoutes = () => (
     <Route path="/sala-virtual/:id/:token" element={<PublicVirtualRoom />} />
     <Route path="/validar-prescricao/:hash" element={<PublicPrescription />} />
     <Route path="/confirmar/:hash/:appointmentId" element={<PublicConfirmation />} />
-
     <Route
       path="/onboarding"
       element={
@@ -70,7 +69,6 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-
     <Route
       path="/planos"
       element={
@@ -81,7 +79,6 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-
     <Route
       path="/atendimento/:agendamentoId"
       element={
@@ -98,7 +95,7 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-
+    import NewPatientForm from './components/NewPatientForm'
     <Route
       element={
         <ProtectedRoute>
@@ -110,6 +107,17 @@ const AppRoutes = () => (
       <Route path="/sala-virtual" element={<VirtualRoom />} />
       <Route path="/agenda" element={<Agenda />} />
       <Route path="/pacientes" element={<Patients />} />
+      <Route
+        path="/pacientes/novo"
+        element={
+          <div className="max-w-4xl mx-auto py-6">
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-6 px-4 md:px-0">
+              Novo Paciente
+            </h1>
+            <NewPatientForm />
+          </div>
+        }
+      />
       <Route path="/pacientes/:id" element={<PatientDetail />} />
       <Route path="/pacientes/:id/prontuario" element={<PatientRecord />} />
       <Route path="/carteira" element={<Finances />} />

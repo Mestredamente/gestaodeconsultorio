@@ -100,25 +100,39 @@ export default function Layout() {
     { path: '/configuracoes', icon: SettingsIcon, label: 'Configurações' },
   ]
 
+  import { ChevronLeft } from 'lucide-react'
+  import MobileNav from './layout/MobileNav'
+
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row pb-16 md:pb-0">
       {/* Mobile Header */}
-      <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-100 sticky top-0 z-50">
-        <div className="flex items-center gap-2 text-primary font-bold text-xl truncate max-w-[200px]">
-          {clinic.logo ? (
-            <img
-              src={clinic.logo}
-              alt="Logo"
-              className="w-8 h-8 object-contain rounded-md shrink-0"
-            />
-          ) : (
-            <Brain className="w-6 h-6 shrink-0" />
+      <header className="md:hidden flex items-center justify-between px-4 h-14 bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div className="flex items-center gap-2">
+          {location.pathname !== '/' && (
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 -ml-2 text-slate-500 hover:bg-slate-50 rounded-full active:bg-slate-100 transition-colors"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
           )}
-          <span className="truncate">{clinic.name}</span>
+          <div className="flex items-center gap-2 text-slate-800 font-bold text-lg truncate max-w-[180px]">
+            {clinic.logo ? (
+              <img
+                src={clinic.logo}
+                alt="Logo"
+                className="w-7 h-7 object-contain rounded-md shrink-0"
+              />
+            ) : (
+              <Brain className="w-5 h-5 shrink-0 text-primary" />
+            )}
+            <span className="truncate">{clinic.name}</span>
+          </div>
         </div>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 -mr-2 text-slate-600 hover:bg-slate-50 rounded-xl shrink-0"
+          className="p-2 -mr-2 text-slate-500 hover:bg-slate-50 rounded-full active:bg-slate-100 transition-colors"
+          aria-label="Menu Principal"
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -200,9 +214,10 @@ export default function Layout() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-10 max-w-full overflow-x-hidden min-h-screen">
+      <main className="flex-1 p-4 sm:p-6 lg:p-10 max-w-full overflow-x-hidden min-h-[calc(100vh-3.5rem)]">
         <Outlet />
       </main>
+      <MobileNav />
     </div>
   )
 }

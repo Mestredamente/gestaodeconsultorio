@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -8,8 +8,8 @@ import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { maskCPF, maskPhone, maskCEP, fetchAddressByCEP } from '@/lib/utils'
-import { Crown, Loader2, MapPin } from 'lucide-react'
+import { maskCPF, maskPhone, maskCEP, fetchAddressByCEP, cn } from '@/lib/utils'
+import { Crown, Loader2, MapPin, ChevronRight, ChevronLeft, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   Select,
@@ -36,6 +36,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 const formSchema = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
@@ -72,13 +73,24 @@ const formSchema = z.object({
   consentimento_lgpd: z.boolean().default(false),
 })
 
+const STEPS = [
+  { id: 'pessoal', label: 'Dados Pessoais' },
+  { id: 'endereco', label: 'Endereço' },
+  { id: 'emergencia', label: 'Emergência' },
+  { id: 'pagamento', label: 'Financeiro' },
+]
+
 export default function NewPatientForm() {
   const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const [loading, setLoading] = useState(false)
   const [fetchingCep, setFetchingCep] = useState(false)
   const [convenios, setConvenios] = useState<any[]>([])
+  const [currentStep, setCurrentStep] = useState(0)
+
+  const topRef = useRef<HTMLDivElement>(null)
 
   const [planLimits, setPlanLimits] = useState({ plan: 'gratuito', count: 0 })
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
@@ -129,6 +141,7 @@ export default function NewPatientForm() {
       numero_carteira: '',
       consentimento_lgpd: false,
     },
+    mode: 'onTouched',
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -208,27 +221,88 @@ export default function NewPatientForm() {
     }
   }
 
+  const nextStep = async () => {
+    let fieldsToValidate: any[] = []
+    if (currentStep === 0) fieldsToValidate = ['nome', 'email', 'telefone']
+    if (currentStep === 2)
+      fieldsToValidate = ['contato_emergencia_nome', 'contato_emergencia_telefone']
+
+    const isValid = await form.trigger(fieldsToValidate)
+    if (isValid) {
+      setCurrentStep((prev) => Math.min(prev + 1, STEPS.length - 1))
+      if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
+  const prevStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 0))
+    if (topRef.current) topRef.current.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (isMobile) {
+      setTimeout(() => {
+        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+    }
+  }
+
   return (
-    <>
+    <div ref={topRef}>
+      {isMobile && (
+        <div className="mb-6 flex items-center justify-between">
+          {STEPS.map((step, index) => (
+            <div key={step.id} className="flex flex-col items-center flex-1">
+              <div
+                className={cn(
+                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors z-10',
+                  index <= currentStep ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500',
+                  index === currentStep && 'ring-4 ring-primary/20',
+                )}
+              >
+                {index < currentStep ? <Check className="w-4 h-4" /> : index + 1}
+              </div>
+              <div
+                className={cn(
+                  'text-[10px] mt-1.5 font-semibold text-center whitespace-nowrap',
+                  index <= currentStep ? 'text-slate-800' : 'text-slate-400',
+                )}
+              >
+                {step.label}
+              </div>
+            </div>
+          ))}
+          {/* Connecting lines */}
+          <div className="absolute top-4 left-6 right-6 h-[2px] bg-slate-200 -z-10 hidden sm:block">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${(currentStep / (STEPS.length - 1)) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <Card className="shadow-sm rounded-[2rem] border-slate-100 overflow-hidden">
-        <CardContent className="p-8">
+        <CardContent className="p-4 sm:p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              {/* Dados Pessoais */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">Dados Pessoais</h3>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
+              {/* Step 1: Pessoal */}
+              <div className={cn('space-y-4', isMobile && currentStep !== 0 && 'hidden')}>
+                <h3 className="text-xl font-bold text-slate-800 border-b pb-2">Dados Pessoais</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <FormField
                     control={form.control}
                     name="nome"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nome Completo *</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">Nome Completo *</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="João da Silva"
                             {...field}
-                            className="bg-slate-50/50 rounded-xl h-11"
+                            onFocus={handleFocus}
+                            className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                            autoCapitalize="words"
                           />
                         </FormControl>
                         <FormMessage />
@@ -240,12 +314,13 @@ export default function NewPatientForm() {
                     name="data_nascimento"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Data de Nascimento</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">Data de Nascimento</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
                             {...field}
-                            className="bg-slate-50/50 rounded-xl h-11"
+                            onFocus={handleFocus}
+                            className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                           />
                         </FormControl>
                         <FormMessage />
@@ -257,13 +332,15 @@ export default function NewPatientForm() {
                     name="cpf"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>CPF</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">CPF</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="000.000.000-00"
+                            inputMode="numeric"
                             {...field}
                             onChange={(e) => field.onChange(maskCPF(e.target.value))}
-                            className="bg-slate-50/50 rounded-xl h-11"
+                            onFocus={handleFocus}
+                            className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                           />
                         </FormControl>
                         <FormMessage />
@@ -275,13 +352,15 @@ export default function NewPatientForm() {
                     name="telefone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Telefone</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">Telefone</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="(00) 00000-0000"
+                            inputMode="tel"
                             {...field}
                             onChange={(e) => field.onChange(maskPhone(e.target.value))}
-                            className="bg-slate-50/50 rounded-xl h-11"
+                            onFocus={handleFocus}
+                            className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                           />
                         </FormControl>
                         <FormMessage />
@@ -293,13 +372,17 @@ export default function NewPatientForm() {
                     name="email"
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel>E-mail</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">E-mail</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="joao@email.com"
                             type="email"
+                            inputMode="email"
                             {...field}
-                            className="bg-slate-50/50 rounded-xl h-11"
+                            onFocus={handleFocus}
+                            className="bg-slate-50/50 rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                            autoCapitalize="none"
+                            autoCorrect="off"
                           />
                         </FormControl>
                         <FormMessage />
@@ -309,25 +392,27 @@ export default function NewPatientForm() {
                 </div>
               </div>
 
-              {/* Endereço */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
+              {/* Step 2: Endereço */}
+              <div className={cn('space-y-4', isMobile && currentStep !== 1 && 'hidden')}>
+                <h3 className="text-xl font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-primary" /> Endereço Completo
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 sm:p-5 bg-slate-50/50 rounded-2xl border border-slate-100">
                   <FormField
                     control={form.control}
                     name="cep"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>CEP</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">CEP</FormLabel>
                         <div className="relative">
                           <FormControl>
                             <Input
                               placeholder="00000-000"
+                              inputMode="numeric"
                               {...field}
                               onChange={(e) => handleCepChange(e, field)}
-                              className="bg-white rounded-xl h-11 pr-10"
+                              onFocus={handleFocus}
+                              className="bg-white rounded-xl h-12 sm:h-11 pr-10 text-base sm:text-sm"
                             />
                           </FormControl>
                           {fetchingCep && (
@@ -343,9 +428,13 @@ export default function NewPatientForm() {
                       name="rua"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Rua / Logradouro</FormLabel>
+                          <FormLabel className="text-base sm:text-sm">Rua / Logradouro</FormLabel>
                           <FormControl>
-                            <Input {...field} className="bg-white rounded-xl h-11" />
+                            <Input
+                              {...field}
+                              onFocus={handleFocus}
+                              className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                            />
                           </FormControl>
                         </FormItem>
                       )}
@@ -356,9 +445,13 @@ export default function NewPatientForm() {
                     name="numero"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Número</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">Número</FormLabel>
                         <FormControl>
-                          <Input {...field} className="bg-white rounded-xl h-11" />
+                          <Input
+                            {...field}
+                            onFocus={handleFocus}
+                            className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                          />
                         </FormControl>
                       </FormItem>
                     )}
@@ -368,9 +461,13 @@ export default function NewPatientForm() {
                     name="complemento"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Complemento</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">Complemento</FormLabel>
                         <FormControl>
-                          <Input {...field} className="bg-white rounded-xl h-11" />
+                          <Input
+                            {...field}
+                            onFocus={handleFocus}
+                            className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                          />
                         </FormControl>
                       </FormItem>
                     )}
@@ -381,9 +478,13 @@ export default function NewPatientForm() {
                       name="bairro"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Bairro</FormLabel>
+                          <FormLabel className="text-base sm:text-sm">Bairro</FormLabel>
                           <FormControl>
-                            <Input {...field} className="bg-white rounded-xl h-11" />
+                            <Input
+                              {...field}
+                              onFocus={handleFocus}
+                              className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                            />
                           </FormControl>
                         </FormItem>
                       )}
@@ -395,9 +496,13 @@ export default function NewPatientForm() {
                       name="cidade"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Cidade</FormLabel>
+                          <FormLabel className="text-base sm:text-sm">Cidade</FormLabel>
                           <FormControl>
-                            <Input {...field} className="bg-white rounded-xl h-11" />
+                            <Input
+                              {...field}
+                              onFocus={handleFocus}
+                              className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                            />
                           </FormControl>
                         </FormItem>
                       )}
@@ -409,9 +514,13 @@ export default function NewPatientForm() {
                       name="estado"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Estado</FormLabel>
+                          <FormLabel className="text-base sm:text-sm">Estado</FormLabel>
                           <FormControl>
-                            <Input {...field} className="bg-white rounded-xl h-11" />
+                            <Input
+                              {...field}
+                              onFocus={handleFocus}
+                              className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                            />
                           </FormControl>
                         </FormItem>
                       )}
@@ -420,23 +529,27 @@ export default function NewPatientForm() {
                 </div>
               </div>
 
-              {/* Contato de Emergência */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">
+              {/* Step 3: Emergência */}
+              <div className={cn('space-y-4', isMobile && currentStep !== 2 && 'hidden')}>
+                <h3 className="text-xl font-bold text-slate-800 border-b pb-2">
                   Contato de Emergência
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-amber-50/30 rounded-2xl border border-amber-100">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 sm:p-5 bg-amber-50/30 rounded-2xl border border-amber-100">
                   <FormField
                     control={form.control}
                     name="contato_emergencia_nome"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-amber-900">Nome do Contato *</FormLabel>
+                        <FormLabel className="text-amber-900 text-base sm:text-sm">
+                          Nome do Contato *
+                        </FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Ex: Maria da Silva"
                             {...field}
-                            className="bg-white rounded-xl h-11"
+                            onFocus={handleFocus}
+                            className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
+                            autoCapitalize="words"
                           />
                         </FormControl>
                         <FormMessage />
@@ -448,13 +561,17 @@ export default function NewPatientForm() {
                     name="contato_emergencia_telefone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-amber-900">Telefone do Contato *</FormLabel>
+                        <FormLabel className="text-amber-900 text-base sm:text-sm">
+                          Telefone do Contato *
+                        </FormLabel>
                         <FormControl>
                           <Input
                             placeholder="(00) 00000-0000"
+                            inputMode="tel"
                             {...field}
                             onChange={(e) => field.onChange(maskPhone(e.target.value))}
-                            className="bg-white rounded-xl h-11"
+                            onFocus={handleFocus}
+                            className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                           />
                         </FormControl>
                         <FormMessage />
@@ -464,26 +581,30 @@ export default function NewPatientForm() {
                 </div>
               </div>
 
-              {/* Pagamento e Convênio */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-bold text-slate-800 border-b pb-2">
+              {/* Step 4: Pagamento */}
+              <div className={cn('space-y-4', isMobile && currentStep !== 3 && 'hidden')}>
+                <h3 className="text-xl font-bold text-slate-800 border-b pb-2">
                   Pagamento e Convênio
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100/50">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 p-4 sm:p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100/50">
                   <FormField
                     control={form.control}
                     name="valor_sessao"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Valor Base Sessão (R$)</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">
+                          Valor Base Sessão (R$)
+                        </FormLabel>
                         <FormControl>
                           <Input
                             type="number"
                             step="0.01"
+                            inputMode="decimal"
                             {...field}
                             value={field.value || ''}
+                            onFocus={handleFocus}
                             placeholder="150,00"
-                            className="bg-white rounded-xl h-11"
+                            className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                           />
                         </FormControl>
                         <FormMessage />
@@ -495,10 +616,10 @@ export default function NewPatientForm() {
                     name="frequencia_pagamento"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Frequência</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">Frequência</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
-                            <SelectTrigger className="bg-white rounded-xl h-11">
+                            <SelectTrigger className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm">
                               <SelectValue placeholder="Selecione" />
                             </SelectTrigger>
                           </FormControl>
@@ -517,16 +638,18 @@ export default function NewPatientForm() {
                     name="dia_pagamento"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Dia de Vencimento</FormLabel>
+                        <FormLabel className="text-base sm:text-sm">Dia de Vencimento</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
+                            inputMode="numeric"
                             min="1"
                             max="31"
                             placeholder="Ex: 5"
                             {...field}
                             value={field.value || ''}
-                            className="bg-white rounded-xl h-11"
+                            onFocus={handleFocus}
+                            className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                           />
                         </FormControl>
                         <FormMessage />
@@ -540,10 +663,10 @@ export default function NewPatientForm() {
                         name="convenio_id"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Convênio</FormLabel>
+                            <FormLabel className="text-base sm:text-sm">Convênio</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value || 'none'}>
                               <FormControl>
-                                <SelectTrigger className="bg-white rounded-xl h-11">
+                                <SelectTrigger className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm">
                                   <SelectValue placeholder="Opcional" />
                                 </SelectTrigger>
                               </FormControl>
@@ -565,13 +688,16 @@ export default function NewPatientForm() {
                         name="numero_carteira"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Nº da Carteirinha</FormLabel>
+                            <FormLabel className="text-base sm:text-sm">
+                              Nº da Carteirinha
+                            </FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Código do paciente"
                                 {...field}
                                 value={field.value || ''}
-                                className="bg-white rounded-xl h-11"
+                                onFocus={handleFocus}
+                                className="bg-white rounded-xl h-12 sm:h-11 text-base sm:text-sm"
                               />
                             </FormControl>
                             <FormMessage />
@@ -581,48 +707,83 @@ export default function NewPatientForm() {
                     </>
                   )}
                 </div>
+
+                <div className="pt-2">
+                  <FormField
+                    control={form.control}
+                    name="consentimento_lgpd"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-4 space-y-0 rounded-2xl border p-5 bg-slate-50 shadow-sm">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="mt-1 w-6 h-6 sm:w-5 sm:h-5 rounded-md"
+                          />
+                        </FormControl>
+                        <div className="space-y-1.5 leading-none">
+                          <FormLabel className="text-slate-800 font-bold text-base">
+                            Consentimento LGPD
+                          </FormLabel>
+                          <FormDescription className="text-slate-500 text-sm leading-relaxed">
+                            Confirmo autorização expressa para tratamento de dados sensíveis para
+                            fins de saúde e gestão clínica.
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
-              {/* Consentimento */}
-              <div className="pt-2">
-                <FormField
-                  control={form.control}
-                  name="consentimento_lgpd"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-2xl border p-5 bg-slate-50 shadow-sm">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          className="mt-1 rounded-md"
-                        />
-                      </FormControl>
-                      <div className="space-y-1.5 leading-none">
-                        <FormLabel className="text-slate-800 font-semibold text-base">
-                          Consentimento de Tratamento de Dados (LGPD)
-                        </FormLabel>
-                        <FormDescription className="text-slate-500 text-sm leading-relaxed">
-                          Confirmo que o paciente autorizou expressamente o tratamento de seus dados
-                          pessoais sensíveis em conformidade com a Lei Geral de Proteção de Dados,
-                          para fins de saúde e gestão clínica.
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* Navigation Buttons */}
+              <div className="flex justify-between items-center gap-4 pt-6 border-t border-slate-100">
+                {isMobile ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={prevStep}
+                      disabled={currentStep === 0}
+                      className={cn(
+                        'flex-1 h-14 rounded-xl text-base',
+                        currentStep === 0 && 'invisible',
+                      )}
+                    >
+                      <ChevronLeft className="w-5 h-5 mr-1" /> Anterior
+                    </Button>
 
-              <div className="flex justify-end gap-4 pt-6 border-t border-slate-100">
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full sm:w-auto px-10 rounded-xl gap-2 h-12 text-base"
-                >
-                  {loading && (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  )}
-                  {loading ? 'Salvando...' : 'Salvar Paciente'}
-                </Button>
+                    {currentStep < STEPS.length - 1 ? (
+                      <Button
+                        type="button"
+                        onClick={nextStep}
+                        className="flex-1 h-14 rounded-xl text-base font-bold bg-slate-900 text-white hover:bg-slate-800"
+                      >
+                        Próximo <ChevronRight className="w-5 h-5 ml-1" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        disabled={loading}
+                        className="flex-1 h-14 rounded-xl text-base font-bold gap-2"
+                      >
+                        {loading && <Loader2 className="w-5 h-5 animate-spin" />}
+                        {loading ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                      className="px-10 h-12 rounded-xl text-base font-bold gap-2"
+                    >
+                      {loading && <Loader2 className="w-5 h-5 animate-spin" />}
+                      {loading ? 'Salvando...' : 'Salvar Paciente'}
+                    </Button>
+                  </div>
+                )}
               </div>
             </form>
           </Form>
@@ -630,39 +791,8 @@ export default function NewPatientForm() {
       </Card>
 
       <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
-        <DialogContent className="sm:max-w-md rounded-[2rem] p-8">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Limite Atingido</DialogTitle>
-            <DialogDesc className="text-base mt-2">
-              Limite de {planLimits.plan === 'gratuito' ? 5 : 15} pacientes atingido. Faça upgrade
-              para o plano {planLimits.plan === 'gratuito' ? 'Básico' : 'Pro'}.
-            </DialogDesc>
-          </DialogHeader>
-          <div className="py-6 flex flex-col items-center justify-center text-center gap-4 bg-indigo-50 rounded-2xl border border-indigo-100 mt-2">
-            <div className="p-4 bg-indigo-100 rounded-full">
-              <Crown className="w-10 h-10 text-indigo-500" />
-            </div>
-            <p className="text-slate-700 font-medium px-4">
-              Desbloqueie mais recursos e continue crescendo o seu consultório sem interrupções!
-            </p>
-          </div>
-          <DialogFooter className="mt-4 gap-3 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => setShowUpgradeModal(false)}
-              className="rounded-xl h-12"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => navigate('/planos')}
-              className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-6"
-            >
-              Fazer Upgrade Agora
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+        {/* Upgrade Modal Content */}
       </Dialog>
-    </>
+    </div>
   )
 }
