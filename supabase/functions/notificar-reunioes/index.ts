@@ -10,38 +10,33 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Consultar agendamentos do dia seguinte
-    const tomorrowStart = new Date()
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1)
-    tomorrowStart.setHours(0, 0, 0, 0)
-    
-    const tomorrowEnd = new Date(tomorrowStart)
-    tomorrowEnd.setHours(23, 59, 59, 999)
+    // Look for activities of type 'Reunião' starting in the next 30 to 45 mins
+    const now = new Date()
+    const startWindow = new Date(now.getTime() + 30 * 60 * 1000)
+    const endWindow = new Date(now.getTime() + 45 * 60 * 1000)
 
-    const { data: agendamentos, error } = await supabase
-      .from('agendamentos')
-      .select(
-        `id, data_hora, status, usuario_id, paciente_id, pacientes (id, nome, telefone), usuarios (id, lembrete_whatsapp_ativo, whatsapp_tipo)`
-      )
-      .in('status', ['agendado', 'confirmado'])
-      .gte('data_hora', tomorrowStart.toISOString())
-      .lte('data_hora', tomorrowEnd.toISOString())
+    const { data: atividades, error } = await supabase
+      .from('atividades')
+      .select('id, titulo, data_agendada, responsavel_id, usuarios!atividades_responsavel_id_fkey(nome, email, lembrete_whatsapp_ativo, whatsapp_tipo, telefone_consultorio)')
+      .eq('tipo', 'Reunião')
+      .eq('status', 'Agendada')
+      .gte('data_agendada', startWindow.toISOString())
+      .lte('data_agendada', endWindow.toISOString())
 
     if (error) throw error
 
     const sentMessages = []
     const historyLogs = []
 
-    for (const apt of agendamentos || []) {
-      const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
-      const u = Array.isArray(apt.usuarios) ? apt.usuarios[0] : apt.usuarios
+    for (const atv of atividades || []) {
+      const u = Array.isArray(atv.usuarios) ? atv.usuarios[0] : atv.usuarios
 
-      if (p?.telefone && u?.lembrete_whatsapp_ativo === true) {
-        const d = new Date(apt.data_hora)
+      if (u?.telefone_consultorio && u?.lembrete_whatsapp_ativo === true) {
+        const d = new Date(atv.data_agendada)
         const timeStr = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
         
-        const message = `Olá ${p.nome}, lembrando da sua sessão amanhã às ${timeStr}. Qualquer dúvida, entre em contato.`
-        const cleanPhone = p.telefone.replace(/[^\d]/g, '')
+        const message = `Lembrete Executivo: Sua reunião "${atv.titulo}" começará em aproximadamente 30 minutos, às ${timeStr}.`
+        const cleanPhone = u.telefone_consultorio.replace(/[^\d]/g, '')
         
         const tipo = u.whatsapp_tipo === 'personal' ? 'padrao' : (u.whatsapp_tipo || 'padrao')
         
@@ -55,21 +50,21 @@ Deno.serve(async (req: Request) => {
         })
 
         if (!invokeErr) {
-          sentMessages.push({ patient: p.nome, phone: p.telefone, time: timeStr, message })
+          sentMessages.push({ user: u.nome, phone: u.telefone_consultorio, time: timeStr, message })
           
           historyLogs.push({
-            usuario_id: apt.usuario_id,
-            paciente_id: apt.paciente_id,
-            tipo: 'lembrete_whatsapp',
-            conteudo: message,
-            status_envio: 'enviado'
+            usuario_id: atv.responsavel_id,
+            acao: 'Lembrete Reunião',
+            tabela_afetada: 'atividades',
+            registro_id: atv.id,
+            detalhes: { message, status: 'enviado via whatsapp' }
           })
         }
       }
     }
 
     if (historyLogs.length > 0) {
-      await supabase.from('historico_mensagens').insert(historyLogs)
+      await supabase.from('logs_auditoria').insert(historyLogs)
     }
 
     return new Response(

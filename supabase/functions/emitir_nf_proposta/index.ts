@@ -10,22 +10,22 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
-    const { agendamento_id } = await req.json()
+    const { proposta_id } = await req.json()
     
-    if (!agendamento_id) throw new Error("ID do agendamento é obrigatório");
+    if (!proposta_id) throw new Error("ID da proposta é obrigatório");
     
     // Simulate integration delay with external API for invoice generation
     await new Promise(resolve => setTimeout(resolve, 800));
     
     // Update DB
     const { error } = await supabaseClient
-      .from('agendamentos')
-      .update({ status_nota_fiscal: 'emitida' })
-      .eq('id', agendamento_id)
+      .from('propostas')
+      .update({ status_nf: 'Emitida' })
+      .eq('id', proposta_id)
       
     if (error) throw error;
     
-    return new Response(JSON.stringify({ success: true, status: 'emitida' }), {
+    return new Response(JSON.stringify({ success: true, status: 'Emitida' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (err: any) {
