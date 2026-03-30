@@ -10,13 +10,23 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useToast } from '@/hooks/use-toast'
-import { Save, Loader2, Building2, MessageCircle, Link as LinkIcon, Shield } from 'lucide-react'
+import {
+  Save,
+  Loader2,
+  Building2,
+  MessageCircle,
+  Link as LinkIcon,
+  Shield,
+  Send,
+} from 'lucide-react'
 
 export default function Settings() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testingWhatsApp, setTestingWhatsApp] = useState(false)
+  const [testPhone, setTestPhone] = useState('')
 
   const [settings, setSettings] = useState({
     nome_consultorio: '',
@@ -73,21 +83,64 @@ export default function Settings() {
     if (!user) return
     setSaving(true)
     try {
-      // Sincronização e sanitização antes de enviar
       const payload = { ...settings }
-      if (payload.whatsapp_tipo === 'personal') {
-        payload.whatsapp_tipo = 'padrao'
-      }
-
+      if (payload.whatsapp_tipo === 'personal') payload.whatsapp_tipo = 'padrao'
       const { error } = await supabase.from('usuarios').update(payload).eq('id', user.id)
       if (error) throw error
-
       toast({ title: 'Configurações salvas com sucesso!' })
-      setSettings(payload) // Atualiza o estado local para garantir consistência
+      setSettings(payload)
     } catch (err: any) {
       toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleTestWhatsApp = async () => {
+    if (!testPhone.trim()) {
+      toast({
+        title: 'Atenção',
+        description: 'Digite um número de telefone.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setTestingWhatsApp(true)
+    try {
+      const cleanPhone = testPhone.replace(/\D/g, '')
+      if (cleanPhone.length < 10) throw new Error('Número inválido. Use DDD + Número.')
+
+      const { error } = await supabase.functions.invoke('enviar_mensagem_whatsapp', {
+        body: {
+          tipo_whatsapp: settings.whatsapp_tipo,
+          telefone: cleanPhone,
+          mensagem: 'Olá! Este é um teste de integração do seu CRM de Gestão de Consultório.',
+          usuario_id: user?.id,
+        },
+      })
+      if (error) throw error
+
+      await supabase.from('log_whatsapp').insert({
+        telefone: cleanPhone,
+        mensagem: 'Teste de Integração CRM',
+        status: 'sucesso',
+        usuario_id: user?.id,
+      })
+
+      toast({ title: 'Sucesso!', description: 'Mensagem de teste enviada.' })
+    } catch (err: any) {
+      toast({ title: 'Falha no teste', description: err.message, variant: 'destructive' })
+      await supabase
+        .from('log_whatsapp')
+        .insert({
+          telefone: testPhone,
+          mensagem: 'Teste de Integração CRM',
+          status: 'erro',
+          erro: err.message,
+          usuario_id: user?.id,
+        })
+    } finally {
+      setTestingWhatsApp(false)
     }
   }
 
@@ -97,14 +150,6 @@ export default function Settings() {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     )
-
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (window.innerWidth < 768) {
-      setTimeout(() => {
-        e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }, 300)
-    }
-  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
@@ -116,95 +161,80 @@ export default function Settings() {
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="h-14 md:h-11 px-6 rounded-xl gap-2 shadow-sm w-full sm:w-auto text-base md:text-sm font-bold"
+          className="h-14 md:h-11 px-6 rounded-xl gap-2 font-bold w-full sm:w-auto"
         >
-          {saving ? (
-            <Loader2 className="w-5 h-5 md:w-4 md:h-4 animate-spin" />
-          ) : (
-            <Save className="w-5 h-5 md:w-4 md:h-4" />
-          )}
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{' '}
           Salvar Alterações
         </Button>
       </div>
 
       <Tabs defaultValue="geral" className="w-full">
-        <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl scrollbar-hide scroll-smooth border border-slate-100">
+        <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl scrollbar-hide border border-slate-100">
           <TabsTrigger
             value="geral"
-            className="px-5 py-3 md:py-2.5 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2"
           >
             <Building2 className="w-4 h-4" /> Perfil
           </TabsTrigger>
           <TabsTrigger
             value="comunicacao"
-            className="px-5 py-3 md:py-2.5 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2"
           >
             <MessageCircle className="w-4 h-4" /> Mensagens
           </TabsTrigger>
           <TabsTrigger
             value="portal"
-            className="px-5 py-3 md:py-2.5 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2"
           >
             <LinkIcon className="w-4 h-4" /> Portal
           </TabsTrigger>
           <TabsTrigger
             value="legal"
-            className="px-5 py-3 md:py-2.5 whitespace-nowrap rounded-xl data-[state=active]:shadow-sm text-sm font-bold flex-shrink-0 flex items-center gap-2"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2"
           >
             <Shield className="w-4 h-4" /> Legal
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="geral" className="space-y-6">
-          <Card className="rounded-[2rem] shadow-sm border-slate-200">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg">Dados Principais</CardTitle>
-            </CardHeader>
+        <TabsContent value="geral">
+          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
             <CardContent className="p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
-                  <Label className="text-base md:text-sm">Nome do Consultório / Profissional</Label>
+                  <Label>Nome do Consultório</Label>
                   <Input
                     value={settings.nome_consultorio}
                     onChange={(e) => setSettings({ ...settings, nome_consultorio: e.target.value })}
-                    onFocus={handleFocus}
-                    className="h-12 md:h-11 rounded-xl text-base md:text-sm"
-                    autoCapitalize="words"
+                    className="h-12 rounded-xl"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-base md:text-sm">Telefone Principal</Label>
+                  <Label>Telefone</Label>
                   <Input
+                    inputMode="tel"
                     value={settings.telefone_consultorio}
                     onChange={(e) =>
                       setSettings({ ...settings, telefone_consultorio: e.target.value })
                     }
-                    onFocus={handleFocus}
-                    className="h-12 md:h-11 rounded-xl text-base md:text-sm"
-                    inputMode="tel"
+                    className="h-12 rounded-xl"
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label className="text-base md:text-sm">Endereço Completo</Label>
+                  <Label>Endereço</Label>
                   <Input
                     value={settings.endereco_consultorio}
                     onChange={(e) =>
                       setSettings({ ...settings, endereco_consultorio: e.target.value })
                     }
-                    onFocus={handleFocus}
-                    className="h-12 md:h-11 rounded-xl text-base md:text-sm"
+                    className="h-12 rounded-xl"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-base md:text-sm">Chave PIX (Para cobranças)</Label>
+                  <Label>Chave PIX</Label>
                   <Input
                     value={settings.chave_pix}
                     onChange={(e) => setSettings({ ...settings, chave_pix: e.target.value })}
-                    onFocus={handleFocus}
-                    className="h-12 md:h-11 rounded-xl font-mono text-base md:text-sm"
-                    placeholder="CPF, Email ou Telefone"
-                    autoCapitalize="none"
-                    autoCorrect="off"
+                    className="h-12 rounded-xl font-mono"
                   />
                 </div>
               </div>
@@ -213,106 +243,99 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="comunicacao" className="space-y-6">
-          <Card className="rounded-[2rem] shadow-sm border-slate-200">
+          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
             <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
               <CardTitle className="text-lg">Integração WhatsApp</CardTitle>
-              <CardDescription>
-                Configure as credenciais para envio de mensagens automáticas.
-              </CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
               <div className="space-y-4">
                 <Label>Tipo de Integração</Label>
                 <RadioGroup
-                  value={settings.whatsapp_tipo === 'personal' ? 'padrao' : settings.whatsapp_tipo}
+                  value={settings.whatsapp_tipo}
                   onValueChange={(v) => setSettings({ ...settings, whatsapp_tipo: v })}
                   className="flex flex-col sm:flex-row gap-4"
                 >
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="padrao" id="config_padrao" />
-                    <Label
-                      htmlFor="config_padrao"
-                      className="font-normal cursor-pointer text-slate-700"
-                    >
-                      WhatsApp Padrão
-                    </Label>
+                    <RadioGroupItem value="padrao" id="wp" />
+                    <Label htmlFor="wp">WhatsApp Padrão</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="business" id="config_business" />
-                    <Label
-                      htmlFor="config_business"
-                      className="font-normal cursor-pointer text-slate-700"
-                    >
-                      WhatsApp Business
-                    </Label>
+                    <RadioGroupItem value="business" id="wb" />
+                    <Label htmlFor="wb">WhatsApp Business API</Label>
                   </div>
                 </RadioGroup>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-slate-100">
                 <div className="space-y-2 md:col-span-2">
-                  <Label className="text-base md:text-sm">API Key</Label>
+                  <Label>API Key</Label>
                   <Input
+                    type="password"
                     value={settings.whatsapp_api_key}
                     onChange={(e) => setSettings({ ...settings, whatsapp_api_key: e.target.value })}
-                    onFocus={handleFocus}
-                    className="h-12 md:h-11 rounded-xl text-base md:text-sm"
-                    placeholder="Token de Acesso (API Key)"
-                    type="password"
+                    className="h-12 rounded-xl"
                   />
                 </div>
                 {settings.whatsapp_tipo === 'business' && (
                   <>
                     <div className="space-y-2">
-                      <Label className="text-base md:text-sm">Phone ID</Label>
+                      <Label>Phone ID</Label>
                       <Input
                         value={settings.whatsapp_business_phone_id}
                         onChange={(e) =>
                           setSettings({ ...settings, whatsapp_business_phone_id: e.target.value })
                         }
-                        onFocus={handleFocus}
-                        className="h-12 md:h-11 rounded-xl text-base md:text-sm"
-                        placeholder="Ex: 10492839281"
-                        inputMode="numeric"
+                        className="h-12 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-base md:text-sm">Account ID</Label>
+                      <Label>Account ID</Label>
                       <Input
                         value={settings.whatsapp_business_account_id}
                         onChange={(e) =>
                           setSettings({ ...settings, whatsapp_business_account_id: e.target.value })
                         }
-                        onFocus={handleFocus}
-                        className="h-12 md:h-11 rounded-xl text-base md:text-sm"
-                        placeholder="Ex: 192837465"
-                        inputMode="numeric"
+                        className="h-12 rounded-xl"
                       />
                     </div>
                   </>
                 )}
               </div>
+              <div className="pt-6 border-t border-slate-100">
+                <h4 className="font-bold mb-3">Testar Conexão</h4>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="5511999999999"
+                    value={testPhone}
+                    onChange={(e) => setTestPhone(e.target.value)}
+                    className="h-12 rounded-xl max-w-xs"
+                    inputMode="tel"
+                  />
+                  <Button
+                    onClick={handleTestWhatsApp}
+                    disabled={testingWhatsApp}
+                    className="h-12 rounded-xl gap-2"
+                  >
+                    {testingWhatsApp ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}{' '}
+                    Enviar Teste
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="rounded-[2rem] shadow-sm border-slate-200">
+          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
             <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg">Automações de WhatsApp</CardTitle>
-              <CardDescription>
-                O sistema enviará mensagens formatadas baseadas nestes templates.
-              </CardDescription>
+              <CardTitle className="text-lg">Automações</CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-8">
-              {/* Lembrete 24h */}
               <div className="space-y-4 p-4 rounded-xl border border-slate-100 bg-slate-50/30">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-base font-bold text-slate-800">
-                      Lembrete de Sessão (24h antes)
-                    </Label>
-                    <p className="text-sm text-slate-500">
-                      Enviado automaticamente para agendamentos futuros.
-                    </p>
+                    <Label className="font-bold">Lembrete de Sessão (24h)</Label>
                   </div>
                   <Switch
                     checked={settings.lembrete_whatsapp_ativo}
@@ -327,23 +350,14 @@ export default function Settings() {
                     onChange={(e) =>
                       setSettings({ ...settings, template_lembrete: e.target.value })
                     }
-                    onFocus={handleFocus}
-                    className="min-h-[100px] rounded-xl text-base md:text-sm"
-                    placeholder="Ex: Olá [Nome], lembrando da nossa sessão [data] às [hora]."
+                    className="min-h-[100px] rounded-xl"
                   />
                 )}
               </div>
-
-              {/* Confirmação Imediata */}
               <div className="space-y-4 p-4 rounded-xl border border-slate-100 bg-slate-50/30">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-base font-bold text-slate-800">
-                      Confirmação de Agendamento
-                    </Label>
-                    <p className="text-sm text-slate-500 pr-4">
-                      Enviado no momento que você agenda o paciente.
-                    </p>
+                    <Label className="font-bold">Confirmação de Agendamento</Label>
                   </div>
                   <Switch
                     checked={settings.whatsapp_confirmacao_ativa}
@@ -358,8 +372,7 @@ export default function Settings() {
                     onChange={(e) =>
                       setSettings({ ...settings, template_confirmacao: e.target.value })
                     }
-                    onFocus={handleFocus}
-                    className="min-h-[100px] rounded-xl text-base md:text-sm"
+                    className="min-h-[100px] rounded-xl"
                   />
                 )}
               </div>
@@ -367,15 +380,12 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="portal" className="space-y-6">
-          <Card className="rounded-[2rem] shadow-sm border-slate-200">
+        <TabsContent value="portal">
+          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
             <CardContent className="p-6 space-y-6 pt-6">
               <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50">
                 <div>
-                  <Label className="text-base font-bold text-slate-800">Agendamento Público</Label>
-                  <p className="text-sm text-slate-500 mt-1">
-                    Permitir que pacientes novos agendem horários pelo seu link público.
-                  </p>
+                  <Label className="font-bold">Agendamento Público</Label>
                 </div>
                 <Switch
                   checked={settings.agendamento_publico_ativo}
@@ -384,55 +394,28 @@ export default function Settings() {
                   }
                 />
               </div>
-
-              {settings.agendamento_publico_ativo && (
-                <div className="p-4 bg-emerald-50 text-emerald-800 rounded-xl text-sm font-medium flex justify-between items-center border border-emerald-100">
-                  <span>Seu link de agendamento:</span>
-                  <a
-                    href={`/agendar/${user?.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline font-bold hover:text-emerald-900"
-                  >
-                    Acessar Link
-                  </a>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="legal" className="space-y-6">
-          <Card className="rounded-[2rem] shadow-sm border-slate-200">
+        <TabsContent value="legal">
+          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
             <CardContent className="p-6 space-y-6 pt-6">
               <div className="space-y-3">
-                <Label className="text-base font-bold">
-                  Termos de Contrato de Prestação de Serviço
-                </Label>
-                <p className="text-sm text-slate-500">
-                  Este texto será exibido no Portal do Paciente para aceite digital (Validade
-                  Jurídica).
-                </p>
+                <Label className="font-bold">Contrato de Prestação</Label>
                 <Textarea
                   value={settings.texto_contrato}
                   onChange={(e) => setSettings({ ...settings, texto_contrato: e.target.value })}
-                  onFocus={handleFocus}
-                  className="min-h-[250px] rounded-xl text-base md:text-sm font-mono"
-                  placeholder="Insira as cláusulas do seu contrato terapêutico..."
+                  className="min-h-[250px] rounded-xl font-mono"
                 />
               </div>
               <div className="space-y-3">
-                <Label className="text-base font-bold">Política de Cancelamento</Label>
-                <p className="text-sm text-slate-500">
-                  Regras para faltas e remarcações (ex: antecedência mínima de 24h).
-                </p>
+                <Label className="font-bold">Política de Cancelamento</Label>
                 <Textarea
                   value={settings.politica_cancelamento}
                   onChange={(e) =>
                     setSettings({ ...settings, politica_cancelamento: e.target.value })
                   }
-                  onFocus={handleFocus}
-                  className="min-h-[100px] rounded-xl text-base md:text-sm"
+                  className="min-h-[100px] rounded-xl"
                 />
               </div>
             </CardContent>

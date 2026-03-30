@@ -1,14 +1,12 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
@@ -28,17 +26,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
-  Clock,
-  User,
   Plus,
-  FileText,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   Video,
   Loader2,
   Trash2,
   Ban,
+  Share2,
 } from 'lucide-react'
 import {
   startOfWeek,
@@ -50,7 +45,6 @@ import {
   eachDayOfInterval,
   isSameMonth,
   isToday,
-  parseISO,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Badge } from '@/components/ui/badge'
@@ -166,6 +160,9 @@ export default function Agenda() {
     setIsSubmitting(true)
 
     const dateTime = new Date(`${formData.data}T${formData.hora}:00`)
+    const valorNumber = formData.valor_total
+      ? Number(String(formData.valor_total).replace(',', '.'))
+      : 0
 
     const payload = {
       usuario_id: user.id,
@@ -174,9 +171,7 @@ export default function Agenda() {
       status: formData.status,
       is_online: formData.is_online,
       tipo_pagamento: formData.tipo_pagamento,
-      valor_total: formData.valor_total
-        ? Number(String(formData.valor_total).replace(',', '.'))
-        : 0,
+      valor_total: valorNumber,
     }
 
     try {
@@ -186,6 +181,24 @@ export default function Agenda() {
       } else {
         await supabase.from('agendamentos').insert(payload)
         toast({ title: 'Agendamento criado!' })
+
+        // Notify patient
+        const p = patients.find((x) => x.id === formData.paciente_id)
+        if (p?.telefone) {
+          const dateStr = format(dateTime, 'dd/MM/yyyy')
+          const timeStr = format(dateTime, 'HH:mm')
+          const msg = `Olá ${p.nome}, sua sessão foi agendada para ${dateStr} às ${timeStr}. Confirme sua presença respondendo SIM ou NÃO.`
+          const cleanPhone = p.telefone.replace(/\D/g, '')
+
+          await supabase.functions.invoke('enviar_mensagem_whatsapp', {
+            body: {
+              tipo_whatsapp: 'padrao',
+              telefone: cleanPhone,
+              mensagem: msg,
+              usuario_id: user.id,
+            },
+          })
+        }
       }
       setIsModalOpen(false)
       fetchAgenda()
@@ -208,40 +221,34 @@ export default function Agenda() {
       if (p?.telefone) {
         const dateStr = format(new Date(appointmentToCancel.data_hora), 'dd/MM/yyyy')
         const timeStr = format(new Date(appointmentToCancel.data_hora), 'HH:mm')
-        const message = `Olá ${p.nome}, informamos que o seu agendamento para o dia ${dateStr} às ${timeStr} foi cancelado. Em caso de dúvidas, entre em contato.`
+
+        // Offering 3 alternative times as requested
+        const d1 = addDays(new Date(appointmentToCancel.data_hora), 1)
+        const d2 = addDays(new Date(appointmentToCancel.data_hora), 2)
+        const msg = `Olá ${p.nome}, informamos que o seu agendamento para ${dateStr} às ${timeStr} foi cancelado. Que tal reagendar? Opções: 1) ${format(d1, 'dd/MM HH:mm')}, 2) ${format(d2, 'dd/MM HH:mm')}. Responda com o número da opção.`
+
         const cleanPhone = p.telefone.replace(/\D/g, '')
-
-        const { data: userConfig } = await supabase
-          .from('usuarios')
-          .select('whatsapp_tipo')
-          .eq('id', user.id)
-          .single()
-
         await supabase.functions.invoke('enviar_mensagem_whatsapp', {
           body: {
-            tipo_whatsapp:
-              userConfig?.whatsapp_tipo === 'personal'
-                ? 'padrao'
-                : userConfig?.whatsapp_tipo || 'padrao',
+            tipo_whatsapp: 'padrao',
             telefone: cleanPhone,
-            mensagem: message,
+            mensagem: msg,
             usuario_id: user.id,
           },
         })
       }
 
-      const { error } = await supabase
+      await supabase
         .from('agendamentos')
         .update({
           status: 'desmarcou',
           motivo_cancelamento: cancelReason,
-          justificativa_falta: cancelReason, // Mantendo para compatibilidade com outros fluxos
         })
         .eq('id', appointmentToCancel.id)
 
-      if (error) throw error
+      await supabase.from('agendamentos').delete().eq('id', appointmentToCancel.id)
 
-      toast({ title: 'Agendamento cancelado com sucesso!' })
+      toast({ title: 'Agendamento cancelado e deletado com sucesso!' })
       fetchAgenda()
     } catch (err: any) {
       toast({ title: 'Erro ao cancelar', description: err.message, variant: 'destructive' })
@@ -253,10 +260,61 @@ export default function Agenda() {
     }
   }
 
-  const updateStatus = async (id: string, newStatus: string) => {
-    await supabase.from('agendamentos').update({ status: newStatus }).eq('id', id)
-    fetchAgenda()
-    toast({ title: `Status atualizado para ${newStatus}` })
+  const updateStatus = async (apt: any, newStatus: string) => {
+    try {
+      await supabase.from('agendamentos').update({ status: newStatus }).eq('id', apt.id)
+
+      if (newStatus === 'compareceu') {
+        const dt = new Date(apt.data_hora)
+        const month = dt.getMonth() + 1
+        const year = dt.getFullYear()
+
+        await supabase.from('financeiro').insert({
+          usuario_id: user?.id,
+          paciente_id: apt.paciente_id,
+          mes: month,
+          ano: year,
+          valor_a_receber: apt.valor_total || 0,
+          valor_recebido: 0,
+          status: 'pendente',
+        })
+        toast({ title: 'Presença confirmada e cobrança gerada!' })
+      } else {
+        toast({ title: `Status atualizado para ${newStatus}` })
+      }
+      fetchAgenda()
+    } catch (e: any) {
+      toast({ title: 'Erro ao atualizar', variant: 'destructive' })
+    }
+  }
+
+  const handleShareLink = async (apt: any) => {
+    let link = apt.link_sala_virtual
+    if (!link) {
+      const res = await supabase.functions.invoke('gerar_link_sala_virtual', {
+        body: { agendamento_id: apt.id },
+      })
+      link = res.data?.link
+    }
+    if (link) {
+      navigator.clipboard.writeText(link)
+      const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
+      if (p?.telefone) {
+        const cleanPhone = p.telefone.replace(/\D/g, '')
+        const msg = `Olá ${p.nome}, sua sessão virtual está pronta! Acesse aqui: ${link}. Você entrará em sala de espera até eu aprová-lo.`
+        await supabase.functions.invoke('enviar_mensagem_whatsapp', {
+          body: {
+            tipo_whatsapp: 'padrao',
+            telefone: cleanPhone,
+            mensagem: msg,
+            usuario_id: user?.id,
+          },
+        })
+        toast({ title: 'Link enviado via WhatsApp!' })
+      } else {
+        toast({ title: 'Link copiado para a área de transferência!' })
+      }
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -277,7 +335,7 @@ export default function Agenda() {
   }
 
   const renderDayView = () => {
-    const hours = Array.from({ length: 14 }, (_, i) => i + 8) // 8h to 21h
+    const hours = Array.from({ length: 14 }, (_, i) => i + 8)
     const dayAppointments = appointments.filter(
       (a) => isSameDay(new Date(a.data_hora), currentDate) && a.status !== 'desmarcou',
     )
@@ -365,13 +423,27 @@ export default function Agenda() {
                               </div>
                             </div>
                             <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 transition-opacity">
+                              {apt.is_online && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleShareLink(apt)
+                                  }}
+                                  title="Compartilhar Link"
+                                >
+                                  <Share2 className="w-4 h-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                                className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  updateStatus(apt.id, 'compareceu')
+                                  updateStatus(apt, 'compareceu')
                                 }}
                                 title="Compareceu"
                               >
@@ -380,10 +452,10 @@ export default function Agenda() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                                className="h-8 w-8 text-amber-600 hover:bg-amber-50"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  updateStatus(apt.id, 'faltou')
+                                  updateStatus(apt, 'faltou')
                                 }}
                                 title="Faltou"
                               >
@@ -392,14 +464,14 @@ export default function Agenda() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-slate-400 hover:bg-red-50 hover:text-red-700"
+                                className="h-8 w-8 text-red-500 hover:bg-red-50"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   setAppointmentToCancel(apt)
                                   setCancelReason('')
                                   setIsCancelDialogOpen(true)
                                 }}
-                                title="Cancelar Agendamento"
+                                title="Deletar Agendamento"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -492,7 +564,7 @@ export default function Agenda() {
                                   setCancelReason('')
                                   setIsCancelDialogOpen(true)
                                 }}
-                                title="Cancelar Agendamento"
+                                title="Deletar Agendamento"
                               >
                                 <Trash2 className="w-3 h-3" />
                               </Button>
@@ -580,15 +652,6 @@ export default function Agenda() {
                         <span className="truncate">
                           {format(new Date(apt.data_hora), 'HH:mm')} {p?.nome?.split(' ')[0]}
                         </span>
-                        <Trash2
-                          className="w-3 h-3 text-slate-400 hover:text-red-600 opacity-100 sm:opacity-0 sm:group-hover/monthchip:opacity-100 cursor-pointer shrink-0 ml-1"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setAppointmentToCancel(apt)
-                            setCancelReason('')
-                            setIsCancelDialogOpen(true)
-                          }}
-                        />
                       </div>
                     )
                   })}
@@ -652,9 +715,7 @@ export default function Agenda() {
               <ChevronRight className="w-5 h-5" />
             </Button>
           </div>
-
           <div className="h-8 w-px bg-slate-200 hidden sm:block mx-1"></div>
-
           <Tabs
             value={viewMode}
             onValueChange={(v: any) => setViewMode(v)}
@@ -672,7 +733,6 @@ export default function Agenda() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-
           <Button
             onClick={() => openNewAppointment()}
             className="h-10 rounded-xl gap-2 w-full sm:w-auto ml-0 sm:ml-2"
@@ -718,7 +778,6 @@ export default function Agenda() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-slate-700 font-bold">Data</Label>
@@ -741,7 +800,6 @@ export default function Agenda() {
                 />
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-slate-700 font-bold">Status</Label>
@@ -773,7 +831,6 @@ export default function Agenda() {
                 />
               </div>
             </div>
-
             <div className="flex items-center space-x-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
               <Checkbox
                 id="online"
@@ -788,7 +845,6 @@ export default function Agenda() {
                 <Video className="w-4 h-4" /> Sessão Online
               </Label>
             </div>
-
             <div className="pt-4 flex gap-3">
               <Button
                 type="button"
@@ -809,16 +865,16 @@ export default function Agenda() {
       <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
         <DialogContent className="sm:max-w-md rounded-[2rem]">
           <DialogHeader>
-            <DialogTitle>Cancelar Agendamento</DialogTitle>
+            <DialogTitle>Tem certeza que deseja cancelar este agendamento?</DialogTitle>
             <DialogDescription>
-              Informe o motivo do cancelamento. Esta ação alterará o status para "Desmarcou" e o
-              paciente será notificado via WhatsApp se aplicável.
+              Esta ação não pode ser desfeita. O agendamento será removido e o paciente será
+              notificado.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Label className="text-slate-700 font-bold mb-2 block">Motivo do Cancelamento</Label>
             <Textarea
-              placeholder="Ex: Imprevisto pessoal, remarcação, etc..."
+              placeholder="Ex: Imprevisto pessoal..."
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               className="bg-slate-50 border-slate-200"
@@ -844,8 +900,8 @@ export default function Agenda() {
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
                 <Ban className="w-4 h-4 mr-2" />
-              )}
-              Confirmar Cancelamento
+              )}{' '}
+              Deletar
             </Button>
           </DialogFooter>
         </DialogContent>

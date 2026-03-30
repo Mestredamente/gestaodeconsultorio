@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, CalendarX, ChevronLeft } from 'lucide-react'
+import { Bell, CalendarX, ChevronLeft, Menu, CheckCircle2, Filter } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
@@ -11,7 +11,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export default function Header() {
@@ -19,9 +21,9 @@ export default function Header() {
   const { toast } = useToast()
   const location = useLocation()
   const navigate = useNavigate()
-  const isMobile = useIsMobile()
   const [unreadCount, setUnreadCount] = useState(0)
   const [clinic, setClinic] = useState({ name: '', logo: '' })
+  const [notifications, setNotifications] = useState<any[]>([])
 
   const [unreadCancelCount, setUnreadCancelCount] = useState(0)
   const [cancellations, setCancellations] = useState<any[]>([])
@@ -31,18 +33,16 @@ export default function Header() {
     if (!user) return
     const fetchNotifs = async () => {
       try {
-        const { count, error } = await supabase
+        const { data, count } = await supabase
           .from('notificacoes')
-          .select('id', { count: 'exact' })
+          .select('*', { count: 'exact' })
           .eq('usuario_id', user.id)
-          .eq('lida', false)
-          .limit(0)
+          .order('data_criacao', { ascending: false })
+          .limit(10)
 
-        if (error) {
-          console.error('Erro ao buscar total de notificações:', error)
-          return
-        }
-        setUnreadCount(count || 0)
+        if (data) setNotifications(data)
+        const unread = data?.filter((n) => !n.lida).length || 0
+        setUnreadCount(unread)
       } catch (err) {
         console.error('Erro inesperado ao buscar notificações:', err)
       }
@@ -68,17 +68,6 @@ export default function Header() {
       )
       .subscribe()
 
-    const clinicSub = supabase
-      .channel('header_clinic_layout')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'usuarios', filter: `id=eq.${user.id}` },
-        (payload) => {
-          setClinic({ name: payload.new.nome_consultorio || '', logo: payload.new.logo_url || '' })
-        },
-      )
-      .subscribe()
-
     const cancelSub = supabase
       .channel('header_cancellations')
       .on(
@@ -91,45 +80,45 @@ export default function Header() {
         },
         async (payload: any) => {
           if (payload.new.status === 'desmarcou') {
-            // Check if it was already desmarcou to avoid duplicate events
             if (payload.old && payload.old.status === 'desmarcou') return
 
-            setCancellations((prev) => {
-              if (prev.some((c) => c.id === payload.new.id)) return prev
+            supabase
+              .from('pacientes')
+              .select('nome')
+              .eq('id', payload.new.paciente_id)
+              .single()
+              .then(({ data }) => {
+                const newCancel = {
+                  id: payload.new.id,
+                  patientName: data?.nome || 'Paciente',
+                  date: payload.new.data_hora,
+                  reason: payload.new.motivo_cancelamento || 'Motivo não informado',
+                }
 
-              // Fetch patient name asynchronously
-              supabase
-                .from('pacientes')
-                .select('nome')
-                .eq('id', payload.new.paciente_id)
-                .single()
-                .then(({ data }) => {
-                  const newCancel = {
-                    id: payload.new.id,
-                    patientName: data?.nome || 'Paciente',
-                    date: payload.new.data_hora,
-                    reason:
-                      payload.new.motivo_cancelamento ||
-                      payload.new.justificativa_falta ||
-                      'Motivo não informado',
-                  }
+                setCancellations((curr) => {
+                  if (curr.some((c) => c.id === newCancel.id)) return curr
+                  setUnreadCancelCount((cnt) => cnt + 1)
 
-                  setCancellations((curr) => {
-                    if (curr.some((c) => c.id === newCancel.id)) return curr
-                    setUnreadCancelCount((cnt) => cnt + 1)
-
-                    toast({
-                      title: 'Agendamento Cancelado',
-                      description: `${newCancel.patientName} cancelou a sessão. Motivo: ${newCancel.reason}`,
-                      variant: 'destructive',
-                    })
-
-                    return [newCancel, ...curr]
+                  toast({
+                    title: 'Sessão Cancelada',
+                    description: `Paciente ${newCancel.patientName} cancelou a sessão de ${new Date(newCancel.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Motivo: ${newCancel.reason}`,
+                    variant: 'destructive',
                   })
-                })
 
-              return prev
-            })
+                  // Add to notificacoes table as well
+                  supabase
+                    .from('notificacoes')
+                    .insert({
+                      usuario_id: user.id,
+                      titulo: 'Sessão Cancelada',
+                      mensagem: `Paciente ${newCancel.patientName} cancelou a sessão de ${new Date(newCancel.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Motivo: ${newCancel.reason}`,
+                      tipo: 'cancelamento',
+                    })
+                    .then()
+
+                  return [newCancel, ...curr]
+                })
+              })
           }
         },
       )
@@ -137,29 +126,36 @@ export default function Header() {
 
     return () => {
       supabase.removeChannel(sub)
-      supabase.removeChannel(clinicSub)
       supabase.removeChannel(cancelSub)
     }
   }, [user])
 
-  // In mobile, we don't render this header (Layout has its own).
-  // But just in case this is used anywhere else in desktop:
-  if (isMobile) return null
+  const markAllAsRead = async () => {
+    if (!user) return
+    await supabase
+      .from('notificacoes')
+      .update({ lida: true })
+      .eq('usuario_id', user.id)
+      .eq('lida', false)
+    setNotifications((prev) => prev.map((n) => ({ ...n, lida: true })))
+    setUnreadCount(0)
+  }
 
   return (
     <>
       <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sticky top-0 z-40 shadow-sm lg:px-8">
         <div className="flex items-center gap-3 lg:hidden">
-          {clinic.logo ? (
-            <img
-              src={clinic.logo}
-              alt="Logo"
-              className="w-8 h-8 rounded-md object-contain bg-white shadow-sm border border-slate-100"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm shrink-0">
-              {clinic.name ? clinic.name.substring(0, 2).toUpperCase() : 'C'}
-            </div>
+          <Button variant="ghost" size="icon" className="-ml-2">
+            <Menu className="w-6 h-6" />
+          </Button>
+          {location.pathname !== '/' && (
+            <button
+              onClick={() => navigate(-1)}
+              className="p-1 hover:bg-slate-100 rounded-md transition-colors"
+              title="Voltar"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
           )}
           <span className="font-bold text-slate-800 text-lg tracking-tight truncate max-w-[150px]">
             {clinic.name || 'Clínica'}
@@ -194,16 +190,110 @@ export default function Header() {
             )}
           </button>
 
-          <Link
-            to="/notificacoes"
-            className="relative p-2.5 text-slate-500 hover:text-primary transition-colors hover:bg-slate-100 rounded-xl"
-            title="Notificações"
-          >
-            <Bell className="w-5 h-5" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-            )}
-          </Link>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                className="relative p-2.5 text-slate-500 hover:text-primary transition-colors hover:bg-slate-100 rounded-xl"
+                title="Notificações"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0 mr-4 mt-2 rounded-2xl shadow-xl border-slate-200">
+              <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
+                <span className="font-bold text-slate-800">Notificações</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={markAllAsRead}
+                  className="h-8 text-xs text-primary"
+                >
+                  Marcar lidas
+                </Button>
+              </div>
+              <Tabs defaultValue="todos">
+                <TabsList className="w-full rounded-none border-b border-slate-100 h-auto p-0 bg-transparent">
+                  <TabsTrigger
+                    value="todos"
+                    className="flex-1 rounded-none py-2 data-[state=active]:border-b-2 data-[state=active]:border-primary shadow-none"
+                  >
+                    Todos
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="naolidos"
+                    className="flex-1 rounded-none py-2 data-[state=active]:border-b-2 data-[state=active]:border-primary shadow-none"
+                  >
+                    Não Lidos
+                  </TabsTrigger>
+                </TabsList>
+                <div className="max-h-80 overflow-y-auto">
+                  <TabsContent value="todos" className="m-0">
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-slate-500 text-sm">
+                        Nenhuma notificação.
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={cn(
+                            'p-4 border-b border-slate-50 text-sm hover:bg-slate-50',
+                            !n.lida && 'bg-indigo-50/30',
+                          )}
+                        >
+                          <p
+                            className={cn(
+                              'font-semibold mb-1',
+                              n.lida ? 'text-slate-700' : 'text-slate-900',
+                            )}
+                          >
+                            {n.titulo}
+                          </p>
+                          <p className="text-slate-600 text-xs mb-2">{n.mensagem}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {new Date(n.data_criacao).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </TabsContent>
+                  <TabsContent value="naolidos" className="m-0">
+                    {notifications.filter((n) => !n.lida).length === 0 ? (
+                      <div className="p-8 text-center text-slate-500 text-sm">
+                        Tudo lido por aqui.
+                      </div>
+                    ) : (
+                      notifications
+                        .filter((n) => !n.lida)
+                        .map((n) => (
+                          <div
+                            key={n.id}
+                            className="p-4 border-b border-slate-50 text-sm bg-indigo-50/30 hover:bg-indigo-50/50"
+                          >
+                            <p className="font-semibold text-slate-900 mb-1">{n.titulo}</p>
+                            <p className="text-slate-600 text-xs mb-2">{n.mensagem}</p>
+                            <p className="text-[10px] text-slate-400">
+                              {new Date(n.data_criacao).toLocaleString('pt-BR')}
+                            </p>
+                          </div>
+                        ))
+                    )}
+                  </TabsContent>
+                </div>
+              </Tabs>
+              <div className="p-2 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl text-center">
+                <Link
+                  to="/notificacoes"
+                  className="text-xs font-bold text-slate-500 hover:text-primary"
+                >
+                  Ver todas as notificações
+                </Link>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </header>
 

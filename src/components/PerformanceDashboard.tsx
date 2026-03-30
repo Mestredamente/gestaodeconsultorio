@@ -20,41 +20,33 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { formatBRL } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
-const growthConfig = { novos: { label: 'Novos Pacientes', color: '#6366f1' } }
-const financeConfig = {
-  recebido: { label: 'Recebido', color: '#10b981' },
-  a_receber: { label: 'A Receber', color: '#f43f5e' },
-}
-const attendanceConfig = {
-  agendado: { label: 'Agendado', color: '#6366f1' },
-  compareceu: { label: 'Compareceu', color: '#10b981' },
-  faltou: { label: 'Faltou', color: '#f43f5e' },
-  desmarcou: { label: 'Desmarcou', color: '#f59e0b' },
-}
-const retentionConfig = {
-  retidos: { label: 'Retidos', color: '#10b981' },
-  nao_retidos: { label: 'Não Retidos', color: '#64748b' },
-}
-const attendanceAnalyticsConfig = {
-  compareceu: { label: 'Compareceu', color: '#10b981' },
-  faltou_desmarcou: { label: 'Não Compareceu', color: '#f43f5e' },
+const cancelConfig = {
+  Imprevisto: { label: 'Imprevisto', color: '#f43f5e' },
+  Remarcação: { label: 'Remarcação', color: '#f59e0b' },
+  Saúde: { label: 'Saúde', color: '#10b981' },
+  Outros: { label: 'Outros', color: '#64748b' },
 }
 
 export function PerformanceDashboard() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const isMobile = useIsMobile()
-  const [viewTable, setViewTable] = useState(false)
   const [metrics, setMetrics] = useState({
     totalPatients: 0,
     monthlyRevenue: 0,
     monthlyAppointments: 0,
-    growthData: [] as any[],
-    financeData: [] as any[],
-    attendanceData: [] as any[],
-    retentionData: [] as any[],
-    analyticsChartData: [] as any[],
+    cancelReasons: [] as any[],
+    monthlyCancellations: [] as any[],
+    patientCancellationRate: [] as any[],
   })
 
   useEffect(() => {
@@ -65,49 +57,44 @@ export function PerformanceDashboard() {
       const now = new Date()
       const startCurrentMonth = startOfMonth(now)
       const endCurrentMonth = endOfMonth(now)
-      const sixMonthsAgo = subMonths(startCurrentMonth, 5)
 
-      const [
-        { data: pats },
-        { data: fins },
-        { data: apts },
-        { data: allCompareceu },
-        { data: msgs },
-      ] = await Promise.all([
-        supabase
-          .from('pacientes')
-          .select('id, data_criacao, recorrencia')
-          .eq('usuario_id', user.id),
+      const [{ data: apts }, { data: fins }] = await Promise.all([
+        supabase.from('agendamentos').select('*, pacientes(nome)').eq('usuario_id', user.id),
         supabase
           .from('financeiro')
-          .select('mes, ano, valor_recebido, valor_a_receber')
+          .select('*')
           .eq('usuario_id', user.id)
-          .gte('ano', sixMonthsAgo.getFullYear()),
-        supabase
-          .from('agendamentos')
-          .select('status, data_hora, paciente_id')
-          .eq('usuario_id', user.id)
-          .gte('data_hora', startCurrentMonth.toISOString())
-          .lt('data_hora', endCurrentMonth.toISOString()),
-        supabase
-          .from('agendamentos')
-          .select('paciente_id')
-          .eq('usuario_id', user.id)
-          .eq('status', 'compareceu'),
-        supabase
-          .from('historico_mensagens')
-          .select('paciente_id, data_envio')
-          .eq('usuario_id', user.id)
-          .in('tipo', ['lembrete', 'pre_consulta', 'lembrete_whatsapp'])
-          .gte('data_envio', subMonths(startCurrentMonth, 1).toISOString()),
+          .eq('mes', now.getMonth() + 1)
+          .eq('ano', now.getFullYear()),
       ])
 
-      const totalPatients = pats?.length || 0
-      const currentMonthFins =
-        fins?.filter((f) => f.mes === now.getMonth() + 1 && f.ano === now.getFullYear()) || []
-      const monthlyRevenue = currentMonthFins.reduce((sum, f) => sum + Number(f.valor_recebido), 0)
-      const monthlyAppointments = apts?.length || 0
+      const allApts = apts || []
+      const currentMonthApts = allApts.filter(
+        (a) =>
+          a.data_hora >= startCurrentMonth.toISOString() &&
+          a.data_hora <= endCurrentMonth.toISOString(),
+      )
 
+      const cancelledApts = allApts.filter((a) => a.status === 'desmarcou')
+
+      // Razões de cancelamento (Pie Chart)
+      const reasonsMap: Record<string, number> = {}
+      cancelledApts.forEach((a) => {
+        const reason = a.motivo_cancelamento?.toLowerCase() || 'outros'
+        let category = 'Outros'
+        if (reason.includes('imprevisto') || reason.includes('trabalho')) category = 'Imprevisto'
+        if (reason.includes('remarcação') || reason.includes('viagem')) category = 'Remarcação'
+        if (reason.includes('saúde') || reason.includes('doente') || reason.includes('médico'))
+          category = 'Saúde'
+        reasonsMap[category] = (reasonsMap[category] || 0) + 1
+      })
+      const cancelReasons = Object.keys(reasonsMap).map((k) => ({
+        name: k,
+        value: reasonsMap[k],
+        fill: cancelConfig[k as keyof typeof cancelConfig]?.color || '#000',
+      }))
+
+      // Tendência de cancelamentos mensal (Line Chart)
       const last6Months = Array.from({ length: 6 }, (_, i) => {
         const d = subMonths(now, 5 - i)
         return {
@@ -117,143 +104,74 @@ export function PerformanceDashboard() {
         }
       })
 
-      const growthData = last6Months.map((m) => {
-        const novos =
-          pats?.filter((p) => {
-            if (!p.data_criacao) return false
-            const pd = new Date(p.data_criacao)
-            return pd.getMonth() + 1 === m.month && pd.getFullYear() === m.year
-          }).length || 0
-        return { name: m.label, novos }
+      const monthlyCancellations = last6Months.map((m) => {
+        const total = allApts.filter(
+          (a) =>
+            new Date(a.data_hora).getMonth() + 1 === m.month &&
+            new Date(a.data_hora).getFullYear() === m.year,
+        ).length
+        const cancelled = allApts.filter(
+          (a) =>
+            a.status === 'desmarcou' &&
+            new Date(a.data_hora).getMonth() + 1 === m.month &&
+            new Date(a.data_hora).getFullYear() === m.year,
+        ).length
+        return { name: m.label, total, cancelados: cancelled }
       })
 
-      const financeData = last6Months.map((m) => {
-        const mFins = fins?.filter((f) => f.mes === m.month && f.ano === m.year) || []
-        const recebido = mFins.reduce((sum, f) => sum + Number(f.valor_recebido), 0)
-        const a_receber = mFins.reduce((sum, f) => sum + Number(f.valor_a_receber), 0)
-        return { name: m.label, recebido, a_receber }
+      // Taxa de cancelamento por paciente
+      const patientStats: Record<string, { total: number; cancelled: number; nome: string }> = {}
+      allApts.forEach((a) => {
+        const pid = a.paciente_id
+        if (!patientStats[pid])
+          patientStats[pid] = {
+            total: 0,
+            cancelled: 0,
+            nome: Array.isArray(a.pacientes) ? a.pacientes[0]?.nome : a.pacientes?.nome,
+          }
+        patientStats[pid].total += 1
+        if (a.status === 'desmarcou') patientStats[pid].cancelled += 1
       })
 
-      const statusCounts =
-        apts?.reduce(
-          (acc, a) => {
-            acc[a.status] = (acc[a.status] || 0) + 1
-            return acc
-          },
-          {} as Record<string, number>,
-        ) || {}
-
-      const attendanceData = [
-        { name: 'Agendado', value: statusCounts['agendado'] || 0, fill: '#6366f1' },
-        { name: 'Compareceu', value: statusCounts['compareceu'] || 0, fill: '#10b981' },
-        { name: 'Faltou', value: statusCounts['faltou'] || 0, fill: '#f43f5e' },
-        { name: 'Desmarcou', value: statusCounts['desmarcou'] || 0, fill: '#f59e0b' },
-      ].filter((d) => d.value > 0)
-
-      const compareceuCountByPatient =
-        allCompareceu?.reduce(
-          (acc, a) => {
-            acc[a.paciente_id] = (acc[a.paciente_id] || 0) + 1
-            return acc
-          },
-          {} as Record<string, number>,
-        ) || {}
-
-      let retainedCount = 0
-      const validPats = pats || []
-      validPats.forEach((p) => {
-        if (
-          (compareceuCountByPatient[p.id] && compareceuCountByPatient[p.id] > 1) ||
-          ['mensal', 'semanal'].includes(p.recorrencia?.toLowerCase() || '')
-        ) {
-          retainedCount++
-        }
-      })
-      const notRetainedCount = Math.max(validPats.length - retainedCount, 0)
-
-      const retentionData = [
-        { name: 'Retidos', value: retainedCount, fill: '#10b981' },
-        { name: 'Não Retidos', value: notRetainedCount, fill: '#64748b' },
-      ].filter((d) => d.value > 0)
-
-      const appointmentsWithReminder =
-        apts
-          ?.filter((a) => ['compareceu', 'faltou', 'desmarcou'].includes(a.status))
-          .map((apt) => {
-            const aptDate = new Date(apt.data_hora).getTime()
-            const hasReminder = msgs?.some((m) => {
-              if (m.paciente_id !== apt.paciente_id) return false
-              const msgDate = new Date(m.data_envio).getTime()
-              const diff = aptDate - msgDate
-              return diff > 0 && diff <= 3 * 24 * 60 * 60 * 1000
-            })
-            return { ...apt, hasReminder }
-          }) || []
-
-      const attendedWithReminder = appointmentsWithReminder.filter(
-        (a) => a.hasReminder && a.status === 'compareceu',
-      ).length
-      const totalWithReminder = appointmentsWithReminder.filter((a) => a.hasReminder).length
-
-      const attendedWithoutReminder = appointmentsWithReminder.filter(
-        (a) => !a.hasReminder && a.status === 'compareceu',
-      ).length
-      const totalWithoutReminder = appointmentsWithReminder.filter((a) => !a.hasReminder).length
-
-      const analyticsChartData = [
-        {
-          name: 'Com Lembrete',
-          compareceu: attendedWithReminder,
-          faltou_desmarcou: totalWithReminder - attendedWithReminder,
-        },
-        {
-          name: 'Sem Lembrete',
-          compareceu: attendedWithoutReminder,
-          faltou_desmarcou: totalWithoutReminder - attendedWithoutReminder,
-        },
-      ].filter((d) => d.compareceu + d.faltou_desmarcou > 0)
+      const patientRate = Object.values(patientStats)
+        .filter((p) => p.total > 2) // only patients with more than 2 appointments
+        .map((p) => ({
+          nome: p.nome,
+          taxa: Math.round((p.cancelled / p.total) * 100),
+          total: p.total,
+          cancelados: p.cancelled,
+        }))
+        .sort((a, b) => b.taxa - a.taxa)
+        .slice(0, 5)
 
       setMetrics({
-        totalPatients,
-        monthlyRevenue,
-        monthlyAppointments,
-        growthData,
-        financeData,
-        attendanceData,
-        retentionData,
-        analyticsChartData,
+        totalPatients: Object.keys(patientStats).length,
+        monthlyRevenue: (fins || []).reduce((acc, f) => acc + Number(f.valor_recebido), 0),
+        monthlyAppointments: currentMonthApts.length,
+        cancelReasons,
+        monthlyCancellations,
+        patientCancellationRate: patientRate,
       })
       setLoading(false)
     }
-
     fetchData()
   }, [user])
 
-  if (loading) {
+  if (loading)
     return (
       <div className="h-40 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
-  }
 
   const chartHeight = isMobile ? 250 : 300
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end mb-4 md:hidden">
-        <button
-          onClick={() => setViewTable(!viewTable)}
-          className="text-sm font-bold text-primary bg-primary/10 px-4 py-2 rounded-xl"
-        >
-          {viewTable ? 'Ver Gráficos' : 'Ver Tabelas de Dados'}
-        </button>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="bg-white shadow-sm border-slate-200">
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
               <Users className="w-6 h-6" />
             </div>
             <div>
@@ -264,7 +182,7 @@ export function PerformanceDashboard() {
         </Card>
         <Card className="bg-white shadow-sm border-slate-200">
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg shrink-0">
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
               <Coins className="w-6 h-6" />
             </div>
             <div>
@@ -277,7 +195,7 @@ export function PerformanceDashboard() {
         </Card>
         <Card className="bg-white shadow-sm border-slate-200">
           <CardContent className="p-6 flex items-center gap-4">
-            <div className="p-3 bg-amber-50 text-amber-600 rounded-lg shrink-0">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
               <CalendarCheck className="w-6 h-6" />
             </div>
             <div>
@@ -292,47 +210,33 @@ export function PerformanceDashboard() {
         <Card className="shadow-sm border-slate-200 rounded-[1.5rem]">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-bold text-slate-800">
-              Crescimento de Pacientes
+              Motivos de Cancelamento
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {viewTable && isMobile ? (
-              <div className="space-y-2 mt-2">
-                {metrics.growthData.map((d, i) => (
-                  <div
-                    key={i}
-                    className="flex justify-between items-center p-3 bg-slate-50 rounded-xl"
-                  >
-                    <span className="font-medium text-slate-600">{d.name}</span>
-                    <span className="font-bold text-indigo-600">{d.novos} novos</span>
-                  </div>
-                ))}
+            {metrics.cancelReasons.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-sm text-slate-400">
+                Nenhum dado disponível
               </div>
             ) : (
-              <ChartContainer
-                config={growthConfig}
-                className={`h-[${chartHeight}px] w-full min-h-[200px]`}
-              >
-                <LineChart data={metrics.growthData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }}
-                    dy={10}
-                    interval={isMobile ? 'preserveStartEnd' : 0}
-                  />
+              <ChartContainer config={cancelConfig} className={`h-[${chartHeight}px] w-full`}>
+                <PieChart>
+                  <Pie
+                    data={metrics.cancelReasons}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                  >
+                    {metrics.cancelReasons.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line
-                    type="monotone"
-                    dataKey="novos"
-                    stroke="var(--color-novos)"
-                    strokeWidth={4}
-                    dot={{ r: 5, strokeWidth: 2, fill: '#fff' }}
-                    activeDot={{ r: 7 }}
-                  />
-                </LineChart>
+                </PieChart>
               </ChartContainer>
             )}
           </CardContent>
@@ -341,198 +245,71 @@ export function PerformanceDashboard() {
         <Card className="shadow-sm border-slate-200 rounded-[1.5rem]">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-bold text-slate-800">
-              Receita e Pendências
+              Tendência de Cancelamentos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {viewTable && isMobile ? (
-              <div className="space-y-2 mt-2">
-                {metrics.financeData.map((d, i) => (
-                  <div key={i} className="flex flex-col p-3 bg-slate-50 rounded-xl">
-                    <span className="font-bold text-slate-800 mb-1">{d.name}</span>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-emerald-600 font-semibold">
-                        Rec: {formatBRL(d.recebido)}
-                      </span>
-                      <span className="text-rose-500 font-semibold">
-                        Pend: {formatBRL(d.a_receber)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <ChartContainer
-                config={financeConfig}
-                className={`h-[${chartHeight}px] w-full min-h-[200px]`}
-              >
-                <BarChart data={metrics.financeData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }}
-                    dy={10}
-                    interval={isMobile ? 'preserveStartEnd' : 0}
-                  />
-                  {!isMobile && (
-                    <YAxis
-                      tickFormatter={(value) => formatBRL(value)}
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 12, fill: '#64748b' }}
-                      width={80}
-                    />
-                  )}
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent formatter={(value) => formatBRL(value as number)} />
-                    }
-                    cursor={{ fill: '#f8fafc' }}
-                  />
-                  <Legend
-                    verticalAlign="top"
-                    height={36}
-                    wrapperStyle={{ fontSize: '13px', fontWeight: 500 }}
-                  />
-                  <Bar
-                    dataKey="recebido"
-                    name="Recebido"
-                    fill="var(--color-recebido)"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={isMobile ? 12 : 20}
-                  />
-                  <Bar
-                    dataKey="a_receber"
-                    name="A Receber"
-                    fill="var(--color-a_receber)"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={isMobile ? 12 : 20}
-                  />
-                </BarChart>
-              </ChartContainer>
-            )}
+            <ChartContainer
+              config={{ cancelados: { label: 'Cancelados', color: '#f43f5e' } }}
+              className={`h-[${chartHeight}px] w-full min-h-[200px]`}
+            >
+              <LineChart data={metrics.monthlyCancellations}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 13, fill: '#64748b' }}
+                  dy={10}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Line
+                  type="monotone"
+                  dataKey="cancelados"
+                  stroke="#f43f5e"
+                  strokeWidth={4}
+                  dot={{ r: 5, fill: '#fff', strokeWidth: 2 }}
+                  activeDot={{ r: 7 }}
+                />
+              </LineChart>
+            </ChartContainer>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-slate-200">
+        <Card className="shadow-sm border-slate-200 rounded-[1.5rem] lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-800">
-              Taxa de Retenção de Pacientes
+            <CardTitle className="text-base font-bold text-slate-800">
+              Maior Taxa de Evasão/Cancelamento
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            {metrics.retentionData.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-sm text-slate-400">
-                Sem dados suficientes
-              </div>
+          <CardContent className="overflow-x-auto">
+            {metrics.patientCancellationRate.length === 0 ? (
+              <div className="text-slate-400 text-sm">Dados insuficientes.</div>
             ) : (
-              <ChartContainer config={retentionConfig} className="h-[200px] w-full">
-                <PieChart>
-                  <Pie
-                    data={metrics.retentionData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                  >
-                    {metrics.retentionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-800">
-              Taxa de Comparecimento (Mês Atual)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {metrics.attendanceData.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-sm text-slate-400">
-                Nenhum dado no mês
-              </div>
-            ) : (
-              <ChartContainer config={attendanceConfig} className="h-[200px] w-full">
-                <PieChart>
-                  <Pie
-                    data={metrics.attendanceData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                  >
-                    {metrics.attendanceData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-slate-200 lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-800">
-              Impacto dos Lembretes na Assiduidade (Mês Atual)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {metrics.analyticsChartData.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-sm text-slate-400">
-                Nenhum dado consolidado no mês
-              </div>
-            ) : (
-              <ChartContainer config={attendanceAnalyticsConfig} className="h-[200px] w-full">
-                <BarChart
-                  data={metrics.analyticsChartData}
-                  layout="vertical"
-                  margin={{ left: 20, right: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                  <XAxis type="number" hide />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 12, fill: '#64748b' }}
-                    width={100}
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar
-                    dataKey="compareceu"
-                    name="Compareceu"
-                    fill="var(--color-compareceu)"
-                    stackId="a"
-                    maxBarSize={40}
-                  />
-                  <Bar
-                    dataKey="faltou_desmarcou"
-                    name="Não Compareceu"
-                    fill="var(--color-faltou_desmarcou)"
-                    radius={[0, 4, 4, 0]}
-                    stackId="a"
-                    maxBarSize={40}
-                  />
-                </BarChart>
-              </ChartContainer>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Paciente</TableHead>
+                    <TableHead className="text-center">Total Agendado</TableHead>
+                    <TableHead className="text-center">Cancelados</TableHead>
+                    <TableHead className="text-right">Taxa</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {metrics.patientCancellationRate.map((p, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-bold">{p.nome}</TableCell>
+                      <TableCell className="text-center">{p.total}</TableCell>
+                      <TableCell className="text-center text-red-500 font-semibold">
+                        {p.cancelados}
+                      </TableCell>
+                      <TableCell className="text-right font-black text-red-600">
+                        {p.taxa}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
