@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Skeleton } from '@/components/ui/skeleton'
 import NewPatientForm from '@/components/NewPatientForm'
+import { cn } from '@/lib/utils'
 
 export default function Patients() {
   const { toast } = useToast()
