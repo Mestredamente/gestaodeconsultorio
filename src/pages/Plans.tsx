@@ -15,10 +15,10 @@ const PLANS_DATA = [
     price: '0,00',
     patients: 'Até 5 pacientes',
     badge: null,
-    style: 'border-slate-200 bg-slate-50/50',
-    titleColor: 'text-slate-700',
-    priceColor: 'text-slate-900',
-    buttonClass: 'bg-slate-200 text-slate-800 hover:bg-slate-300',
+    style: 'border-emerald-200 bg-emerald-50/30',
+    titleColor: 'text-emerald-700',
+    priceColor: 'text-emerald-900',
+    buttonClass: 'bg-emerald-600 text-white hover:bg-emerald-700',
     features: [
       { name: 'Agendamento Básico', inc: true },
       { name: 'Prontuário Digital', inc: true },
@@ -52,11 +52,11 @@ const PLANS_DATA = [
     name: 'Pro',
     price: '79,00',
     patients: 'Pacientes Ilimitados',
-    badge: null,
-    style: 'border-purple-200 bg-purple-50/30',
-    titleColor: 'text-purple-700',
-    priceColor: 'text-purple-700',
-    buttonClass: 'bg-purple-600 text-white hover:bg-purple-700',
+    badge: 'Premium',
+    style: 'border-violet-200 bg-violet-50/30',
+    titleColor: 'text-violet-700',
+    priceColor: 'text-violet-700',
+    buttonClass: 'bg-violet-600 text-white hover:bg-violet-700',
     features: [
       { name: 'Agendamento Básico', inc: true },
       { name: 'Prontuário Digital', inc: true },
@@ -94,7 +94,7 @@ export default function Plans() {
       const success = searchParams.get('success')
       const plan = searchParams.get('plan')
       if (success === 'true' && plan) {
-        await supabase.rpc('confirm_plan_upgrade', { p_plano: plan })
+        await supabase.from('usuarios').update({ plano: plan }).eq('id', user?.id)
         setCurrentPlan(plan)
         toast({
           title: 'Assinatura confirmada!',
@@ -104,7 +104,7 @@ export default function Plans() {
       }
     }
     checkSuccess()
-  }, [searchParams, navigate, toast])
+  }, [searchParams, navigate, toast, user?.id])
 
   const handleSelect = async (planId: string) => {
     localStorage.setItem('selected_plan', planId)
@@ -113,15 +113,16 @@ export default function Plans() {
       setLoadingPlan(planId)
       if (user) {
         const { error } = await supabase
-          .from('usuarios')
-          .update({ plano: planId })
-          .eq('id', user.id)
-        if (!error) {
-          toast({ title: 'Plano Gratuito confirmado!', description: 'Seu acesso foi configurado.' })
-          navigate('/')
-        } else {
-          toast({ title: 'Erro ao atualizar plano', variant: 'destructive' })
-        }
+          .from('subscriptions')
+          .upsert(
+            { user_id: user.id, plan_id: planId, status: 'active' },
+            { onConflict: 'user_id' },
+          )
+
+        await supabase.from('usuarios').update({ plano: planId }).eq('id', user.id)
+
+        toast({ title: 'Plano Gratuito confirmado!', description: 'Seu acesso foi configurado.' })
+        navigate('/')
       }
       setLoadingPlan(null)
       return
@@ -130,12 +131,12 @@ export default function Plans() {
     setLoadingPlan(planId)
     try {
       const return_url = `${window.location.origin}/planos?success=true&plan=${planId}`
-      const { data, error } = await supabase.functions.invoke('criar_checkout_stripe', {
-        body: { plan: planId, return_url },
+      const { data, error } = await supabase.functions.invoke('processar_pagamento', {
+        body: { plano_id: planId, metodo_pagamento: 'cartao', gateway: 'stripe', return_url },
       })
       if (error) throw error
-      if (data?.url) {
-        window.location.href = data.url
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl
       } else {
         toast({ title: 'Redirecionando para pagamento...' })
         setTimeout(() => {
@@ -173,7 +174,12 @@ export default function Plans() {
           >
             {plan.badge && (
               <div className="absolute -top-4 inset-x-0 flex justify-center">
-                <span className="bg-blue-600 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-md">
+                <span
+                  className={cn(
+                    'text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-md',
+                    plan.id === 'pro' ? 'bg-violet-600' : 'bg-blue-600',
+                  )}
+                >
                   <Star className="w-3.5 h-3.5 fill-current" /> {plan.badge}
                 </span>
               </div>

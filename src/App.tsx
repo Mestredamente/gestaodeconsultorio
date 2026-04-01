@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider, useAuth } from '@/hooks/use-auth'
 import Layout from './components/Layout'
 import Index from './pages/Index'
+import AdminSaasDashboard from './pages/admin/AdminSaasDashboard'
 import Agenda from './pages/Agenda'
 import Patients from './pages/Patients'
 import PatientDetail from './pages/PatientDetail'
@@ -132,6 +133,7 @@ const AppRoutes = () => (
       <Route path="/configuracoes" element={<Settings />} />
       <Route path="/perfil" element={<Navigate to="/configuracoes" replace />} />
       <Route path="/contatos" element={<Contacts />} />
+      <Route path="/admin" element={<AdminSaasDashboard />} />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>

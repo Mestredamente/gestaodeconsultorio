@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+  }
+
+  /* Custom Themes added by SaaS requirements */
+  [data-theme='emerald'] {
+    --primary: 142.1 76.2% 36.3%;
+    --ring: 142.1 76.2% 36.3%;
+  }
+  [data-theme='violet'] {
+    --primary: 262.1 83.3% 57.8%;
+    --ring: 262.1 83.3% 57.8%;
+  }
+  [data-theme='rose'] {
+    --primary: 346.8 77.2% 49.8%;
+    --ring: 346.8 77.2% 49.8%;
+  }
+  [data-theme='orange'] {
+    --primary: 24.6 95% 53.1%;
+    --ring: 24.6 95% 53.1%;
+  }
+  [data-theme='zinc'] {
+    --primary: 240 5.9% 10%;
+    --ring: 240 5.9% 10%;
+  }
+  [data-theme='red'] {
+    --primary: 0 72.2% 50.6%;
+    --ring: 0 72.2% 50.6%;
+  }
+  [data-theme='yellow'] {
+    --primary: 47.9 95.8% 53.1%;
+    --ring: 47.9 95.8% 53.1%;
+  }
+  [data-theme='cyan'] {
+    --primary: 189 94% 43%;
+    --ring: 189 94% 43%;
+  }
+  [data-theme='green'] {
+    --primary: 142 71% 45%;
+    --ring: 142 71% 45%;
+  }
+  [data-theme='purple'] {
+    --primary: 280 65% 60%;
+    --ring: 280 65% 60%;
+  }
+  [data-theme='teal'] {
+    --primary: 173 80% 40%;
+    --ring: 173 80% 40%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

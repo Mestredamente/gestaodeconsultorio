@@ -7,25 +7,28 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { proposta_id, email_destinatario, mensagem_personalizada, incluir_pdf, incluir_link } = await req.json()
+    const { proposta_id, email_destinatario, mensagem_personalizada, incluir_pdf, incluir_link } =
+      await req.json()
     if (!proposta_id || !email_destinatario) throw new Error('Parâmetros incompletos')
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email_destinatario)) throw new Error('Email inválido')
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabase = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    )
+    const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: req.headers.get('Authorization')! } },
+    })
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
-    
+
     const { data: proposta, error: propError } = await supabase
       .from('propostas')
-      .select('*, empresas(nome), contatos(nome), usuarios(nome, nome_consultorio, email, telefone_consultorio, logo_url)')
+      .select(
+        '*, empresas(nome), contatos(nome), usuarios(nome, nome_consultorio, email, telefone_consultorio, logo_url)',
+      )
       .eq('id', proposta_id)
       .single()
 
@@ -47,17 +50,22 @@ Deno.serve(async (req: Request) => {
     const trackingPixel = `${supabaseUrl}/functions/v1/rastrear-visualizacao-proposta?id=${proposta_id}&token=${token}`
 
     const formatCurrency = (val: number) => `R$ ${Number(val).toFixed(2).replace('.', ',')}`
-    
-    let itensHtml = (itens || []).map(i => `
+
+    let itensHtml = (itens || [])
+      .map(
+        (i) => `
       <tr>
         <td style="padding: 10px; border-bottom: 1px solid #eee;">${i.tipo_servico}<br/><small style="color: #666;">${i.descricao || ''}</small></td>
         <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">${i.quantidade}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(i.valor_unitario)}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(i.subtotal || i.quantidade * i.valor_unitario)}</td>
       </tr>
-    `).join('')
+    `,
+      )
+      .join('')
 
-    if (!itensHtml) itensHtml = `<tr><td colspan="4" style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">Nenhum serviço detalhado</td></tr>`
+    if (!itensHtml)
+      itensHtml = `<tr><td colspan="4" style="padding: 10px; text-align: center; border-bottom: 1px solid #eee;">Nenhum serviço detalhado</td></tr>`
 
     let custosHtml = ''
     if (custos && custos.length > 0) {
@@ -69,29 +77,38 @@ Deno.serve(async (req: Request) => {
             <th style="padding: 12px 10px; text-align: left;">Descrição</th>
             <th style="padding: 12px 10px; text-align: right;">Valor</th>
           </tr>
-          ${custos.map(c => `
+          ${custos
+            .map(
+              (c) => `
             <tr>
               <td style="padding: 10px; border-bottom: 1px solid #eee;">${c.tipo}</td>
               <td style="padding: 10px; border-bottom: 1px solid #eee;">${c.descricao || '-'}</td>
               <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(c.valor)}</td>
             </tr>
-          `).join('')}
+          `,
+            )
+            .join('')}
         </table>
       `
     }
 
     const consultorio = Array.isArray(proposta.usuarios) ? proposta.usuarios[0] : proposta.usuarios
     const consultorioNome = consultorio?.nome_consultorio || consultorio?.nome || 'Consultoria'
-    const logoHtml = consultorio?.logo_url ? `<img src="${consultorio.logo_url}" height="40" alt="Logo" style="margin-bottom: 10px;" />` : ''
+    const logoHtml = consultorio?.logo_url
+      ? `<img src="${consultorio.logo_url}" height="40" alt="Logo" style="margin-bottom: 10px;" />`
+      : ''
 
     const origin = req.headers.get('origin') || 'https://lmconsultoria.goskip.app'
     const linkUrl = `${origin}/proposals/${proposta_id}/view?token=${token}`
 
     let pdfHtml = ''
     if (incluir_pdf) {
-      const { data: pdfData, error: pdfError } = await supabase.functions.invoke('gerar-pdf-proposta', {
-        body: { proposta_id }
-      })
+      const { data: pdfData, error: pdfError } = await supabase.functions.invoke(
+        'gerar-pdf-proposta',
+        {
+          body: { proposta_id },
+        },
+      )
       if (!pdfError && pdfData?.url) {
         pdfHtml = `<p style="text-align: center; margin-top: 10px;"><a href="${pdfData.url}" style="color: #2563eb; text-decoration: underline;">Download do PDF da Proposta</a></p>`
       }
@@ -146,11 +163,15 @@ Deno.serve(async (req: Request) => {
           </table>
 
           <!-- Costs -->
-          ${custosHtml ? `
+          ${
+            custosHtml
+              ? `
             <div style="margin-top: 32px;">
               ${custosHtml}
             </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <!-- Financial Summary -->
           <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 24px; margin-top: 40px; text-align: right;">
@@ -165,17 +186,25 @@ Deno.serve(async (req: Request) => {
 
           <!-- CTAs -->
           <div style="margin-top: 40px; text-align: center;">
-            ${incluir_link ? `
+            ${
+              incluir_link
+                ? `
               <a href="${linkUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2); transition: background-color 0.2s;">
                 Visualizar Proposta Online
               </a>
-            ` : ''}
+            `
+                : ''
+            }
             
-            ${pdfHtml ? `
+            ${
+              pdfHtml
+                ? `
               <div style="margin-top: 20px;">
                 ${pdfHtml.replace('<p', '<p style="margin:0;"').replace('<a', '<a style="color: #64748b; font-size: 14px; text-decoration: underline;"')}
               </div>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
         </div>
 
@@ -205,15 +234,15 @@ Deno.serve(async (req: Request) => {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${resendApiKey}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           from: `${consultorioNome} <onboarding@resend.dev>`,
           to: [email_destinatario],
           subject: `Proposta Comercial - ${proposta?.numero_proposta || 'S/N'}`,
-          html: html
-        })
+          html: html,
+        }),
       })
       if (!res.ok) {
         const errText = await res.text()
@@ -231,7 +260,7 @@ Deno.serve(async (req: Request) => {
       email_destinatario,
       assunto: `Proposta Comercial - ${proposta?.numero_proposta || 'S/N'}`,
       status: 'Enviado',
-      email_id_resend
+      email_id_resend,
     })
 
     if (insertEmailError) console.error('Erro ao registrar email_proposta', insertEmailError)
@@ -239,15 +268,22 @@ Deno.serve(async (req: Request) => {
     await supabase.from('historico_propostas').insert({
       proposta_id,
       acao: 'Enviada',
-      usuario_id: user.id
+      usuario_id: user.id,
     })
 
     await supabase.from('propostas').update({ status: 'Enviada' }).eq('id', proposta_id)
 
-    return new Response(JSON.stringify({ success: true, email_id: email_id_resend, timestamp: new Date().toISOString() }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
-    })
+    return new Response(
+      JSON.stringify({
+        success: true,
+        email_id: email_id_resend,
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      },
+    )
   } catch (error: any) {
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       status: 500,

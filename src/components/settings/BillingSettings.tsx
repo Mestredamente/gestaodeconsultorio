@@ -19,7 +19,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { CreditCard, AlertTriangle } from 'lucide-react'
+import { CreditCard, AlertTriangle, Loader2 } from 'lucide-react'
 import { cn, formatBRL } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 
@@ -32,15 +32,18 @@ interface BillingSettingsProps {
 export function BillingSettings({ user, formData, setFormData }: BillingSettingsProps) {
   const { toast } = useToast()
   const [patientCount, setPatientCount] = useState(0)
-  const [faturas, setFaturas] = useState<any[]>([])
+  const [payments, setPayments] = useState<any[]>([])
+  const [subscription, setSubscription] = useState<any>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [canceling, setCanceling] = useState(false)
   const [upgradingTo, setUpgradingTo] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true)
         const { count } = await supabase
           .from('pacientes')
           .select('id', { count: 'exact' })
@@ -48,16 +51,30 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
 
         setPatientCount(count || 0)
 
-        const { data } = await supabase
-          .from('faturas')
-          .select('*')
-          .eq('usuario_id', user.id)
-          .order('data_vencimento', { ascending: false })
-          .limit(12)
+        // Fetch new subscription structure
+        const { data: sub } = await supabase
+          .from('subscriptions')
+          .select('*, subscription_plans(name, features)')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle()
 
-        setFaturas(data || [])
+        setSubscription(sub)
+
+        if (sub) {
+          const { data: pay } = await supabase
+            .from('payments')
+            .select('*')
+            .eq('subscription_id', sub.id)
+            .order('created_at', { ascending: false })
+            .limit(12)
+
+          setPayments(pay || [])
+        }
       } catch (error) {
         console.error('Erro ao buscar dados de faturamento:', error)
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -66,22 +83,27 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
     }
   }, [user?.id])
 
+  const planId = subscription?.plan_id || formData.plano || 'gratuito'
+  const planName =
+    subscription?.subscription_plans?.name ||
+    (planId === 'basico' ? 'Básico' : planId === 'pro' ? 'Pro' : 'Gratuito')
+
   const getPlanLimit = (plano: string) => {
     if (plano === 'pro') return 'Ilimitado'
     if (plano === 'basico') return 15
     return 5
   }
-  const planLimit = getPlanLimit(formData.plano || 'gratuito')
+  const planLimit = getPlanLimit(planId)
 
-  const handleUpgrade = async (planId: string) => {
-    setUpgradingTo(planId)
+  const handleUpgrade = async (newPlanId: string) => {
+    setUpgradingTo(newPlanId)
     try {
       const return_url = `${window.location.origin}/configuracoes?upgrade_success=true`
-      const { data, error } = await supabase.functions.invoke('criar_checkout_stripe', {
-        body: { plan: planId, return_url },
+      const { data, error } = await supabase.functions.invoke('processar_pagamento', {
+        body: { plano_id: newPlanId, metodo_pagamento: 'cartao', gateway: 'stripe', return_url },
       })
       if (error) throw error
-      if (data?.url) window.location.href = data.url
+      if (data?.checkoutUrl) window.location.href = data.checkoutUrl
       else {
         toast({ title: 'Redirecionando...' })
         setTimeout(() => window.location.reload(), 1500)
@@ -94,18 +116,38 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
 
   const handleCancelSubscription = async () => {
     setCanceling(true)
+
+    if (subscription) {
+      await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', subscription.id)
+      await supabase.from('subscription_audit_log').insert({
+        subscription_id: subscription.id,
+        user_id: user.id,
+        action: 'Cancelamento pelo Usuário',
+      })
+    }
+
     const { error } = await supabase
       .from('usuarios')
       .update({ plano: 'gratuito', data_proxima_cobranca: null, stripe_subscription_id: null })
       .eq('id', user.id)
+
     setCanceling(false)
     if (!error) {
       toast({ title: 'Assinatura cancelada com sucesso.' })
       setShowCancelModal(false)
       setFormData((prev: any) => ({ ...prev, plano: 'gratuito', data_proxima_cobranca: null }))
+      setSubscription(null)
     } else {
       toast({ title: 'Erro ao cancelar', variant: 'destructive' })
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -123,10 +165,8 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                   Plano Atual
                 </h4>
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl font-bold text-slate-800 capitalize">
-                    {formData.plano || 'Gratuito'}
-                  </span>
-                  {(formData.plano === 'basico' || formData.plano === 'pro') && (
+                  <span className="text-3xl font-bold text-slate-800 capitalize">{planName}</span>
+                  {(planId === 'basico' || planId === 'pro') && (
                     <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
                       Ativo
                     </Badge>
@@ -135,12 +175,14 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
               </div>
               <div className="space-y-1 md:text-right">
                 <h4 className="text-sm font-medium text-slate-500 uppercase tracking-wider">
-                  Próxima Cobrança
+                  Próxima Cobrança / Renovação
                 </h4>
                 <p className="text-lg font-semibold text-slate-700">
-                  {formData.data_proxima_cobranca
-                    ? new Date(formData.data_proxima_cobranca).toLocaleDateString('pt-BR')
-                    : 'N/A'}
+                  {subscription?.renewal_date
+                    ? new Date(subscription.renewal_date).toLocaleDateString('pt-BR')
+                    : formData.data_proxima_cobranca
+                      ? new Date(formData.data_proxima_cobranca).toLocaleDateString('pt-BR')
+                      : 'N/A'}
                 </p>
               </div>
             </div>
@@ -177,7 +219,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
               >
                 Fazer Upgrade
               </Button>
-              {(formData.plano === 'basico' || formData.plano === 'pro') && (
+              {(planId === 'basico' || planId === 'pro') && (
                 <Button
                   variant="outline"
                   className="w-full sm:w-auto rounded-xl h-12 text-base text-rose-600 border-rose-200 hover:bg-rose-50"
@@ -195,7 +237,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
             <CardTitle className="text-xl">Pagamento</CardTitle>
           </CardHeader>
           <CardContent className="p-6 md:p-8 pt-6 flex-1 flex flex-col justify-center">
-            {formData.plano === 'basico' || formData.plano === 'pro' ? (
+            {planId === 'basico' || planId === 'pro' ? (
               <div className="space-y-6">
                 <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                   <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200">
@@ -203,8 +245,10 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                   </div>
                   <div>
                     <p className="font-semibold text-slate-700">
-                      {formData.cartao_bandeira ? formData.cartao_bandeira.toUpperCase() : 'Cartão'}{' '}
-                      final {formData.cartao_final || '****'}
+                      {formData.cartao_bandeira
+                        ? formData.cartao_bandeira.toUpperCase()
+                        : 'Cartão / PIX padrão'}{' '}
+                      {formData.cartao_final ? `final ${formData.cartao_final}` : ''}
                     </p>
                     <p className="text-xs text-slate-500">Forma de pagamento padrão</p>
                   </div>
@@ -214,7 +258,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                   className="w-full rounded-xl h-12 text-base"
                   onClick={() => toast({ title: 'Redirecionando para portal seguro...' })}
                 >
-                  Atualizar Cartão
+                  Atualizar Forma de Pagamento
                 </Button>
               </div>
             ) : (
@@ -223,7 +267,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                   <AlertTriangle className="w-6 h-6 text-slate-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-700">Nenhum cartão</p>
+                  <p className="font-medium text-slate-700">Nenhum método configurado</p>
                   <p className="text-sm text-slate-500">Você está no plano gratuito.</p>
                 </div>
               </div>
@@ -234,8 +278,8 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
 
       <Card className="rounded-[2rem] shadow-sm border-slate-100">
         <CardHeader className="p-6 md:p-8 pb-4">
-          <CardTitle className="text-xl">Histórico de Faturas</CardTitle>
-          <CardDescription>Suas cobranças dos últimos 12 meses.</CardDescription>
+          <CardTitle className="text-xl">Histórico de Pagamentos da Assinatura</CardTitle>
+          <CardDescription>Suas cobranças recentes.</CardDescription>
         </CardHeader>
         <CardContent className="px-4 sm:px-8 pb-8 pt-0">
           <div className="border border-slate-100 rounded-2xl overflow-hidden">
@@ -243,37 +287,37 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
               <TableHeader className="bg-slate-50/80">
                 <TableRow className="hover:bg-slate-50/80">
                   <TableHead className="font-semibold">Data</TableHead>
-                  <TableHead className="font-semibold">Plano</TableHead>
+                  <TableHead className="font-semibold">Gateway</TableHead>
                   <TableHead className="font-semibold">Valor</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {faturas.length === 0 ? (
+                {payments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-slate-500 h-24">
-                      Nenhuma fatura encontrada.
+                      Nenhum pagamento encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  faturas.map((f) => (
-                    <TableRow key={f.id}>
+                  payments.map((p) => (
+                    <TableRow key={p.id}>
                       <TableCell className="font-medium text-slate-700 whitespace-nowrap">
-                        {new Date(f.data_vencimento).toLocaleDateString('pt-BR')}
+                        {new Date(p.created_at).toLocaleDateString('pt-BR')}
                       </TableCell>
-                      <TableCell className="capitalize text-slate-600">{f.plano}</TableCell>
-                      <TableCell className="text-slate-700">{formatBRL(f.valor)}</TableCell>
+                      <TableCell className="capitalize text-slate-600">{p.gateway}</TableCell>
+                      <TableCell className="text-slate-700">{formatBRL(p.amount)}</TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
                           className={cn(
                             'font-semibold border-0',
-                            f.status === 'pago'
+                            p.status === 'paid'
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-amber-100 text-amber-700',
                           )}
                         >
-                          {f.status}
+                          {p.status === 'paid' ? 'Pago' : p.status}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -309,19 +353,19 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
               </ul>
               <Button
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-12 text-base"
-                disabled={upgradingTo === 'basico' || formData.plano === 'basico'}
+                disabled={upgradingTo === 'basico' || planId === 'basico'}
                 onClick={() => handleUpgrade('basico')}
               >
                 {upgradingTo === 'basico'
                   ? 'Processando...'
-                  : formData.plano === 'basico'
+                  : planId === 'basico'
                     ? 'Plano Atual'
                     : 'Selecionar Básico'}
               </Button>
             </div>
-            <div className="border-2 border-purple-200 bg-purple-50/30 rounded-2xl p-6">
-              <h3 className="text-xl font-bold text-purple-700 mb-2">Pro</h3>
-              <p className="text-3xl font-extrabold text-purple-900 mb-4">
+            <div className="border-2 border-violet-200 bg-violet-50/30 rounded-2xl p-6">
+              <h3 className="text-xl font-bold text-violet-700 mb-2">Pro</h3>
+              <p className="text-3xl font-extrabold text-violet-900 mb-4">
                 R$ 79,00<span className="text-sm font-medium text-slate-500">/mês</span>
               </p>
               <ul className="space-y-2 mb-6 text-sm font-medium text-slate-700">
@@ -330,13 +374,13 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
                 <li className="flex items-center gap-2">✓ Telemedicina Integrada</li>
               </ul>
               <Button
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl h-12 text-base"
-                disabled={upgradingTo === 'pro' || formData.plano === 'pro'}
+                className="w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl h-12 text-base"
+                disabled={upgradingTo === 'pro' || planId === 'pro'}
                 onClick={() => handleUpgrade('pro')}
               >
                 {upgradingTo === 'pro'
                   ? 'Processando...'
-                  : formData.plano === 'pro'
+                  : planId === 'pro'
                     ? 'Plano Atual'
                     : 'Selecionar Pro'}
               </Button>
