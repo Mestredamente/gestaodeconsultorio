@@ -23,7 +23,7 @@ export default function MobileNav() {
   const [open, setOpen] = useState(false)
 
   const coreItems = [
-    { name: 'Início', path: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Agenda', path: '/agenda', icon: Calendar },
     { name: 'Sala Virtual', path: '/sala-virtual', icon: Video },
     { name: 'Pacientes', path: '/pacientes', icon: Users },

@@ -32,6 +32,8 @@ import {
   Plus,
   MapPin,
   Image as ImageIcon,
+  Copy,
+  Upload,
 } from 'lucide-react'
 
 export default function Settings() {
@@ -50,6 +52,7 @@ export default function Settings() {
 
   const [testingWhatsApp, setTestingWhatsApp] = useState(false)
   const [testPhone, setTestPhone] = useState('')
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   const [settings, setSettings] = useState({
     nome_consultorio: '',
@@ -213,6 +216,43 @@ export default function Settings() {
       toast({ title: 'Erro ao excluir', description: err.message, variant: 'destructive' })
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'A imagem deve ter no máximo 5MB', variant: 'destructive' })
+      return
+    }
+
+    try {
+      setUploadingLogo(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `logo-${user.id}-${Date.now()}.${fileExt}`
+      const filePath = `logos/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('documentos-propostas')
+        .upload(filePath, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('documentos-propostas').getPublicUrl(filePath)
+
+      setSettings((prev) => ({ ...prev, logo_url: data.publicUrl }))
+      toast({ title: 'Logo anexada com sucesso! Lembre-se de salvar as alterações.' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao fazer upload do logo',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setUploadingLogo(false)
+      if (e.target) e.target.value = ''
     }
   }
 
@@ -535,9 +575,9 @@ export default function Settings() {
             </CardHeader>
             <CardContent className="p-6 space-y-8">
               <div className="space-y-4">
-                <Label className="text-base font-bold">Logotipo do Consultório (URL)</Label>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="w-24 h-24 bg-slate-100 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
+                <Label className="text-base font-bold">Logotipo do Consultório</Label>
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                  <div className="w-24 h-24 bg-slate-100 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center shrink-0 overflow-hidden relative group">
                     {settings.logo_url ? (
                       <img
                         src={settings.logo_url}
@@ -547,18 +587,35 @@ export default function Settings() {
                     ) : (
                       <ImageIcon className="w-8 h-8 text-slate-300" />
                     )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-2xl">
+                      <Upload className="w-6 h-6 text-white" />
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      onChange={handleLogoUpload}
+                      disabled={uploadingLogo}
+                      title="Fazer upload de logo"
+                    />
                   </div>
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-2 w-full">
                     <Input
                       placeholder="https://exemplo.com/logo.png"
                       value={settings.logo_url}
                       onChange={(e) => setSettings({ ...settings, logo_url: e.target.value })}
                       className="h-12 rounded-xl"
                     />
-                    <p className="text-xs text-slate-500">
-                      Cole o link (URL) direto de uma imagem para utilizá-la nos portais,
-                      prescrições e propostas.
-                    </p>
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs text-slate-500">
+                        Faça upload clicando no quadro ao lado ou cole o link (URL) direto.
+                      </p>
+                      {uploadingLogo && (
+                        <p className="text-xs text-indigo-600 animate-pulse flex items-center gap-1 font-medium">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Enviando...
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -716,7 +773,7 @@ export default function Settings() {
 
         <TabsContent value="portal">
           <Card className="rounded-[2rem] border-slate-200 shadow-sm">
-            <CardContent className="p-6 pt-6">
+            <CardContent className="p-6 pt-6 space-y-6">
               <div className="flex items-center justify-between p-5 rounded-2xl border border-slate-100 bg-slate-50">
                 <div>
                   <Label className="font-bold text-base">
@@ -733,6 +790,37 @@ export default function Settings() {
                   }
                 />
               </div>
+
+              {settings.agendamento_publico_ativo && (
+                <div className="space-y-3 p-5 rounded-2xl border border-indigo-100 bg-indigo-50/50">
+                  <Label className="font-bold text-indigo-900">
+                    Link de Agendamento (Novo Paciente)
+                  </Label>
+                  <p className="text-sm text-indigo-700">
+                    Compartilhe este link no seu Instagram, WhatsApp ou site para que os pacientes
+                    realizem o auto-cadastro e agendamento.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      readOnly
+                      value={`${window.location.origin}/agendar/${user?.id}`}
+                      className="bg-white border-indigo-200 font-mono text-sm h-12 rounded-xl text-slate-600"
+                    />
+                    <Button
+                      variant="outline"
+                      className="h-12 rounded-xl border-indigo-200 hover:bg-indigo-100 shrink-0 gap-2 text-indigo-700 font-semibold"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}/agendar/${user?.id}`,
+                        )
+                        toast({ title: 'Link copiado para a área de transferência!' })
+                      }}
+                    >
+                      <Copy className="w-4 h-4" /> Copiar Link
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
