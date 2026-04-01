@@ -32,6 +32,8 @@
     "gerar-precificacao-ia": 1,
     "gerar-followup-ia": 1,
     "excluir_usuario": 1,
-    "convidar_usuario": 1
+    "convidar_usuario": 1,
+    "renovar_assinaturas": 1,
+    "bloquear_assinaturas_vencidas": 1
   }
 }
