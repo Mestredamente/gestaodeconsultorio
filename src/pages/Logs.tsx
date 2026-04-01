@@ -1,172 +1,142 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { useAuth } from '@/hooks/use-auth'
-import { Card } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import {
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
   TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
 } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { ShieldAlert, Eye, FileText, Download } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Loader2, ShieldAlert, Activity } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
+import { ProtectedComponent } from '@/components/ProtectedComponent'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 
 export default function Logs() {
-  const { user } = useAuth()
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedLog, setSelectedLog] = useState<any>(null)
+  const { user } = useAuth()
 
   useEffect(() => {
-    if (user) {
-      supabase
-        .from('logs_auditoria')
-        .select('*')
-        .eq('usuario_id', user.id)
-        .order('data_criacao', { ascending: false })
+    const fetchLogs = async () => {
+      const { data } = await supabase
+        .from('audit_log')
+        .select('*, usuarios(nome, email)')
+        .order('timestamp', { ascending: false })
         .limit(100)
-        .then(({ data }) => {
-          if (data) setLogs(data)
-          setLoading(false)
+
+      if (data) setLogs(data)
+      setLoading(false)
+
+      if (user) {
+        supabase.functions.invoke('audit_logger', {
+          body: { user_id: user.id, action: 'view', table_name: 'audit_log' },
         })
+      }
     }
+    fetchLogs()
   }, [user])
 
-  const handleExportCSV = () => {
-    const headers = ['Data', 'Acao', 'Tabela', 'Detalhes']
-    const csvData = logs.map((l) =>
-      [
-        new Date(l.data_criacao).toLocaleString('pt-BR'),
-        l.acao,
-        l.tabela_afetada,
-        `"${JSON.stringify(l.detalhes).replace(/"/g, '""')}"`,
-      ].join(';'),
-    )
-    const blob = new Blob(['\uFEFF' + [headers.join(';'), ...csvData].join('\n')], {
-      type: 'text/csv;charset=utf-8;',
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'auditoria_logs.csv'
-    a.click()
+  const getActionColor = (action: string) => {
+    if (action.includes('delete') || action.includes('excluir'))
+      return 'bg-red-50 text-red-700 border-red-200'
+    if (action.includes('create') || action.includes('invite'))
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    if (action.includes('update')) return 'bg-blue-50 text-blue-700 border-blue-200'
+    return 'bg-slate-50 text-slate-700'
   }
 
   return (
-    <div className="space-y-6 animate-fade-in pb-10 print:hidden">
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
+    <ProtectedComponent
+      requiredPermission="view_audit_logs"
+      fallback={
+        <div className="p-8 text-center text-slate-500">
+          Acesso negado. Você não tem permissão para visualizar logs de auditoria.
+        </div>
+      }
+    >
+      <div className="max-w-6xl mx-auto space-y-6 animate-fade-in pb-10">
         <div className="flex items-center gap-3">
-          <ShieldAlert className="w-8 h-8 text-primary" />
+          <div className="bg-amber-100 p-3 rounded-xl">
+            <ShieldAlert className="w-8 h-8 text-amber-700" />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Logs do Sistema</h1>
-            <p className="text-slate-500 mt-1">Trilha de auditoria e registros críticos.</p>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+              Logs de Auditoria
+            </h1>
+            <p className="text-slate-500 mt-1">
+              Monitore atividades sensíveis e acessos no sistema.
+            </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={() => window.print()}>
-            <FileText className="w-4 h-4" /> Exportar PDF
-          </Button>
-          <Button className="gap-2" onClick={handleExportCSV}>
-            <Download className="w-4 h-4" /> Exportar Excel
-          </Button>
-        </div>
-      </div>
 
-      <Card className="shadow-sm border-slate-200 overflow-hidden">
-        <Table>
-          <TableHeader className="bg-slate-50/50">
-            <TableRow>
-              <TableHead>Data / Hora</TableHead>
-              <TableHead>Ação</TableHead>
-              <TableHead>Tabela</TableHead>
-              <TableHead className="text-right">Detalhes</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
+          <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="w-5 h-5 text-slate-500" /> Registro de Atividades (Últimos 100)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
-                  Carregando...
-                </TableCell>
-              </TableRow>
+              <div className="flex justify-center p-12">
+                <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+              </div>
             ) : logs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-slate-500">
-                  Nenhum log encontrado.
-                </TableCell>
-              </TableRow>
+              <div className="text-center p-12 text-slate-500">Nenhum log registrado.</div>
             ) : (
-              logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell className="text-slate-600">
-                    {new Date(log.data_criacao).toLocaleString('pt-BR')}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-bold ${log.acao === 'INSERT' ? 'bg-emerald-100 text-emerald-700' : log.acao === 'UPDATE' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}
-                    >
-                      {log.acao}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-slate-700">
-                    {log.tabela_afetada}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedLog(log)}
-                      className="text-slate-600 hover:text-primary"
-                    >
-                      <Eye className="w-4 h-4 mr-2" /> Ver Mudanças
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50/50">
+                      <TableHead>Data/Hora</TableHead>
+                      <TableHead>Usuário</TableHead>
+                      <TableHead>Ação</TableHead>
+                      <TableHead>Tabela</TableHead>
+                      <TableHead>IP / Dispositivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logs.map((log) => (
+                      <TableRow key={log.id} className="hover:bg-slate-50/50">
+                        <TableCell className="whitespace-nowrap text-sm text-slate-600">
+                          {format(new Date(log.timestamp), 'dd/MM/yyyy HH:mm:ss', { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-semibold text-slate-800">
+                            {log.usuarios?.nome || 'Sistema'}
+                          </p>
+                          <p className="text-xs text-slate-500">{log.usuarios?.email}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getActionColor(log.action)}>
+                            {log.action.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm font-medium text-slate-600">
+                          {log.table_name || '-'}
+                        </TableCell>
+                        <TableCell
+                          className="text-xs text-slate-500 max-w-[200px] truncate"
+                          title={log.user_agent}
+                        >
+                          <p className="font-mono bg-slate-100 px-1 py-0.5 rounded inline-block mb-1">
+                            {log.ip_address}
+                          </p>
+                          <p className="truncate">{log.user_agent}</p>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
-          </TableBody>
-        </Table>
-      </Card>
-
-      <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Detalhes da Modificação</DialogTitle>
-          </DialogHeader>
-          <div className="bg-slate-950 p-4 rounded-md overflow-auto max-h-[60vh] mt-4">
-            <pre className="text-emerald-400 text-xs font-mono whitespace-pre-wrap">
-              {JSON.stringify(selectedLog?.detalhes, null, 2)}
-            </pre>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Print View */}
-      <style>{`@media print { body * { visibility: hidden; } .print\\:block, .print\\:block * { visibility: visible !important; } }`}</style>
-      <div className="hidden print:block absolute inset-0 bg-white p-8 z-[999]">
-        <h1 className="text-2xl font-bold mb-6">Relatório de Auditoria</h1>
-        <table className="w-full text-sm text-left border-collapse">
-          <thead>
-            <tr className="border-b">
-              <th className="py-2">Data</th>
-              <th>Ação</th>
-              <th>Tabela</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((l) => (
-              <tr key={l.id} className="border-b">
-                <td className="py-2">{new Date(l.data_criacao).toLocaleString('pt-BR')}</td>
-                <td>{l.acao}</td>
-                <td className="font-mono">{l.tabela_afetada}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </ProtectedComponent>
   )
 }

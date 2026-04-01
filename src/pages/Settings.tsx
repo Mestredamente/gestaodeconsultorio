@@ -241,11 +241,36 @@ export default function Settings() {
     }
     setInviting(true)
     try {
-      const { data, error } = await supabase.functions.invoke('convidar_usuario', {
-        body: { email: inviteEmail, nome: inviteNome, role: inviteRole },
+      const roleMap: Record<string, string> = {
+        profissional: 'professional',
+        secretaria: 'secretary',
+      }
+      const mappedRole = roleMap[inviteRole] || 'professional'
+
+      const { data, error } = await supabase.functions.invoke('gerar_convite', {
+        body: {
+          email: inviteEmail,
+          role_name: mappedRole,
+          clinic_id: user?.id,
+          clinic_name: settings.nome_consultorio || 'Clínica',
+        },
       })
       if (error || data?.error) throw new Error(error?.message || data?.error)
-      toast({ title: 'Convite enviado com sucesso!' })
+
+      // Register in audit log
+      await supabase.functions.invoke('audit_logger', {
+        body: {
+          user_id: user?.id,
+          action: 'invite_user',
+          table_name: 'invitation_links',
+          details: { email: inviteEmail, role: mappedRole },
+        },
+      })
+
+      toast({
+        title:
+          'Convite enviado com sucesso! O profissional receberá um email com o link de acesso.',
+      })
       setInviteEmail('')
       setInviteNome('')
       fetchSettings()

@@ -63,11 +63,12 @@ export default function Patients() {
 
   useEffect(() => {
     fetchPatients()
+    if (user) {
+      supabase.functions.invoke('audit_logger', {
+        body: { user_id: user.id, action: 'view_list', table_name: 'pacientes' },
+      })
+    }
   }, [user, statusFilter])
-
-  useEffect(() => {
-    fetchPatients()
-  }, [user])
 
   const filteredPatients = patients.filter(
     (p) =>

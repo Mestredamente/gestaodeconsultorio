@@ -17,76 +17,35 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
+import { useAuthorization } from '@/hooks/use-authorization'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 const NAV_ITEMS = [
-  {
-    path: '/',
-    label: 'Dashboard',
-    icon: BarChart3,
-    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
-  },
-  {
-    path: '/agenda',
-    label: 'Agenda',
-    icon: CalendarDays,
-    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
-  },
-  {
-    path: '/sala-virtual',
-    label: 'Sala Virtual',
-    icon: Video,
-    badge: 'Novo',
-    roles: ['admin', 'profissional', 'superadmin'],
-  },
-  {
-    path: '/pacientes',
-    label: 'Pacientes',
-    icon: Users,
-    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
-  },
-  {
-    path: '/carteira',
-    label: 'Carteira',
-    icon: Wallet,
-    roles: ['admin', 'secretaria', 'superadmin'],
-  },
-  { path: '/admin', label: 'Painel Admin', icon: ShieldAlert, roles: ['superadmin'] },
+  { path: '/', label: 'Dashboard', icon: BarChart3 },
+  { path: '/agenda', label: 'Agenda', icon: CalendarDays, requiredPerm: 'view_schedule' },
+  { path: '/sala-virtual', label: 'Sala Virtual', icon: Video, badge: 'Novo' },
+  { path: '/pacientes', label: 'Pacientes', icon: Users, requiredPerm: 'view_patients' },
+  { path: '/carteira', label: 'Carteira', icon: Wallet, requiredPerm: 'view_financial' },
+  { path: '/admin', label: 'Painel Admin', icon: ShieldAlert, requiredPerm: 'manage_clinics' },
 ]
 
 const TOOLS_ITEMS = [
-  {
-    path: '/relatorios',
-    label: 'Relatórios',
-    icon: BarChart3,
-    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
-  },
-  { path: '/marketing', label: 'Marketing', icon: Megaphone, roles: ['admin', 'superadmin'] },
-  { path: '/rh', label: 'Recursos Humanos', icon: Users2, roles: ['admin', 'superadmin'] },
-  { path: '/estoque', label: 'Estoque', icon: Database, roles: ['admin', 'superadmin'] },
-  {
-    path: '/supervisao',
-    label: 'Supervisão',
-    icon: BriefcaseMedical,
-    roles: ['admin', 'profissional', 'superadmin'],
-  },
+  { path: '/relatorios', label: 'Relatórios', icon: BarChart3, requiredPerm: 'view_reports' },
+  { path: '/marketing', label: 'Marketing', icon: Megaphone, requiredPerm: 'manage_settings' },
+  { path: '/rh', label: 'Recursos Humanos', icon: Users2, requiredPerm: 'manage_settings' },
+  { path: '/estoque', label: 'Estoque', icon: Database, requiredPerm: 'manage_settings' },
+  { path: '/supervisao', label: 'Supervisão', icon: BriefcaseMedical },
 ]
 
 const SYSTEM_ITEMS = [
-  {
-    path: '/configuracoes',
-    label: 'Ajustes',
-    icon: SettingsIcon,
-    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
-  },
-  { path: '/logs', label: 'Auditoria', icon: Database, roles: ['admin', 'superadmin'] },
+  { path: '/configuracoes', label: 'Ajustes', icon: SettingsIcon },
+  { path: '/logs', label: 'Auditoria', icon: Database, requiredPerm: 'view_audit_logs' },
 ]
 
 export default function Sidebar() {
   const location = useLocation()
-  const { signOut, userProfile } = useAuth()
-
-  const role = userProfile?.role || 'admin'
+  const { signOut } = useAuth()
+  const { hasPermission } = useAuthorization()
 
   return (
     <aside className="w-[60px] md:w-[80px] lg:w-[260px] bg-white border-r border-slate-200 flex flex-col transition-all duration-300 h-screen sticky top-0 shrink-0 z-50">
@@ -111,39 +70,41 @@ export default function Sidebar() {
               Gestão Clínica
             </h3>
             <nav className="space-y-1">
-              {NAV_ITEMS.filter((i) => i.roles.includes(role)).map((item) => {
-                const Icon = item.icon
-                const isActive =
-                  location.pathname === item.path ||
-                  (item.path !== '/' && location.pathname.startsWith(item.path))
-                return (
-                  <Link key={item.path} to={item.path}>
-                    <Button
-                      variant={isActive ? 'secondary' : 'ghost'}
-                      className={cn(
-                        'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group relative',
-                        isActive
-                          ? 'bg-primary/10 text-primary font-bold shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
-                      )}
-                      title={item.label}
-                    >
-                      <Icon
+              {NAV_ITEMS.filter((i) => !i.requiredPerm || hasPermission(i.requiredPerm)).map(
+                (item) => {
+                  const Icon = item.icon as any
+                  const isActive =
+                    location.pathname === item.path ||
+                    (item.path !== '/' && location.pathname.startsWith(item.path))
+                  return (
+                    <Link key={item.path} to={item.path}>
+                      <Button
+                        variant={isActive ? 'secondary' : 'ghost'}
                         className={cn(
-                          'w-5 h-5 lg:mr-3 shrink-0',
-                          isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600',
+                          'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group relative',
+                          isActive
+                            ? 'bg-primary/10 text-primary font-bold shadow-sm'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
                         )}
-                      />
-                      <span className="hidden lg:block truncate">{item.label}</span>
-                      {item.badge && (
-                        <span className="hidden lg:flex absolute right-3 items-center justify-center px-1.5 h-5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-md">
-                          {item.badge}
-                        </span>
-                      )}
-                    </Button>
-                  </Link>
-                )
-              })}
+                        title={item.label}
+                      >
+                        <Icon
+                          className={cn(
+                            'w-5 h-5 lg:mr-3 shrink-0',
+                            isActive ? 'text-primary' : 'text-slate-400 group-hover:text-slate-600',
+                          )}
+                        />
+                        <span className="hidden lg:block truncate">{item.label}</span>
+                        {item.badge && (
+                          <span className="hidden lg:flex absolute right-3 items-center justify-center px-1.5 h-5 text-[10px] font-bold bg-amber-100 text-amber-700 rounded-md">
+                            {item.badge}
+                          </span>
+                        )}
+                      </Button>
+                    </Link>
+                  )
+                },
+              )}
             </nav>
           </div>
 
@@ -152,32 +113,36 @@ export default function Sidebar() {
               Ferramentas Extras
             </h3>
             <nav className="space-y-1">
-              {TOOLS_ITEMS.filter((i) => i.roles.includes(role)).map((item) => {
-                const Icon = item.icon
-                const isActive = location.pathname.startsWith(item.path)
-                return (
-                  <Link key={item.path} to={item.path}>
-                    <Button
-                      variant={isActive ? 'secondary' : 'ghost'}
-                      className={cn(
-                        'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group',
-                        isActive
-                          ? 'bg-slate-100 text-slate-900 font-bold shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
-                      )}
-                      title={item.label}
-                    >
-                      <Icon
+              {TOOLS_ITEMS.filter((i) => !i.requiredPerm || hasPermission(i.requiredPerm)).map(
+                (item) => {
+                  const Icon = item.icon as any
+                  const isActive = location.pathname.startsWith(item.path)
+                  return (
+                    <Link key={item.path} to={item.path}>
+                      <Button
+                        variant={isActive ? 'secondary' : 'ghost'}
                         className={cn(
-                          'w-5 h-5 lg:mr-3 shrink-0',
-                          isActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-600',
+                          'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group',
+                          isActive
+                            ? 'bg-slate-100 text-slate-900 font-bold shadow-sm'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
                         )}
-                      />
-                      <span className="hidden lg:block truncate">{item.label}</span>
-                    </Button>
-                  </Link>
-                )
-              })}
+                        title={item.label}
+                      >
+                        <Icon
+                          className={cn(
+                            'w-5 h-5 lg:mr-3 shrink-0',
+                            isActive
+                              ? 'text-slate-700'
+                              : 'text-slate-400 group-hover:text-slate-600',
+                          )}
+                        />
+                        <span className="hidden lg:block truncate">{item.label}</span>
+                      </Button>
+                    </Link>
+                  )
+                },
+              )}
             </nav>
           </div>
 
@@ -186,32 +151,36 @@ export default function Sidebar() {
               Sistema
             </h3>
             <nav className="space-y-1">
-              {SYSTEM_ITEMS.filter((i) => i.roles.includes(role)).map((item) => {
-                const Icon = item.icon
-                const isActive = location.pathname.startsWith(item.path)
-                return (
-                  <Link key={item.path} to={item.path}>
-                    <Button
-                      variant={isActive ? 'secondary' : 'ghost'}
-                      className={cn(
-                        'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group',
-                        isActive
-                          ? 'bg-slate-100 text-slate-900 font-bold shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
-                      )}
-                      title={item.label}
-                    >
-                      <Icon
+              {SYSTEM_ITEMS.filter((i) => !i.requiredPerm || hasPermission(i.requiredPerm)).map(
+                (item) => {
+                  const Icon = item.icon as any
+                  const isActive = location.pathname.startsWith(item.path)
+                  return (
+                    <Link key={item.path} to={item.path}>
+                      <Button
+                        variant={isActive ? 'secondary' : 'ghost'}
                         className={cn(
-                          'w-5 h-5 lg:mr-3 shrink-0',
-                          isActive ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-600',
+                          'w-full justify-center lg:justify-start h-12 lg:h-11 rounded-xl transition-all group',
+                          isActive
+                            ? 'bg-slate-100 text-slate-900 font-bold shadow-sm'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium',
                         )}
-                      />
-                      <span className="hidden lg:block truncate">{item.label}</span>
-                    </Button>
-                  </Link>
-                )
-              })}
+                        title={item.label}
+                      >
+                        <Icon
+                          className={cn(
+                            'w-5 h-5 lg:mr-3 shrink-0',
+                            isActive
+                              ? 'text-slate-700'
+                              : 'text-slate-400 group-hover:text-slate-600',
+                          )}
+                        />
+                        <span className="hidden lg:block truncate">{item.label}</span>
+                      </Button>
+                    </Link>
+                  )
+                },
+              )}
             </nav>
           </div>
         </div>

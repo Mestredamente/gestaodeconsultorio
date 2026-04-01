@@ -153,6 +153,11 @@ export default function Agenda() {
 
   useEffect(() => {
     fetchAgenda()
+    if (user) {
+      supabase.functions.invoke('audit_logger', {
+        body: { user_id: user.id, action: 'view_schedule', table_name: 'agendamentos' },
+      })
+    }
   }, [user, currentDate, viewMode])
 
   const openNewAppointment = (dateStr?: string, timeStr?: string) => {

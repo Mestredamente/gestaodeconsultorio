@@ -36,6 +36,8 @@ import HR from './pages/HR'
 import VirtualRoom from './pages/VirtualRoom'
 import Contacts from './pages/Contacts'
 import NewPatientForm from './components/NewPatientForm'
+import Join from './pages/Join'
+import { AuthorizationProvider } from './hooks/use-authorization'
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth()
@@ -53,6 +55,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => (
   <Routes>
     <Route path="/auth" element={<Auth />} />
+    <Route path="/join/:token" element={<Join />} />
     <Route path="/recuperar-senha" element={<ResetPassword />} />
     <Route path="/atualizar-senha" element={<UpdatePassword />} />
     <Route path="/login" element={<Navigate to="/auth" replace />} />
@@ -141,13 +144,15 @@ const AppRoutes = () => (
 
 const App = () => (
   <AuthProvider>
-    <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AppRoutes />
-      </TooltipProvider>
-    </BrowserRouter>
+    <AuthorizationProvider>
+      <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AppRoutes />
+        </TooltipProvider>
+      </BrowserRouter>
+    </AuthorizationProvider>
   </AuthProvider>
 )
 
