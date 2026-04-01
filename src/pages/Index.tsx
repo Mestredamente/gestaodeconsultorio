@@ -159,11 +159,11 @@ export default function Index() {
             className="h-12 px-4 rounded-xl font-bold shadow-sm flex-1 sm:flex-none gap-2 border-slate-200 hover:bg-slate-50"
             title="Personalizar Painel"
           >
-            <Settings2 className="w-5 h-5" /> <span className="hidden sm:inline">Personalizar</span>
+            <Settings2 className="w-5 h-5" />
           </Button>
           <Button
             onClick={() => navigate('/agenda')}
-            className="h-12 px-6 rounded-xl font-bold shadow-sm flex-1 sm:flex-none gap-2"
+            className="h-12 px-6 rounded-xl font-bold shadow-sm flex-1 sm:flex-none gap-2 text-[0.75rem]"
           >
             <Plus className="w-5 h-5" /> Nova Sessão
           </Button>
