@@ -4,8 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -20,7 +19,7 @@ Deno.serve(async (req: Request) => {
     let query = supabase
       .from('agendamentos')
       .select(
-        `id, data_hora, status, tipo_pagamento, usuario_id, paciente_id, pacientes (id, nome, telefone, hash_anamnese), usuarios (id, nome_consultorio, lembrete_whatsapp_ativo, template_lembrete, whatsapp_tipo)`,
+        `id, data_hora, status, tipo_pagamento, usuario_id, paciente_id, pacientes (id, nome, telefone, hash_anamnese), usuarios (id, nome_consultorio, lembrete_whatsapp_ativo, template_lembrete, whatsapp_tipo)`
       )
       .eq('status', 'agendado')
 
@@ -56,8 +55,7 @@ Deno.serve(async (req: Request) => {
           const d = new Date(apt.data_hora)
           const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
           const dateStr = d.toLocaleDateString('pt-BR')
-          const template =
-            u.template_lembrete || 'Olá [Nome], você tem uma consulta marcada às [hora].'
+          const template = u.template_lembrete || 'Olá [Nome], você tem uma consulta marcada às [hora].'
           const portalLink = `${origin}/portal/${p.hash_anamnese}`
           const confirmLink = `${origin}/confirmar/${p.hash_anamnese}/${apt.id}`
 
@@ -69,40 +67,41 @@ Deno.serve(async (req: Request) => {
             .replace(/\[link_confirmacao\]/gi, confirmLink)
             .replace(/\[link_portal\]/gi, portalLink)
 
-          const tipo = u.whatsapp_tipo === 'personal' ? 'padrao' : u.whatsapp_tipo || 'padrao'
+          const tipo = u.whatsapp_tipo === 'personal' ? 'padrao' : (u.whatsapp_tipo || 'padrao')
 
           const { error: invokeErr } = await supabase.functions.invoke('enviar_mensagem_whatsapp', {
             body: {
               tipo_whatsapp: tipo,
               telefone: p.telefone,
               mensagem: message,
-              usuario_id: u.id,
-            },
+              usuario_id: u.id
+            }
           })
 
           if (!invokeErr) {
             console.log(`[Lembrete Sent API] To: ${p.telefone} -> ${message}`)
             sentMessages.push({ patient: p.nome, phone: p.telefone, time: apt.data_hora, message })
             sentApptIds.push(apt.id)
-
+            
             historyLogs.push({
               usuario_id: apt.usuario_id,
               paciente_id: apt.paciente_id,
               tipo: 'lembrete',
               conteudo: message,
-              status_envio: 'enviado',
+              status_envio: 'enviado'
             })
 
             notificacoesLogs.push({
               usuario_id: apt.usuario_id,
               titulo: 'Lembrete de Consulta Enviado',
               mensagem: `Lembrete enviado para o paciente ${p.nome} (Sessão: ${dateStr} às ${timeStr}).`,
-              tipo: 'sistema',
+              tipo: 'sistema'
             })
           } else {
             console.error(`[Lembrete Falhou] To: ${p.telefone}`, invokeErr)
             failedApptIds.push(apt.id)
           }
+
         } else {
           failedApptIds.push(apt.id)
         }

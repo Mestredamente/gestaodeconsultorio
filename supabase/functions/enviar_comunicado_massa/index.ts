@@ -8,11 +8,9 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } },
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Unauthorized')
 
     const { titulo, conteudo, tipo, objetivo_terapeutico } = await req.json()
@@ -26,8 +24,8 @@ Deno.serve(async (req: Request) => {
 
     if (campError) throw campError
 
-    const ninetyDaysAgo = new Date()
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     // Busca emails dos pacientes do usuário logado
     const { data: pacientes } = await supabase
@@ -42,9 +40,9 @@ Deno.serve(async (req: Request) => {
       .eq('usuario_id', user.id)
       .gte('data_hora', ninetyDaysAgo.toISOString())
 
-    let activePatientIds = new Set(agendamentos?.map((a) => a.paciente_id) || [])
+    let activePatientIds = new Set(agendamentos?.map(a => a.paciente_id) || [])
 
-    // Lógica para filtrar por objetivo (Dynamic Newsletter). Em um cenário real,
+    // Lógica para filtrar por objetivo (Dynamic Newsletter). Em um cenário real, 
     // os prontuários ou a tabela de pacientes teriam uma flag `objetivo_terapeutico`.
     // Aqui usamos uma simulação que checaria o histórico ou simplesmente pegaria todos se for 'all'.
     if (objetivo_terapeutico && objetivo_terapeutico !== 'all') {
@@ -53,18 +51,16 @@ Deno.serve(async (req: Request) => {
         .select('paciente_id, queixa_principal')
         .eq('usuario_id', user.id)
         .ilike('queixa_principal', `%${objetivo_terapeutico}%`)
-
-      const filteredSet = new Set(prontuarios?.map((p) => p.paciente_id) || [])
+      
+      const filteredSet = new Set(prontuarios?.map(p => p.paciente_id) || [])
       // Intersection
-      activePatientIds = new Set([...activePatientIds].filter((x) => filteredSet.has(x)))
+      activePatientIds = new Set([...activePatientIds].filter(x => filteredSet.has(x)))
     }
 
-    const validPatients = (pacientes || []).filter(
-      (p) => p.email && p.email.trim() !== '' && activePatientIds.has(p.id),
-    )
+    const validPatients = (pacientes || []).filter(p => p.email && p.email.trim() !== '' && activePatientIds.has(p.id))
 
     // Simulando o delay do envio
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    await new Promise(resolve => setTimeout(resolve, 500))
 
     // Log de auditoria da ação
     await supabase.from('logs_auditoria').insert({
@@ -72,21 +68,14 @@ Deno.serve(async (req: Request) => {
       acao: 'SEND_MASS_EMAIL',
       tabela_afetada: 'comunicacoes_campanhas',
       registro_id: campanha.id,
-      detalhes: {
-        recipients_count: validPatients.length,
-        titulo,
-        action: 'Mock Send',
-        filter: objetivo_terapeutico,
-      },
+      detalhes: { recipients_count: validPatients.length, titulo, action: 'Mock Send', filter: objetivo_terapeutico }
     })
 
     return new Response(JSON.stringify({ success: true, count: validPatients.length, campanha }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
+
