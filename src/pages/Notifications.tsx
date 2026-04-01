@@ -48,7 +48,7 @@ export default function Notifications() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10 px-4 sm:px-0 mt-6 sm:mt-0">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary/10 text-primary rounded-lg">

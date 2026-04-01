@@ -352,7 +352,11 @@ export default function Header() {
                 )}
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0 mr-4 mt-2 rounded-2xl shadow-xl border-slate-200">
+            <PopoverContent
+              align="end"
+              sideOffset={8}
+              className="w-80 max-w-[calc(100vw-2rem)] p-0 rounded-2xl shadow-xl border-slate-200 z-50"
+            >
               <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
                 <span className="font-bold text-slate-800">Notificações</span>
                 <Button

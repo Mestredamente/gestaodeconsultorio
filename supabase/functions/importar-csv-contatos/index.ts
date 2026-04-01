@@ -4,7 +4,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -17,10 +18,13 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      { global: { headers: { Authorization: authHeader } } },
     )
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
     if (userError || !user) throw new Error('Unauthorized')
 
     const { records, preview } = await req.json()
@@ -31,21 +35,21 @@ Deno.serve(async (req: Request) => {
       total: records.length,
       sucesso: 0,
       erros: [] as any[],
-      tempo_ms: 0
+      tempo_ms: 0,
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const validRecords = []
-    
+
     for (let i = 0; i < records.length; i++) {
       const rec = records[i]
       const linha = i + 1
-      
+
       if (!rec.nome || rec.nome.trim() === '') {
         results.erros.push({ linha, motivo: 'Nome é obrigatório' })
         continue
       }
-      
+
       if (rec.email && !emailRegex.test(rec.email)) {
         results.erros.push({ linha, motivo: 'Email inválido' })
         continue
@@ -54,14 +58,16 @@ Deno.serve(async (req: Request) => {
       validRecords.push({
         ...rec,
         usuario_id: user.id,
-        _linha: linha
+        _linha: linha,
       })
     }
 
     if (preview) {
       results.sucesso = validRecords.length
       results.tempo_ms = Date.now() - startTime
-      return new Response(JSON.stringify(results), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify(results), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     for (const rec of validRecords) {
