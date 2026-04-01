@@ -1,13 +1,13 @@
 {
   "_versions": {
     "enviar_cobranca_whatsapp": 17,
-    "enviar_lembrete_consulta": 21,
+    "enviar_lembrete_consulta": 22,
     "emitir_nota_fiscal": 5,
     "enviar_comunicado_massa": 5,
     "transcrever_audio": 3,
     "processar_cobrancas_recorrentes": 5,
     "functions": 6,
-    "lembrete_sessao": 9,
+    "lembrete_sessao": 10,
     "gerar_insights_paciente": 4,
     "gerar_sugestao_evolucao": 2,
     "processar_pagamento": 5,
