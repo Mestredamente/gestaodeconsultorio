@@ -95,8 +95,6 @@ export default function VirtualRoom() {
     }, 3000)
     return () => clearTimeout(timer)
   }, [notes, activeSession, user])
-  const [isNotesOpen, setIsNotesOpen] = useState(false)
-  const [notes, setNotes] = useState('')
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false)
 
   useEffect(() => {

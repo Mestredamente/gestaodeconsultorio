@@ -8,7 +8,7 @@ ALTER TABLE public.pacientes
 ADD COLUMN IF NOT EXISTS ativo BOOLEAN DEFAULT true;
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $
+RETURNS trigger AS $$
 BEGIN
   INSERT INTO public.usuarios (id, email, nome_consultorio, nome, especialidade)
   VALUES (
@@ -26,4 +26,4 @@ BEGIN
 
   RETURN new;
 END;
-$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

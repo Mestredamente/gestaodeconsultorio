@@ -15,7 +15,7 @@
     "criar_checkout_stripe": 5,
     "stripe_webhook": 4,
     "gerar_link_sala_virtual": 4,
-    "enviar_mensagem_whatsapp": 8,
+    "enviar_mensagem_whatsapp": 9,
     "executar_automacao": 6,
     "gerar-pdf-proposta": 2,
     "enviar-proposta-email": 3,
@@ -34,6 +34,7 @@
     "excluir_usuario": 1,
     "convidar_usuario": 1,
     "renovar_assinaturas": 1,
-    "bloquear_assinaturas_vencidas": 1
+    "bloquear_assinaturas_vencidas": 1,
+    "excluir_minha_conta": 1
   }
 }
