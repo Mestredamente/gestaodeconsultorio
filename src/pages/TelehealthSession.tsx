@@ -732,7 +732,10 @@ export default function TelehealthSession() {
                         stream.getTracks().forEach((t) => t.stop())
                         setStream(null)
                       }
-                      setInWaitingRoom(false)
+                      // Delay to ensure mobile hardware camera is fully released
+                      setTimeout(() => {
+                        setInWaitingRoom(false)
+                      }, 600)
                     }}
                   >
                     <CheckCircle className="w-5 h-5" /> Confirmar Dispositivos e Iniciar Sessão
@@ -779,7 +782,7 @@ export default function TelehealthSession() {
         <div className="flex-1 flex flex-col relative p-0 bg-slate-900">
           <iframe
             allow="camera; microphone; fullscreen; display-capture; autoplay"
-            src={`https://meet.jit.si/PsicManager_${(apt?.id || agendamentoId || 'avulsa').replace(/-/g, '')}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}&config.prejoinPageEnabled=false`}
+            src={`https://meet.jit.si/PsicManager_${(apt?.id || agendamentoId || 'avulsa').replace(/-/g, '')}${apt?.sala_virtual_token ? `?jwt=${apt.sala_virtual_token}` : ''}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}&config.prejoinPageEnabled=false`}
             className="w-full h-full border-0 absolute inset-0 pt-16 md:pt-0"
           />
         </div>

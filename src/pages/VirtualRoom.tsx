@@ -166,8 +166,12 @@ export default function VirtualRoom() {
   const joinLiveSession = () => {
     if (stream) stream.getTracks().forEach((t) => t.stop())
     setStream(null)
-    setInDeviceTest(false)
-    setIframeLoaded(false)
+
+    // Pequeno delay para garantir que o hardware da câmera foi liberado pelo SO mobile
+    setTimeout(() => {
+      setInDeviceTest(false)
+      setIframeLoaded(false)
+    }, 600)
   }
 
   const endSession = async () => {
@@ -366,8 +370,8 @@ export default function VirtualRoom() {
           </div>
         )}
         <iframe
-          src={`https://meet.jit.si/PsicManager_${activeSession.id.replace(/-/g, '')}?jwt=${activeSession.sala_virtual_token || ''}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}`}
-          allow="camera; microphone; fullscreen"
+          src={`https://meet.jit.si/PsicManager_${activeSession.id.replace(/-/g, '')}${activeSession.sala_virtual_token ? `?jwt=${activeSession.sala_virtual_token}` : ''}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}&config.prejoinPageEnabled=false`}
+          allow="camera; microphone; fullscreen; display-capture; autoplay"
           className={`w-full h-full border-0 absolute inset-0 pt-16 pb-24 z-0 ${!iframeLoaded ? 'opacity-0' : 'opacity-100'}`}
           onLoad={() => setIframeLoaded(true)}
         />
