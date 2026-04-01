@@ -14,11 +14,8 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) throw new Error('Não autorizado')
 
     const token = authHeader.replace('Bearer ', '')
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token)
-
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    
     if (authError || !user) throw new Error('Não autorizado')
 
     const { email, password } = await req.json()
@@ -27,7 +24,7 @@ Deno.serve(async (req: Request) => {
     const authClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '')
     const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
       email,
-      password,
+      password
     })
 
     if (signInError || !signInData.user || signInData.user.id !== user.id) {
@@ -39,19 +36,19 @@ Deno.serve(async (req: Request) => {
       acao: 'DELETA_CONTA',
       tabela_afetada: 'usuarios',
       registro_id: user.id,
-      detalhes: { email: user.email, reason: 'Exclusão solicitada pelo próprio usuário' },
+      detalhes: { email: user.email, reason: 'Exclusão solicitada pelo próprio usuário' }
     })
 
     const { error: deleteError } = await supabase.auth.admin.deleteUser(user.id)
     if (deleteError) throw deleteError
 
     return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 })
