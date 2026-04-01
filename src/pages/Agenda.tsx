@@ -255,7 +255,12 @@ export default function Agenda() {
 
       await supabase.from('agendamentos').delete().eq('id', appointmentToCancel.id)
 
-      toast({ title: 'Agendamento cancelado e deletado com sucesso!' })
+      toast({
+        title: 'Agendamento cancelado!',
+        description: 'O paciente foi notificado do cancelamento.',
+        className: 'bg-emerald-500 text-white',
+        duration: 3000,
+      })
       fetchAgenda()
     } catch (err: any) {
       toast({ title: 'Erro ao cancelar', description: err.message, variant: 'destructive' })
@@ -285,13 +290,18 @@ export default function Agenda() {
           valor_recebido: 0,
           status: 'pendente',
         })
-        toast({ title: 'Presença confirmada e cobrança gerada!' })
+        toast({
+          title: 'Presença confirmada!',
+          description: 'Cobrança gerada com sucesso.',
+          className: 'bg-emerald-500 text-white',
+          duration: 3000,
+        })
       } else {
-        toast({ title: `Status atualizado para ${newStatus}` })
+        toast({ title: `Status atualizado para ${newStatus}`, duration: 3000 })
       }
       fetchAgenda()
     } catch (e: any) {
-      toast({ title: 'Erro ao atualizar', variant: 'destructive' })
+      toast({ title: 'Erro ao atualizar', variant: 'destructive', duration: 5000 })
     }
   }
 
@@ -329,7 +339,6 @@ export default function Agenda() {
       case 'agendado':
         return 'bg-blue-50 text-blue-700 border-blue-200'
       case 'confirmado':
-        return 'bg-indigo-50 text-indigo-700 border-indigo-200'
       case 'compareceu':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200'
       case 'faltou':
@@ -493,9 +502,9 @@ export default function Agenda() {
                               <div className="hidden sm:flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
                                 {apt.is_online && (
                                   <Button
-                                    variant="ghost"
+                                    variant="outline"
                                     size="icon"
-                                    className="h-8 w-8 text-blue-600 hover:bg-blue-50"
+                                    className="h-8 w-8 text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       handleShareLink(apt)
@@ -506,42 +515,42 @@ export default function Agenda() {
                                   </Button>
                                 )}
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="icon"
-                                  className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                                  className="h-8 w-8 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border-emerald-200"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     updateStatus(apt, 'compareceu')
                                   }}
-                                  title="Compareceu"
+                                  title="Presença"
                                 >
                                   <CheckCircle2 className="w-4 h-4" />
                                 </Button>
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="icon"
-                                  className="h-8 w-8 text-amber-600 hover:bg-amber-50"
+                                  className="h-8 w-8 text-red-600 bg-red-50 hover:bg-red-100 border-red-200"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     updateStatus(apt, 'faltou')
                                   }}
-                                  title="Faltou"
+                                  title="Falta"
                                 >
                                   <XCircle className="w-4 h-4" />
                                 </Button>
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="icon"
-                                  className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                  className="h-8 w-8 text-slate-600 bg-slate-50 hover:bg-slate-100 border-slate-200"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setAppointmentToCancel(apt)
                                     setCancelReason('')
                                     setIsCancelDialogOpen(true)
                                   }}
-                                  title="Deletar Agendamento"
+                                  title="Cancelado"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Ban className="w-4 h-4" />
                                 </Button>
                               </div>
                             </div>

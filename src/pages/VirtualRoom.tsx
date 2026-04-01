@@ -71,6 +71,32 @@ export default function VirtualRoom() {
   const [iframeLoaded, setIframeLoaded] = useState(false)
   const [isNotesOpen, setIsNotesOpen] = useState(false)
   const [notes, setNotes] = useState('')
+  const notesRef = useRef(notes)
+
+  useEffect(() => {
+    notesRef.current = notes
+  }, [notes])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (notes && activeSession && user) {
+        supabase
+          .from('prontuarios')
+          .upsert(
+            {
+              paciente_id: activeSession.paciente_id,
+              usuario_id: user.id,
+              nova_nota: notes,
+            },
+            { onConflict: 'paciente_id' },
+          )
+          .then()
+      }
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [notes, activeSession, user])
+  const [isNotesOpen, setIsNotesOpen] = useState(false)
+  const [notes, setNotes] = useState('')
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false)
 
   useEffect(() => {
@@ -193,11 +219,38 @@ export default function VirtualRoom() {
         valor_recebido: 0,
         status: 'pendente',
       })
+
+      if (notesRef.current) {
+        const { data: rec } = await supabase
+          .from('prontuarios')
+          .select('historico_sessoes')
+          .eq('paciente_id', activeSession.paciente_id)
+          .maybeSingle()
+        const history = Array.isArray(rec?.historico_sessoes) ? rec.historico_sessoes : []
+        const entry = {
+          data: new Date().toISOString(),
+          tipo: 'Evolução de Sessão Online',
+          descricao: notesRef.current,
+        }
+        await supabase.from('prontuarios').upsert(
+          {
+            paciente_id: activeSession.paciente_id,
+            usuario_id: user?.id,
+            historico_sessoes: [entry, ...history],
+            nova_nota: '',
+          },
+          { onConflict: 'paciente_id' },
+        )
+      }
     }
     setActiveSession(null)
     setInDeviceTest(false)
     navigate('/')
-    toast({ title: 'Sessão finalizada com sucesso!' })
+    toast({
+      title: 'Sessão finalizada com sucesso!',
+      className: 'bg-emerald-500 text-white',
+      duration: 3000,
+    })
   }
 
   if (loading)
@@ -362,6 +415,37 @@ export default function VirtualRoom() {
         <span className="text-white font-medium pointer-events-auto">
           Sessão com <strong className="font-bold">{patient?.nome}</strong>
         </span>
+
+        <Sheet open={isNotesOpen} onOpenChange={setIsNotesOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="secondary"
+              className="pointer-events-auto gap-2 bg-slate-800 text-white hover:bg-slate-700 border-none"
+            >
+              <FileText className="w-4 h-4" /> Notas da Sessão
+            </Button>
+          </SheetTrigger>
+          <SheetContent
+            side="right"
+            className="w-[90vw] sm:max-w-[500px] flex flex-col h-full bg-white z-[60] border-l border-slate-200"
+          >
+            <SheetHeader>
+              <SheetTitle>Notas da Sessão</SheetTitle>
+              <SheetDescription>Suas notas são salvas automaticamente.</SheetDescription>
+            </SheetHeader>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="flex-1 mt-4 resize-none bg-slate-50 focus-visible:ring-primary rounded-xl"
+              placeholder="Digite suas evoluções em tempo real..."
+            />
+            <div className="pt-4 flex justify-end">
+              <Button onClick={() => setIsNotesOpen(false)} className="rounded-xl px-8">
+                Salvar e Fechar
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
       <div className="flex-1 relative flex items-center justify-center bg-slate-900 w-full pt-16 pb-24">
         {!iframeLoaded && (

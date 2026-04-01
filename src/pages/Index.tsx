@@ -17,11 +17,13 @@ import {
 import { formatBRL, cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/hooks/use-toast'
 import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
 
 export default function Index() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
 
   const [stats, setStats] = useState({ sessoesHoje: 0, saldoAReceber: 0 })
@@ -136,6 +138,41 @@ export default function Index() {
     }
 
     fetchDashboardData()
+
+    if (user) {
+      const channel = supabase
+        .channel('dashboard_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'financeiro', filter: `usuario_id=eq.${user.id}` },
+          fetchDashboardData,
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'agendamentos',
+            filter: `usuario_id=eq.${user.id}`,
+          },
+          (payload) => {
+            if (payload.new.status === 'desmarcou' && payload.old.status !== 'desmarcou') {
+              toast({
+                title: 'Sessão Cancelada 🔔',
+                description: `O paciente cancelou a sessão. Motivo: ${payload.new.motivo_cancelamento || 'Não informado'}`,
+                duration: 6000,
+                className: 'bg-amber-500 text-white',
+              })
+            }
+            fetchDashboardData()
+          },
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
   }, [user])
 
   if (loading) {

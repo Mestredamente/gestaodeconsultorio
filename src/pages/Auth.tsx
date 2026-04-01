@@ -56,6 +56,8 @@ export default function Auth() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [clinicName, setClinicName] = useState('')
+  const [nome, setNome] = useState('')
+  const [especialidade, setEspecialidade] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [showPws, setShowPws] = useState({ login: false, signup: false, confirm: false })
@@ -77,7 +79,30 @@ export default function Auth() {
     e.preventDefault()
 
     if (action === 'signup' && password !== confirmPassword) {
-      toast({ title: 'Erro', description: 'As senhas não coincidem.', variant: 'destructive' })
+      toast({
+        title: 'Erro',
+        description: 'As senhas não coincidem.',
+        variant: 'destructive',
+        duration: 5000,
+      })
+      return
+    }
+    if (action === 'signup' && password.length < 8) {
+      toast({
+        title: 'Erro',
+        description: 'A senha deve ter no mínimo 8 caracteres.',
+        variant: 'destructive',
+        duration: 5000,
+      })
+      return
+    }
+    if (action === 'signup' && password.length < 8) {
+      toast({
+        title: 'Erro',
+        description: 'A senha deve ter no mínimo 8 caracteres.',
+        variant: 'destructive',
+        duration: 5000,
+      })
       return
     }
 
@@ -87,14 +112,20 @@ export default function Auth() {
       if (action === 'login') {
         const { error } = await signIn(email, password)
         if (error) throw error
-        toast({ title: 'Bem-vindo de volta!' })
+        toast({
+          title: 'Bem-vindo de volta!',
+          className: 'bg-emerald-500 text-white',
+          duration: 3000,
+        })
         navigate('/', { replace: true })
       } else {
-        const { error } = await signUp(email, password, clinicName)
+        const { error } = await signUp(email, password, clinicName, nome, especialidade)
         if (error) throw error
         toast({
           title: 'Conta criada!',
           description: 'Bem-vindo ao sistema. Complete seu cadastro.',
+          className: 'bg-emerald-500 text-white',
+          duration: 3000,
         })
         navigate('/onboarding', { replace: true })
       }
@@ -189,6 +220,19 @@ export default function Auth() {
 
             <TabsContent value="signup">
               <form onSubmit={(e) => handleAuth('signup', e)} className="space-y-3">
+                <div className="space-y-1">
+                  <Label>Nome Completo</Label>
+                  <Input value={nome} onChange={(e) => setNome(e.target.value)} required />
+                </div>
+                <div className="space-y-1">
+                  <Label>Especialidade</Label>
+                  <Input
+                    value={especialidade}
+                    onChange={(e) => setEspecialidade(e.target.value)}
+                    placeholder="Ex: Psicologia Clínica"
+                    required
+                  />
+                </div>
                 <div className="space-y-1">
                   <Label>Nome do Consultório</Label>
                   <Input

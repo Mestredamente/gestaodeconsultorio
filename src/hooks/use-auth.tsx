@@ -9,6 +9,8 @@ interface AuthContextType {
     email: string,
     password: string,
     clinicName?: string,
+    nome?: string,
+    especialidade?: string,
   ) => Promise<{ data: any; error: any }>
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>
   signInWithGoogle: () => Promise<{ data: any; error: any }>
@@ -164,13 +166,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
-  const signUp = async (email: string, password: string, clinicName?: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    clinicName?: string,
+    nome?: string,
+    especialidade?: string,
+  ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: clinicName ? { nome_consultorio: clinicName } : undefined,
+        data: { nome_consultorio: clinicName, nome, especialidade },
       },
     })
     return { data, error }

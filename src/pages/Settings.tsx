@@ -93,7 +93,16 @@ export default function Settings() {
     data_proxima_cobranca: null,
     cartao_bandeira: '',
     cartao_final: '',
+    nome: '',
+    cpf: '',
+    especialidade: '',
+    valor_sessao_padrao: '',
+    dados_bancarios: { banco: '', agencia: '', conta: '' },
   })
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
 
   const [preferences, setPreferences] = useState<any>({ theme_color: 'indigo' })
 
@@ -131,6 +140,11 @@ export default function Settings() {
         data_proxima_cobranca: data.data_proxima_cobranca || null,
         cartao_bandeira: data.cartao_bandeira || '',
         cartao_final: data.cartao_final || '',
+        nome: data.nome || '',
+        cpf: data.cpf || '',
+        especialidade: data.especialidade || '',
+        valor_sessao_padrao: data.valor_sessao_padrao || '',
+        dados_bancarios: data.dados_bancarios || { banco: '', agencia: '', conta: '' },
       })
       if (data.preferencias_dashboard) {
         setPreferences(data.preferencias_dashboard)
@@ -331,6 +345,7 @@ export default function Settings() {
     { id: 'violet', name: 'Violeta', class: 'bg-violet-500' },
     { id: 'amber', name: 'Âmbar', class: 'bg-amber-500' },
     { id: 'cyan', name: 'Ciano', class: 'bg-cyan-500' },
+    { id: 'pink', name: 'Rosa', class: 'bg-pink-500' },
   ]
 
   return (
@@ -404,7 +419,32 @@ export default function Settings() {
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Nome do Consultório / Profissional</Label>
+                  <Label>Nome Completo</Label>
+                  <Input
+                    value={settings.nome}
+                    onChange={(e) => setSettings({ ...settings, nome: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Especialidade</Label>
+                  <Input
+                    value={settings.especialidade}
+                    onChange={(e) => setSettings({ ...settings, especialidade: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>CPF</Label>
+                  <Input
+                    value={settings.cpf}
+                    onChange={(e) => setSettings({ ...settings, cpf: maskCPF(e.target.value) })}
+                    className="h-12 rounded-xl"
+                    placeholder="000.000.000-00"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Nome do Consultório</Label>
                   <Input
                     value={settings.nome_consultorio}
                     onChange={(e) => setSettings({ ...settings, nome_consultorio: e.target.value })}
@@ -424,6 +464,18 @@ export default function Settings() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label>Valor Padrão da Sessão</Label>
+                  <Input
+                    type="number"
+                    value={settings.valor_sessao_padrao}
+                    onChange={(e) =>
+                      setSettings({ ...settings, valor_sessao_padrao: e.target.value })
+                    }
+                    className="h-12 rounded-xl"
+                    placeholder="150.00"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label>Chave PIX (Padrão para Recebimentos)</Label>
                   <Input
                     value={settings.chave_pix}
@@ -431,9 +483,136 @@ export default function Settings() {
                     className="h-12 rounded-xl font-mono text-sm"
                   />
                 </div>
+                <div className="space-y-2 md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="col-span-1 sm:col-span-3">
+                    <Label className="font-bold">Dados Bancários</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Banco</Label>
+                    <Input
+                      value={settings.dados_bancarios?.banco}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          dados_bancarios: { ...settings.dados_bancarios, banco: e.target.value },
+                        })
+                      }
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Agência</Label>
+                    <Input
+                      value={settings.dados_bancarios?.agencia}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          dados_bancarios: { ...settings.dados_bancarios, agencia: e.target.value },
+                        })
+                      }
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Conta</Label>
+                    <Input
+                      value={settings.dados_bancarios?.conta}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          dados_bancarios: { ...settings.dados_bancarios, conta: e.target.value },
+                        })
+                      }
+                      className="bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-8 pt-8 border-t border-red-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h4 className="text-red-600 font-bold">Deletar Minha Conta</h4>
+                  <p className="text-sm text-slate-500">
+                    Esta ação é irreversível e apagará todos os seus dados.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="w-full sm:w-auto"
+                  onClick={() => setShowDeleteModal(true)}
+                >
+                  Deletar Conta
+                </Button>
               </div>
             </CardContent>
           </Card>
+
+          <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+            <DialogContent className="rounded-2xl p-6 w-[95vw] sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle className="text-red-600">Deletar Conta Definitivamente?</DialogTitle>
+                <DialogDescription>
+                  Para confirmar, digite sua senha. Todos os seus pacientes, agendamentos e dados
+                  serão apagados para sempre.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Label>Sua Senha</Label>
+                <Input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="mt-2"
+                />
+              </div>
+              <DialogFooter className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  disabled={!deletePassword || deletingAccount}
+                  onClick={async () => {
+                    setDeletingAccount(true)
+                    try {
+                      const { data, error } = await supabase.functions.invoke(
+                        'excluir_minha_conta',
+                        { body: { email: user?.email, password: deletePassword } },
+                      )
+                      if (error || data?.error)
+                        throw new Error(error?.message || data?.error || 'Erro ao excluir')
+                      toast({
+                        title: 'Conta excluída',
+                        description: 'Sua conta foi removida com sucesso.',
+                        duration: 3000,
+                      })
+                      window.location.href = '/'
+                    } catch (err: any) {
+                      toast({
+                        title: 'Erro',
+                        description: err.message,
+                        variant: 'destructive',
+                        duration: 5000,
+                      })
+                    } finally {
+                      setDeletingAccount(false)
+                    }
+                  }}
+                >
+                  {deletingAccount ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Confirmar Exclusão'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Card className="rounded-[2rem] border-slate-200 shadow-sm">
             <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 rounded-t-[2rem]">

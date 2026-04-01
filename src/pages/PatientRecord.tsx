@@ -25,6 +25,15 @@ export default function PatientRecord() {
   const [noteType, setNoteType] = useState('Evolução Clínica')
   const [saving, setSaving] = useState(false)
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (newNote.trim() && record && user) {
+        supabase.from('prontuarios').update({ nova_nota: newNote }).eq('id', record.id).then()
+      }
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [newNote, record, user])
+
   const fetchData = async () => {
     if (!user || !id) return
     setLoading(true)

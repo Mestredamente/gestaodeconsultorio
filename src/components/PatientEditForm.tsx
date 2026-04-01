@@ -413,23 +413,47 @@ export default function PatientEditForm({ patient, onCancel, onSuccess }: any) {
             </div>
           </div>
 
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-slate-100">
             <Button
               type="button"
-              variant="outline"
-              onClick={onCancel}
-              className="rounded-xl h-14 sm:h-12 px-6 text-base"
+              variant="destructive"
+              className="w-full sm:w-auto rounded-xl h-12"
+              onClick={async () => {
+                if (
+                  confirm(
+                    'Tem certeza que deseja inativar este paciente? O histórico será mantido.',
+                  )
+                ) {
+                  await supabase.from('pacientes').update({ ativo: false }).eq('id', patient.id)
+                  toast({
+                    title: 'Paciente inativado com sucesso.',
+                    className: 'bg-emerald-500 text-white',
+                    duration: 3000,
+                  })
+                  onSuccess()
+                }
+              }}
             >
-              Cancelar
+              Inativar Paciente
             </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="rounded-xl h-14 sm:h-12 px-8 text-base font-bold"
-            >
-              {loading && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
-              Salvar Alterações
-            </Button>
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 w-full sm:w-auto">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                className="rounded-xl h-14 sm:h-12 px-6 text-base"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="rounded-xl h-14 sm:h-12 px-8 text-base font-bold"
+              >
+                {loading && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
+                Salvar Alterações
+              </Button>
+            </div>
           </div>
         </form>
       </CardContent>

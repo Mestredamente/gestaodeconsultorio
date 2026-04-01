@@ -335,19 +335,15 @@ export default function Finances() {
                   <Label className="text-slate-700 font-semibold text-base md:text-sm">
                     Valor (R$)
                   </Label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
-                      R$
-                    </span>
-                    <Input
-                      type="number"
-                      placeholder="0,00"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="pl-10 h-12 rounded-xl text-lg font-bold bg-slate-50/50"
-                    />
-                  </div>
-                </div>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="h-12 rounded-xl text-lg font-bold bg-slate-50/50"
+                  />
+                </div>{' '}
               </div>
 
               <div className="space-y-3">

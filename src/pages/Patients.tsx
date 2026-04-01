@@ -36,19 +36,25 @@ export default function Patients() {
   const [patients, setPatients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ativos')
 
   const fetchPatients = async () => {
     if (!user) return
     setLoading(true)
     const { data } = await supabase
       .from('pacientes')
-      .select('id, nome, telefone, email, data_criacao, recorrencia, status:id')
+      .select('id, nome, telefone, email, data_criacao, recorrencia, ativo')
       .eq('usuario_id', user.id)
+      .eq('ativo', statusFilter === 'ativos')
       .order('nome')
 
     if (data) setPatients(data)
     setLoading(false)
   }
+
+  useEffect(() => {
+    fetchPatients()
+  }, [user, statusFilter])
 
   useEffect(() => {
     fetchPatients()
@@ -87,11 +93,30 @@ export default function Patients() {
               className="pl-10 h-12 md:h-10 rounded-xl bg-white border-slate-200 shadow-sm text-base md:text-sm"
             />
           </div>
-          {isMobile && (
-            <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl shrink-0">
-              <Filter className="w-5 h-5 text-slate-600" />
-            </Button>
-          )}
+          <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 h-12 md:h-10">
+            <button
+              className={cn(
+                'px-4 rounded-lg text-sm font-bold transition-all h-full flex items-center',
+                statusFilter === 'ativos'
+                  ? 'bg-white shadow-sm text-slate-900'
+                  : 'text-slate-500 hover:text-slate-700',
+              )}
+              onClick={() => setStatusFilter('ativos')}
+            >
+              Ativos
+            </button>
+            <button
+              className={cn(
+                'px-4 rounded-lg text-sm font-bold transition-all h-full flex items-center',
+                statusFilter === 'inativos'
+                  ? 'bg-white shadow-sm text-slate-900'
+                  : 'text-slate-500 hover:text-slate-700',
+              )}
+              onClick={() => setStatusFilter('inativos')}
+            >
+              Inativos
+            </button>
+          </div>
         </div>
 
         {loading ? (
