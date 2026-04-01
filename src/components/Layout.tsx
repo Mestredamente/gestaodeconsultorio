@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase/client'
 import MobileNav from './layout/MobileNav'
+import NotificationsBell from './layout/NotificationsBell'
 
 const removeThemes = () => {
   document.documentElement.classList.remove(
@@ -128,13 +129,16 @@ export default function Layout() {
             <span className="truncate">{clinic.name}</span>
           </div>
         </div>
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 -mr-2 text-slate-500 hover:bg-slate-50 rounded-full active:bg-slate-100 transition-colors"
-          aria-label="Menu Principal"
-        >
-          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationsBell />
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 -mr-2 text-slate-500 hover:bg-slate-50 rounded-full active:bg-slate-100 transition-colors"
+            aria-label="Menu Principal"
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        </div>
       </header>
 
       {/* Sidebar */}
@@ -213,8 +217,13 @@ export default function Layout() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-10 max-w-full overflow-x-hidden min-h-[calc(100vh-3.5rem)]">
-        <Outlet />
+      <main className="flex-1 max-w-full overflow-x-hidden min-h-[calc(100vh-3.5rem)] flex flex-col relative">
+        <div className="hidden md:flex justify-end px-6 pt-6 pb-2 lg:px-10 lg:pt-8 lg:pb-0 sticky top-0 z-40 bg-slate-50/90 backdrop-blur-sm border-b border-transparent">
+          <NotificationsBell />
+        </div>
+        <div className="flex-1 p-4 sm:p-6 lg:px-10 lg:pb-10 lg:pt-6">
+          <Outlet />
+        </div>
       </main>
       <MobileNav />
     </div>

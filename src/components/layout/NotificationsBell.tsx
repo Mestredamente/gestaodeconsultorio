@@ -1,0 +1,288 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Bell, CalendarX } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
+import { supabase } from '@/lib/supabase/client'
+import { useToast } from '@/hooks/use-toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+
+export default function NotificationsBell() {
+  const { user } = useAuth()
+  const { toast } = useToast()
+
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notifications, setNotifications] = useState<any[]>([])
+
+  const [unreadCancelCount, setUnreadCancelCount] = useState(0)
+  const [cancellations, setCancellations] = useState<any[]>([])
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    const fetchNotifs = async () => {
+      try {
+        const { data } = await supabase
+          .from('notificacoes')
+          .select('*')
+          .eq('usuario_id', user.id)
+          .order('data_criacao', { ascending: false })
+          .limit(10)
+
+        if (data) {
+          setNotifications(data)
+          setUnreadCount(data.filter((n) => !n.lida).length)
+        }
+      } catch (err) {
+        console.error('Erro inesperado ao buscar notificações:', err)
+      }
+    }
+    fetchNotifs()
+
+    const sub = supabase
+      .channel('header_notifs_layout')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notificacoes', filter: `usuario_id=eq.${user.id}` },
+        () => fetchNotifs(),
+      )
+      .subscribe()
+
+    const cancelSub = supabase
+      .channel('header_cancellations')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agendamentos',
+          filter: `usuario_id=eq.${user.id}`,
+        },
+        async (payload: any) => {
+          if (payload.new.status === 'desmarcou') {
+            if (payload.old && payload.old.status === 'desmarcou') return
+
+            supabase
+              .from('pacientes')
+              .select('nome')
+              .eq('id', payload.new.paciente_id)
+              .single()
+              .then(({ data }) => {
+                const newCancel = {
+                  id: payload.new.id,
+                  patientName: data?.nome || 'Paciente',
+                  date: payload.new.data_hora,
+                  reason: payload.new.motivo_cancelamento || 'Motivo não informado',
+                }
+
+                setCancellations((curr) => {
+                  if (curr.some((c) => c.id === newCancel.id)) return curr
+                  setUnreadCancelCount((cnt) => cnt + 1)
+
+                  toast({
+                    title: 'Sessão Cancelada',
+                    description: `Paciente ${newCancel.patientName} cancelou a sessão de ${new Date(newCancel.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Motivo: ${newCancel.reason}`,
+                    variant: 'destructive',
+                  })
+
+                  return [newCancel, ...curr]
+                })
+              })
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(sub)
+      supabase.removeChannel(cancelSub)
+    }
+  }, [user, toast])
+
+  const markAllAsRead = async () => {
+    if (!user) return
+    await supabase
+      .from('notificacoes')
+      .update({ lida: true })
+      .eq('usuario_id', user.id)
+      .eq('lida', false)
+    setNotifications((prev) => prev.map((n) => ({ ...n, lida: true })))
+    setUnreadCount(0)
+  }
+
+  return (
+    <div className="flex items-center gap-1 sm:gap-2 bg-white/80 backdrop-blur-md rounded-2xl p-1 shadow-sm border border-slate-200/60">
+      <button
+        onClick={() => {
+          setIsCancelModalOpen(true)
+          setUnreadCancelCount(0)
+        }}
+        className="relative p-2 sm:p-2.5 text-slate-500 hover:text-red-600 transition-colors hover:bg-red-50 rounded-xl"
+        title="Cancelamentos Recentes"
+      >
+        <CalendarX className="w-5 h-5" />
+        {unreadCancelCount > 0 && (
+          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+        )}
+      </button>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            className="relative p-2 sm:p-2.5 text-slate-500 hover:text-primary transition-colors hover:bg-slate-100 rounded-xl group"
+            title="Notificações"
+          >
+            <Bell
+              className={cn(
+                'w-5 h-5 transition-transform group-hover:scale-110',
+                unreadCount > 0 && 'text-primary',
+              )}
+            />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+            )}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          sideOffset={8}
+          className="w-80 max-w-[calc(100vw-2rem)] p-0 rounded-2xl shadow-xl border-slate-200 z-50"
+        >
+          <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
+            <span className="font-bold text-slate-800">Notificações</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={markAllAsRead}
+              className="h-8 text-xs text-primary"
+            >
+              Marcar lidas
+            </Button>
+          </div>
+          <Tabs defaultValue="todos">
+            <TabsList className="w-full rounded-none border-b border-slate-100 h-auto p-0 bg-transparent">
+              <TabsTrigger
+                value="todos"
+                className="flex-1 rounded-none py-2 data-[state=active]:border-b-2 data-[state=active]:border-primary shadow-none"
+              >
+                Todos
+              </TabsTrigger>
+              <TabsTrigger
+                value="naolidos"
+                className="flex-1 rounded-none py-2 data-[state=active]:border-b-2 data-[state=active]:border-primary shadow-none"
+              >
+                Não Lidos
+              </TabsTrigger>
+            </TabsList>
+            <div className="max-h-80 overflow-y-auto">
+              <TabsContent value="todos" className="m-0">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 text-sm">Nenhuma notificação.</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={cn(
+                        'p-4 border-b border-slate-50 text-sm hover:bg-slate-50',
+                        !n.lida && 'bg-indigo-50/30',
+                      )}
+                    >
+                      <p
+                        className={cn(
+                          'font-semibold mb-1',
+                          n.lida ? 'text-slate-700' : 'text-slate-900',
+                        )}
+                      >
+                        {n.titulo}
+                      </p>
+                      <p className="text-slate-600 text-xs mb-2">{n.mensagem}</p>
+                      <p className="text-[10px] text-slate-400">
+                        {new Date(n.data_criacao).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </TabsContent>
+              <TabsContent value="naolidos" className="m-0">
+                {notifications.filter((n) => !n.lida).length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 text-sm">Tudo lido por aqui.</div>
+                ) : (
+                  notifications
+                    .filter((n) => !n.lida)
+                    .map((n) => (
+                      <div
+                        key={n.id}
+                        className="p-4 border-b border-slate-50 text-sm bg-indigo-50/30 hover:bg-indigo-50/50"
+                      >
+                        <p className="font-semibold text-slate-900 mb-1">{n.titulo}</p>
+                        <p className="text-slate-600 text-xs mb-2">{n.mensagem}</p>
+                        <p className="text-[10px] text-slate-400">
+                          {new Date(n.data_criacao).toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                    ))
+                )}
+              </TabsContent>
+            </div>
+          </Tabs>
+          <div className="p-2 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl text-center">
+            <Link
+              to="/notificacoes"
+              className="text-xs font-bold text-slate-500 hover:text-primary"
+            >
+              Ver todas as notificações
+            </Link>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <CalendarX className="w-5 h-5" /> Cancelamentos Recentes
+            </DialogTitle>
+            <DialogDescription>
+              Acompanhe os agendamentos que foram desmarcados recentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {cancellations.length === 0 ? (
+              <p className="text-slate-500 text-center py-8 bg-slate-50 rounded-xl border border-dashed">
+                Nenhum cancelamento recente.
+              </p>
+            ) : (
+              cancellations.map((c, idx) => (
+                <div key={idx} className="bg-red-50 border border-red-100 p-4 rounded-xl shadow-sm">
+                  <p className="font-bold text-red-900 text-base">Paciente: {c.patientName}</p>
+                  <p className="text-xs text-red-800 mt-1 font-medium bg-white/50 inline-block px-2 py-0.5 rounded">
+                    Sessão de:{' '}
+                    {new Date(c.date).toLocaleString('pt-BR', {
+                      dateStyle: 'short',
+                      timeStyle: 'short',
+                    })}
+                  </p>
+                  <div className="mt-3 bg-white p-3 rounded-lg border border-red-100">
+                    <p className="text-xs text-red-400 uppercase font-bold tracking-wider mb-1">
+                      Motivo
+                    </p>
+                    <p className="text-sm text-slate-700 italic">"{c.reason}"</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
