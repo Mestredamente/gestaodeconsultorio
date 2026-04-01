@@ -48,6 +48,9 @@ export default function Settings() {
   const searchParams = new URLSearchParams(location.search)
   const tabParam = searchParams.get('tab') || 'geral'
   const [activeTab, setActiveTab] = useState(tabParam)
+  const { userProfile } = useAuth()
+  const role = userProfile?.role || 'admin'
+  const isOwner = role === 'admin' || role === 'superadmin'
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -373,42 +376,47 @@ export default function Settings() {
           >
             <Building2 className="w-4 h-4" /> Perfil
           </TabsTrigger>
-          <TabsTrigger
-            value="equipe"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
-          >
-            <Users className="w-4 h-4" /> Equipe
-          </TabsTrigger>
-          <TabsTrigger
-            value="aparencia"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
-          >
-            <Palette className="w-4 h-4" /> Aparência
-          </TabsTrigger>
-          <TabsTrigger
-            value="comunicacao"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
-          >
-            <MessageCircle className="w-4 h-4" /> Mensagens
-          </TabsTrigger>
-          <TabsTrigger
-            value="portal"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
-          >
-            <LinkIcon className="w-4 h-4" /> Portal
-          </TabsTrigger>
-          <TabsTrigger
-            value="legal"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
-          >
-            <Shield className="w-4 h-4" /> Legal
-          </TabsTrigger>
-          <TabsTrigger
-            value="assinatura"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
-          >
-            <CreditCard className="w-4 h-4" /> Assinatura
-          </TabsTrigger>
+
+          {isOwner && (
+            <>
+              <TabsTrigger
+                value="equipe"
+                className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+              >
+                <Users className="w-4 h-4" /> Equipe
+              </TabsTrigger>
+              <TabsTrigger
+                value="aparencia"
+                className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+              >
+                <Palette className="w-4 h-4" /> Aparência
+              </TabsTrigger>
+              <TabsTrigger
+                value="comunicacao"
+                className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+              >
+                <MessageCircle className="w-4 h-4" /> Mensagens
+              </TabsTrigger>
+              <TabsTrigger
+                value="portal"
+                className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+              >
+                <LinkIcon className="w-4 h-4" /> Portal
+              </TabsTrigger>
+              <TabsTrigger
+                value="legal"
+                className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+              >
+                <Shield className="w-4 h-4" /> Legal
+              </TabsTrigger>
+              <TabsTrigger
+                value="assinatura"
+                className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+              >
+                <CreditCard className="w-4 h-4" /> Assinatura
+              </TabsTrigger>
+            </>
+          )}
         </TabsList>
 
         <TabsContent value="geral" className="space-y-6">
@@ -443,90 +451,108 @@ export default function Settings() {
                     placeholder="000.000.000-00"
                   />
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Nome do Consultório</Label>
-                  <Input
-                    value={settings.nome_consultorio}
-                    onChange={(e) => setSettings({ ...settings, nome_consultorio: e.target.value })}
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone (WhatsApp)</Label>
-                  <Input
-                    inputMode="tel"
-                    placeholder="(00) 00000-0000"
-                    value={settings.telefone_consultorio}
-                    onChange={(e) =>
-                      setSettings({ ...settings, telefone_consultorio: maskPhone(e.target.value) })
-                    }
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Valor Padrão da Sessão</Label>
-                  <Input
-                    type="number"
-                    value={settings.valor_sessao_padrao}
-                    onChange={(e) =>
-                      setSettings({ ...settings, valor_sessao_padrao: e.target.value })
-                    }
-                    className="h-12 rounded-xl"
-                    placeholder="150.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Chave PIX (Padrão para Recebimentos)</Label>
-                  <Input
-                    value={settings.chave_pix}
-                    onChange={(e) => setSettings({ ...settings, chave_pix: e.target.value })}
-                    className="h-12 rounded-xl font-mono text-sm"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="col-span-1 sm:col-span-3">
-                    <Label className="font-bold">Dados Bancários</Label>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Banco</Label>
-                    <Input
-                      value={settings.dados_bancarios?.banco}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          dados_bancarios: { ...settings.dados_bancarios, banco: e.target.value },
-                        })
-                      }
-                      className="bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Agência</Label>
-                    <Input
-                      value={settings.dados_bancarios?.agencia}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          dados_bancarios: { ...settings.dados_bancarios, agencia: e.target.value },
-                        })
-                      }
-                      className="bg-white"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Conta</Label>
-                    <Input
-                      value={settings.dados_bancarios?.conta}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          dados_bancarios: { ...settings.dados_bancarios, conta: e.target.value },
-                        })
-                      }
-                      className="bg-white"
-                    />
-                  </div>
-                </div>
+                {isOwner && (
+                  <>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Nome do Consultório</Label>
+                      <Input
+                        value={settings.nome_consultorio}
+                        onChange={(e) =>
+                          setSettings({ ...settings, nome_consultorio: e.target.value })
+                        }
+                        className="h-12 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Telefone (WhatsApp)</Label>
+                      <Input
+                        inputMode="tel"
+                        placeholder="(00) 00000-0000"
+                        value={settings.telefone_consultorio}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            telefone_consultorio: maskPhone(e.target.value),
+                          })
+                        }
+                        className="h-12 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Valor Padrão da Sessão</Label>
+                      <Input
+                        type="number"
+                        value={settings.valor_sessao_padrao}
+                        onChange={(e) =>
+                          setSettings({ ...settings, valor_sessao_padrao: e.target.value })
+                        }
+                        className="h-12 rounded-xl"
+                        placeholder="150.00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Chave PIX (Padrão para Recebimentos)</Label>
+                      <Input
+                        value={settings.chave_pix}
+                        onChange={(e) => setSettings({ ...settings, chave_pix: e.target.value })}
+                        className="h-12 rounded-xl font-mono text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <div className="col-span-1 sm:col-span-3">
+                        <Label className="font-bold">Dados Bancários</Label>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Banco</Label>
+                        <Input
+                          value={settings.dados_bancarios?.banco}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              dados_bancarios: {
+                                ...settings.dados_bancarios,
+                                banco: e.target.value,
+                              },
+                            })
+                          }
+                          className="bg-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Agência</Label>
+                        <Input
+                          value={settings.dados_bancarios?.agencia}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              dados_bancarios: {
+                                ...settings.dados_bancarios,
+                                agencia: e.target.value,
+                              },
+                            })
+                          }
+                          className="bg-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Conta</Label>
+                        <Input
+                          value={settings.dados_bancarios?.conta}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              dados_bancarios: {
+                                ...settings.dados_bancarios,
+                                conta: e.target.value,
+                              },
+                            })
+                          }
+                          className="bg-white"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="mt-8 pt-8 border-t border-red-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
@@ -614,78 +640,80 @@ export default function Settings() {
             </DialogContent>
           </Dialog>
 
-          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
-            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 rounded-t-[2rem]">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-primary" /> Endereço
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="space-y-2 relative">
-                  <Label>CEP</Label>
-                  <Input
-                    value={settings.cep}
-                    inputMode="numeric"
-                    onChange={handleCepChange}
-                    placeholder="00000-000"
-                    className="h-12 rounded-xl pr-10"
-                  />
-                  {fetchingCep && (
-                    <Loader2 className="absolute right-3 top-9 w-4 h-4 text-slate-400 animate-spin" />
-                  )}
+          {isOwner && (
+            <Card className="rounded-[2rem] border-slate-200 shadow-sm">
+              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 rounded-t-[2rem]">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary" /> Endereço
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2 relative">
+                    <Label>CEP</Label>
+                    <Input
+                      value={settings.cep}
+                      inputMode="numeric"
+                      onChange={handleCepChange}
+                      placeholder="00000-000"
+                      className="h-12 rounded-xl pr-10"
+                    />
+                    {fetchingCep && (
+                      <Loader2 className="absolute right-3 top-9 w-4 h-4 text-slate-400 animate-spin" />
+                    )}
+                  </div>
+                  <div className="space-y-2 md:col-span-3">
+                    <Label>Rua / Logradouro</Label>
+                    <Input
+                      value={settings.rua}
+                      onChange={(e) => setSettings({ ...settings, rua: e.target.value })}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Número</Label>
+                    <Input
+                      value={settings.numero}
+                      onChange={(e) => setSettings({ ...settings, numero: e.target.value })}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Complemento</Label>
+                    <Input
+                      value={settings.complemento}
+                      onChange={(e) => setSettings({ ...settings, complemento: e.target.value })}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Bairro</Label>
+                    <Input
+                      value={settings.bairro}
+                      onChange={(e) => setSettings({ ...settings, bairro: e.target.value })}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Cidade</Label>
+                    <Input
+                      value={settings.cidade}
+                      onChange={(e) => setSettings({ ...settings, cidade: e.target.value })}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Estado</Label>
+                    <Input
+                      value={settings.estado}
+                      onChange={(e) => setSettings({ ...settings, estado: e.target.value })}
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2 md:col-span-3">
-                  <Label>Rua / Logradouro</Label>
-                  <Input
-                    value={settings.rua}
-                    onChange={(e) => setSettings({ ...settings, rua: e.target.value })}
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Número</Label>
-                  <Input
-                    value={settings.numero}
-                    onChange={(e) => setSettings({ ...settings, numero: e.target.value })}
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Complemento</Label>
-                  <Input
-                    value={settings.complemento}
-                    onChange={(e) => setSettings({ ...settings, complemento: e.target.value })}
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Bairro</Label>
-                  <Input
-                    value={settings.bairro}
-                    onChange={(e) => setSettings({ ...settings, bairro: e.target.value })}
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Cidade</Label>
-                  <Input
-                    value={settings.cidade}
-                    onChange={(e) => setSettings({ ...settings, cidade: e.target.value })}
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Estado</Label>
-                  <Input
-                    value={settings.estado}
-                    onChange={(e) => setSettings({ ...settings, estado: e.target.value })}
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="equipe" className="space-y-6">

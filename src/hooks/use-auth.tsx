@@ -18,6 +18,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ error: any }>
   updatePassword: (password: string) => Promise<{ error: any }>
   loading: boolean
+  userProfile: any
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -32,6 +33,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [userProfile, setUserProfile] = useState<any>(null)
 
   useEffect(() => {
     let mounted = true
@@ -132,6 +134,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         setSession(session)
         setUser(session?.user ?? null)
+        if (session?.user) {
+          supabase
+            .from('usuarios')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+            .then(({ data }) => {
+              if (data && mounted) setUserProfile(data)
+            })
+        } else {
+          setUserProfile(null)
+        }
       }
       setLoading(false)
     })
@@ -145,6 +159,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setSession(session)
           setUser(session?.user ?? null)
+          if (session?.user) {
+            supabase
+              .from('usuarios')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+              .then(({ data }) => {
+                if (data && mounted) setUserProfile(data)
+              })
+          }
         }
       })
       .catch((err) => {
@@ -276,6 +300,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         resetPassword,
         updatePassword,
         loading,
+        userProfile,
       }}
     >
       {children}

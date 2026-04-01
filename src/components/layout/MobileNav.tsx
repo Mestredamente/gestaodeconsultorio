@@ -17,17 +17,48 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useState, useEffect } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function MobileNav() {
   const location = useLocation()
   const [open, setOpen] = useState(false)
+  const { userProfile } = useAuth()
+  const role = userProfile?.role || 'admin'
 
-  const coreItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Agenda', path: '/agenda', icon: Calendar },
-    { name: 'Sala Virtual', path: '/sala-virtual', icon: Video },
-    { name: 'Pacientes', path: '/pacientes', icon: Users },
+  const allItems = [
+    {
+      name: 'Dashboard',
+      path: '/',
+      icon: LayoutDashboard,
+      roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+    },
+    {
+      name: 'Agenda',
+      path: '/agenda',
+      icon: Calendar,
+      roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+    },
+    {
+      name: 'Sala Virtual',
+      path: '/sala-virtual',
+      icon: Video,
+      roles: ['admin', 'profissional', 'superadmin'],
+    },
+    {
+      name: 'Pacientes',
+      path: '/pacientes',
+      icon: Users,
+      roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+    },
+    {
+      name: 'Carteira',
+      path: '/carteira',
+      icon: Wallet,
+      roles: ['admin', 'secretaria', 'superadmin'],
+    },
   ]
+
+  const coreItems = allItems.filter((i) => i.roles.includes(role)).slice(0, 4)
 
   return (
     <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 flex items-center justify-around p-2 pb-safe md:hidden z-50 shadow-[0_-8px_24px_rgba(0,0,0,0.04)] h-16">

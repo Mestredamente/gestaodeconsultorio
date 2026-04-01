@@ -28,7 +28,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import NewPatientForm from '@/components/NewPatientForm'
 
 export default function Patients() {
-  const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -38,15 +37,25 @@ export default function Patients() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ativos')
 
+  const { user, userProfile } = useAuth()
+
   const fetchPatients = async () => {
     if (!user) return
     setLoading(true)
-    const { data } = await supabase
+
+    const tenantId = userProfile?.parent_id || user.id
+
+    let query = supabase
       .from('pacientes')
       .select('id, nome, telefone, email, data_criacao, recorrencia, ativo')
-      .eq('usuario_id', user.id)
+      .eq('usuario_id', tenantId)
       .eq('ativo', statusFilter === 'ativos')
-      .order('nome')
+
+    if (userProfile?.role === 'profissional') {
+      query = query.eq('profissional_id', user.id)
+    }
+
+    const { data } = await query.order('nome')
 
     if (data) setPatients(data)
     setLoading(false)

@@ -47,7 +47,7 @@ import WhatsAppBillingDialog from '@/components/WhatsAppBillingDialog'
 import { useIsMobile } from '@/hooks/use-mobile'
 
 export default function Finances() {
-  const { user, session } = useAuth()
+  const { user, session, userProfile } = useAuth()
   const { toast } = useToast()
   const isMobile = useIsMobile()
   const [loading, setLoading] = useState(true)
@@ -72,19 +72,20 @@ export default function Finances() {
     const currentYear = today.getFullYear()
 
     try {
+      const tenantId = userProfile?.parent_id || user.id
       const [finRes, despRes, patRes, userRes] = await Promise.all([
         supabase
           .from('financeiro')
           .select('*, pacientes(nome)')
-          .eq('usuario_id', user.id)
+          .eq('usuario_id', tenantId)
           .order('data_atualizacao', { ascending: false }),
         supabase
           .from('despesas')
           .select('*')
-          .eq('usuario_id', user.id)
+          .eq('usuario_id', tenantId)
           .gte('data', `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`),
-        supabase.from('pacientes').select('id, nome').eq('usuario_id', user.id),
-        supabase.from('usuarios').select('chave_pix').eq('id', user.id).single(),
+        supabase.from('pacientes').select('id, nome').eq('usuario_id', tenantId),
+        supabase.from('usuarios').select('chave_pix').eq('id', tenantId).single(),
       ])
 
       const allFinances = finRes.data || []
@@ -125,8 +126,9 @@ export default function Finances() {
     setIsProcessing(true)
     try {
       const dateObj = new Date(paymentDate)
+      const tenantId = userProfile?.parent_id || user!.id
       const { error } = await supabase.from('financeiro').insert({
-        usuario_id: user!.id,
+        usuario_id: tenantId,
         paciente_id: selectedPatient,
         valor_recebido: Number(amount),
         valor_a_receber: 0,
@@ -181,9 +183,10 @@ export default function Finances() {
         toast({ title: 'Link Gerado', description: `Redirecionando para o ${gateway}...` })
 
         // Optimistically update
+        const tenantId = userProfile?.parent_id || user!.id
         const dateObj = new Date()
         await supabase.from('financeiro').insert({
-          usuario_id: user!.id,
+          usuario_id: tenantId,
           paciente_id: selectedPatient,
           valor_recebido: Number(amount),
           valor_a_receber: 0,

@@ -20,29 +20,73 @@ import { useAuth } from '@/hooks/use-auth'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 const NAV_ITEMS = [
-  { path: '/', label: 'Dashboard', icon: BarChart3 },
-  { path: '/agenda', label: 'Agenda', icon: CalendarDays },
-  { path: '/sala-virtual', label: 'Sala Virtual', icon: Video, badge: 'Novo' },
-  { path: '/pacientes', label: 'Pacientes', icon: Users },
-  { path: '/carteira', label: 'Carteira', icon: Wallet },
+  {
+    path: '/',
+    label: 'Dashboard',
+    icon: BarChart3,
+    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+  },
+  {
+    path: '/agenda',
+    label: 'Agenda',
+    icon: CalendarDays,
+    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+  },
+  {
+    path: '/sala-virtual',
+    label: 'Sala Virtual',
+    icon: Video,
+    badge: 'Novo',
+    roles: ['admin', 'profissional', 'superadmin'],
+  },
+  {
+    path: '/pacientes',
+    label: 'Pacientes',
+    icon: Users,
+    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+  },
+  {
+    path: '/carteira',
+    label: 'Carteira',
+    icon: Wallet,
+    roles: ['admin', 'secretaria', 'superadmin'],
+  },
+  { path: '/admin', label: 'Painel Admin', icon: ShieldAlert, roles: ['superadmin'] },
 ]
 
 const TOOLS_ITEMS = [
-  { path: '/relatorios', label: 'Relatórios', icon: BarChart3 },
-  { path: '/marketing', label: 'Marketing', icon: Megaphone },
-  { path: '/rh', label: 'Recursos Humanos', icon: Users2 },
-  { path: '/estoque', label: 'Estoque', icon: Database },
-  { path: '/supervisao', label: 'Supervisão', icon: BriefcaseMedical },
+  {
+    path: '/relatorios',
+    label: 'Relatórios',
+    icon: BarChart3,
+    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+  },
+  { path: '/marketing', label: 'Marketing', icon: Megaphone, roles: ['admin', 'superadmin'] },
+  { path: '/rh', label: 'Recursos Humanos', icon: Users2, roles: ['admin', 'superadmin'] },
+  { path: '/estoque', label: 'Estoque', icon: Database, roles: ['admin', 'superadmin'] },
+  {
+    path: '/supervisao',
+    label: 'Supervisão',
+    icon: BriefcaseMedical,
+    roles: ['admin', 'profissional', 'superadmin'],
+  },
 ]
 
 const SYSTEM_ITEMS = [
-  { path: '/configuracoes', label: 'Ajustes', icon: SettingsIcon },
-  { path: '/logs', label: 'Auditoria', icon: Database },
+  {
+    path: '/configuracoes',
+    label: 'Ajustes',
+    icon: SettingsIcon,
+    roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+  },
+  { path: '/logs', label: 'Auditoria', icon: Database, roles: ['admin', 'superadmin'] },
 ]
 
 export default function Sidebar() {
   const location = useLocation()
-  const { signOut } = useAuth()
+  const { signOut, userProfile } = useAuth()
+
+  const role = userProfile?.role || 'admin'
 
   return (
     <aside className="w-[60px] md:w-[80px] lg:w-[260px] bg-white border-r border-slate-200 flex flex-col transition-all duration-300 h-screen sticky top-0 shrink-0 z-50">
@@ -67,7 +111,7 @@ export default function Sidebar() {
               Gestão Clínica
             </h3>
             <nav className="space-y-1">
-              {NAV_ITEMS.map((item) => {
+              {NAV_ITEMS.filter((i) => i.roles.includes(role)).map((item) => {
                 const Icon = item.icon
                 const isActive =
                   location.pathname === item.path ||
@@ -108,7 +152,7 @@ export default function Sidebar() {
               Ferramentas Extras
             </h3>
             <nav className="space-y-1">
-              {TOOLS_ITEMS.map((item) => {
+              {TOOLS_ITEMS.filter((i) => i.roles.includes(role)).map((item) => {
                 const Icon = item.icon
                 const isActive = location.pathname.startsWith(item.path)
                 return (
@@ -142,7 +186,7 @@ export default function Sidebar() {
               Sistema
             </h3>
             <nav className="space-y-1">
-              {SYSTEM_ITEMS.map((item) => {
+              {SYSTEM_ITEMS.filter((i) => i.roles.includes(role)).map((item) => {
                 const Icon = item.icon
                 const isActive = location.pathname.startsWith(item.path)
                 return (

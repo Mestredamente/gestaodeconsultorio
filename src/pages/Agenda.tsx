@@ -59,7 +59,13 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn, formatBRL } from '@/lib/utils'
 
 export default function Agenda() {
-  const { user } = useAuth()
+  const { user, userProfile } = useAuth()
+  const role = userProfile?.role || 'admin'
+  const canCreate = ['admin', 'superadmin', 'secretaria'].includes(role)
+  const canEdit = ['admin', 'superadmin', 'secretaria'].includes(role)
+  const canDelete = ['admin', 'superadmin'].includes(role)
+  const canCancel = ['admin', 'superadmin', 'secretaria'].includes(role)
+  const isProfissional = role === 'profissional'
   const { toast } = useToast()
 
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -67,6 +73,7 @@ export default function Agenda() {
 
   const [appointments, setAppointments] = useState<any[]>([])
   const [patients, setPatients] = useState<any[]>([])
+  const [professionals, setProfessionals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -74,6 +81,7 @@ export default function Agenda() {
   const [formData, setFormData] = useState({
     id: '',
     paciente_id: '',
+    profissional_id: '',
     data: format(new Date(), 'yyyy-MM-dd'),
     hora: '09:00',
     status: 'agendado',
@@ -105,21 +113,41 @@ export default function Agenda() {
       end.setHours(23, 59, 59, 999)
     }
 
-    const { data } = await supabase
+    const tenantId = userProfile?.parent_id || user.id
+
+    let agendaQuery = supabase
       .from('agendamentos')
       .select('*, pacientes(id, nome, valor_sessao, telefone)')
-      .eq('usuario_id', user.id)
+      .eq('usuario_id', tenantId)
       .gte('data_hora', start.toISOString())
       .lte('data_hora', end.toISOString())
-      .order('data_hora')
 
-    const { data: pats } = await supabase
+    if (isProfissional) {
+      agendaQuery = agendaQuery.eq('profissional_id', user.id)
+    }
+
+    const { data } = await agendaQuery.order('data_hora')
+
+    let patsQuery = supabase
       .from('pacientes')
       .select('id, nome, valor_sessao, telefone')
-      .eq('usuario_id', user.id)
+      .eq('usuario_id', tenantId)
+
+    if (isProfissional) {
+      patsQuery = patsQuery.eq('profissional_id', user.id)
+    }
+
+    const { data: pats } = await patsQuery
+
+    const { data: profs } = await supabase
+      .from('usuarios')
+      .select('id, nome, role')
+      .or(`id.eq.${tenantId},parent_id.eq.${tenantId}`)
 
     if (data) setAppointments(data)
     if (pats) setPatients(pats)
+    if (profs)
+      setProfessionals(profs.filter((p: any) => p.role === 'admin' || p.role === 'profissional'))
     setLoading(false)
   }
 
@@ -128,9 +156,11 @@ export default function Agenda() {
   }, [user, currentDate, viewMode])
 
   const openNewAppointment = (dateStr?: string, timeStr?: string) => {
+    if (!canCreate) return
     setFormData({
       id: '',
       paciente_id: '',
+      profissional_id: isProfissional ? user.id : userProfile?.parent_id || user.id,
       data: dateStr || format(currentDate, 'yyyy-MM-dd'),
       hora: timeStr || '09:00',
       status: 'agendado',
@@ -142,10 +172,12 @@ export default function Agenda() {
   }
 
   const openEditAppointment = (apt: any) => {
+    if (!canEdit) return
     const d = new Date(apt.data_hora)
     setFormData({
       id: apt.id,
       paciente_id: apt.paciente_id,
+      profissional_id: apt.profissional_id || apt.usuario_id,
       data: format(d, 'yyyy-MM-dd'),
       hora: format(d, 'HH:mm'),
       status: apt.status,
@@ -171,8 +203,11 @@ export default function Agenda() {
       ? Number(String(formData.valor_total).replace(',', '.'))
       : 0
 
+    const tenantId = userProfile?.parent_id || user.id
+
     const payload = {
-      usuario_id: user.id,
+      usuario_id: tenantId,
+      profissional_id: formData.profissional_id,
       paciente_id: formData.paciente_id,
       data_hora: dateTime.toISOString(),
       status: formData.status,
@@ -281,8 +316,9 @@ export default function Agenda() {
         const month = dt.getMonth() + 1
         const year = dt.getFullYear()
 
+        const tenantId = userProfile?.parent_id || user?.id
         await supabase.from('financeiro').insert({
-          usuario_id: user?.id,
+          usuario_id: tenantId,
           paciente_id: apt.paciente_id,
           mes: month,
           ano: year,
@@ -377,14 +413,20 @@ export default function Agenda() {
                 </div>
                 <div className="flex-1 min-h-[4rem] border-l-2 border-slate-100 pl-4 py-1 relative">
                   {aptsInHour.length === 0 ? (
-                    <div
-                      className="h-full w-full rounded-xl border-2 border-dashed border-transparent group-hover:border-slate-200 flex items-center justify-center cursor-pointer transition-colors opacity-0 group-hover:opacity-100"
-                      onClick={() => openNewAppointment(format(currentDate, 'yyyy-MM-dd'), timeStr)}
-                    >
-                      <span className="text-slate-400 text-sm font-medium flex items-center gap-1">
-                        <Plus className="w-4 h-4" /> Agendar
-                      </span>
-                    </div>
+                    canCreate ? (
+                      <div
+                        className="h-full w-full rounded-xl border-2 border-dashed border-transparent group-hover:border-slate-200 flex items-center justify-center cursor-pointer transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={() =>
+                          openNewAppointment(format(currentDate, 'yyyy-MM-dd'), timeStr)
+                        }
+                      >
+                        <span className="text-slate-400 text-sm font-medium flex items-center gap-1">
+                          <Plus className="w-4 h-4" /> Agendar
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="h-full w-full"></div>
+                    )
                   ) : (
                     <div className="flex flex-col gap-2">
                       {aptsInHour.map((apt) => {
@@ -486,14 +528,41 @@ export default function Agenda() {
                                     <DropdownMenuItem
                                       onClick={(e) => {
                                         e.stopPropagation()
+                                        if (!canCancel)
+                                          return toast({
+                                            title: 'Acesso Negado',
+                                            variant: 'destructive',
+                                          })
                                         setAppointmentToCancel(apt)
                                         setCancelReason('')
                                         setIsCancelDialogOpen(true)
                                       }}
                                       className="text-red-600 focus:bg-red-50 py-2.5"
+                                      disabled={!canCancel}
                                     >
                                       <Trash2 className="w-4 h-4 mr-2" /> Cancelar Sessão
                                     </DropdownMenuItem>
+
+                                    {canDelete && (
+                                      <DropdownMenuItem
+                                        onClick={async (e) => {
+                                          e.stopPropagation()
+                                          if (
+                                            confirm('Excluir permanentemente este agendamento?')
+                                          ) {
+                                            await supabase
+                                              .from('agendamentos')
+                                              .delete()
+                                              .eq('id', apt.id)
+                                            toast({ title: 'Excluído' })
+                                            fetchAgenda()
+                                          }
+                                        }}
+                                        className="text-red-600 focus:bg-red-50 py-2.5"
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" /> Excluir Registro
+                                      </DropdownMenuItem>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </div>
@@ -544,11 +613,14 @@ export default function Agenda() {
                                   className="h-8 w-8 text-slate-600 bg-slate-50 hover:bg-slate-100 border-slate-200"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    setAppointmentToCancel(apt)
-                                    setCancelReason('')
-                                    setIsCancelDialogOpen(true)
+                                    if (canCancel) {
+                                      setAppointmentToCancel(apt)
+                                      setCancelReason('')
+                                      setIsCancelDialogOpen(true)
+                                    }
                                   }}
                                   title="Cancelado"
+                                  disabled={!canCancel}
                                 >
                                   <Ban className="w-4 h-4" />
                                 </Button>
@@ -608,12 +680,16 @@ export default function Agenda() {
                 </div>
                 <div className="flex-1 flex flex-col gap-2">
                   {dayApts.length === 0 ? (
-                    <div
-                      className="flex-1 border-2 border-dashed border-transparent hover:border-slate-200 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
-                      onClick={() => openNewAppointment(format(day, 'yyyy-MM-dd'))}
-                    >
-                      <Plus className="w-4 h-4 text-slate-300" />
-                    </div>
+                    canCreate ? (
+                      <div
+                        className="flex-1 border-2 border-dashed border-transparent hover:border-slate-200 rounded-xl flex items-center justify-center cursor-pointer transition-colors"
+                        onClick={() => openNewAppointment(format(day, 'yyyy-MM-dd'))}
+                      >
+                        <Plus className="w-4 h-4 text-slate-300" />
+                      </div>
+                    ) : (
+                      <div className="flex-1"></div>
+                    )
                   ) : (
                     dayApts.map((apt) => {
                       const p = Array.isArray(apt.pacientes) ? apt.pacientes[0] : apt.pacientes
@@ -638,11 +714,14 @@ export default function Agenda() {
                                 className="h-6 w-6 text-slate-400 hover:text-red-600 opacity-100 sm:opacity-0 sm:group-hover/weekcard:opacity-100 transition-opacity p-0"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  setAppointmentToCancel(apt)
-                                  setCancelReason('')
-                                  setIsCancelDialogOpen(true)
+                                  if (canCancel) {
+                                    setAppointmentToCancel(apt)
+                                    setCancelReason('')
+                                    setIsCancelDialogOpen(true)
+                                  }
                                 }}
-                                title="Deletar Agendamento"
+                                title="Cancelar Agendamento"
+                                disabled={!canCancel}
                               >
                                 <Trash2 className="w-3 h-3" />
                               </Button>
@@ -811,12 +890,14 @@ export default function Agenda() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button
-            onClick={() => openNewAppointment()}
-            className="h-10 rounded-xl gap-2 w-full sm:w-auto ml-0 sm:ml-2"
-          >
-            <Plus className="w-4 h-4" /> Novo
-          </Button>
+          {canCreate && (
+            <Button
+              onClick={() => openNewAppointment()}
+              className="h-10 rounded-xl gap-2 w-full sm:w-auto ml-0 sm:ml-2"
+            >
+              <Plus className="w-4 h-4" /> Novo
+            </Button>
+          )}
         </div>
       </div>
 
@@ -841,20 +922,42 @@ export default function Agenda() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-            <div className="space-y-2">
-              <Label className="text-slate-700 font-bold">Paciente</Label>
-              <Select value={formData.paciente_id} onValueChange={handlePatientSelect} required>
-                <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl max-h-64">
-                  {patients.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-bold">Paciente</Label>
+                <Select value={formData.paciente_id} onValueChange={handlePatientSelect} required>
+                  <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl max-h-64">
+                    {patients.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-bold">Profissional</Label>
+                <Select
+                  value={formData.profissional_id}
+                  onValueChange={(v) => setFormData({ ...formData, profissional_id: v })}
+                  required
+                  disabled={isProfissional}
+                >
+                  <SelectTrigger className="bg-slate-50 h-12 rounded-xl text-base">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl max-h-64">
+                    {professionals.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome || 'Profissional'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

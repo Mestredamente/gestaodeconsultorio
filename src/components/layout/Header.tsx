@@ -34,36 +34,86 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const menuGroups = [
-  {
-    title: 'Principal',
-    items: [
-      { title: 'Início', path: '/', icon: LayoutDashboard },
-      { title: 'Agenda', path: '/agenda', icon: Calendar },
-      { title: 'Sessão Online', path: '/sala-virtual', icon: Video },
-      { title: 'Pacientes', path: '/pacientes', icon: Users },
-      { title: 'Contatos (CRM)', path: '/contatos', icon: MessageSquare },
-    ],
-  },
-  {
-    title: 'Gestão',
-    items: [
-      { title: 'Financeiro', path: '/carteira', icon: Wallet },
-      { title: 'Relatórios', path: '/relatorios', icon: PieChart },
-      { title: 'Estoque', path: '/estoque', icon: Box },
-      { title: 'Marketing', path: '/marketing', icon: Filter },
-      { title: 'RH', path: '/rh', icon: Users },
-      { title: 'Supervisão', path: '/supervisao', icon: ShieldAlert },
-    ],
-  },
-  {
-    title: 'Sistema',
-    items: [{ title: 'Configurações', path: '/configuracoes', icon: SettingsIcon }],
-  },
-]
+const getMenuGroups = (role: string) =>
+  [
+    {
+      title: 'Principal',
+      items: [
+        {
+          title: 'Início',
+          path: '/',
+          icon: LayoutDashboard,
+          roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+        },
+        {
+          title: 'Agenda',
+          path: '/agenda',
+          icon: Calendar,
+          roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+        },
+        {
+          title: 'Sessão Online',
+          path: '/sala-virtual',
+          icon: Video,
+          roles: ['admin', 'profissional', 'superadmin'],
+        },
+        {
+          title: 'Pacientes',
+          path: '/pacientes',
+          icon: Users,
+          roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+        },
+        {
+          title: 'Contatos (CRM)',
+          path: '/contatos',
+          icon: MessageSquare,
+          roles: ['admin', 'superadmin'],
+        },
+      ].filter((i) => i.roles.includes(role)),
+    },
+    {
+      title: 'Gestão',
+      items: [
+        {
+          title: 'Financeiro',
+          path: '/carteira',
+          icon: Wallet,
+          roles: ['admin', 'secretaria', 'superadmin'],
+        },
+        {
+          title: 'Relatórios',
+          path: '/relatorios',
+          icon: PieChart,
+          roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+        },
+        { title: 'Estoque', path: '/estoque', icon: Box, roles: ['admin', 'superadmin'] },
+        { title: 'Marketing', path: '/marketing', icon: Filter, roles: ['admin', 'superadmin'] },
+        { title: 'RH', path: '/rh', icon: Users, roles: ['admin', 'superadmin'] },
+        {
+          title: 'Supervisão',
+          path: '/supervisao',
+          icon: ShieldAlert,
+          roles: ['admin', 'profissional', 'superadmin'],
+        },
+      ].filter((i) => i.roles.includes(role)),
+    },
+    {
+      title: 'Sistema',
+      items: [
+        {
+          title: 'Configurações',
+          path: '/configuracoes',
+          icon: SettingsIcon,
+          roles: ['admin', 'profissional', 'secretaria', 'superadmin'],
+        },
+      ].filter((i) => i.roles.includes(role)),
+    },
+  ].filter((g) => g.items.length > 0)
 
 export default function Header() {
-  const { user } = useAuth()
+  const { user, userProfile } = useAuth()
+  const role = userProfile?.role || 'admin'
+  const menuGroups = getMenuGroups(role)
   const { toast } = useToast()
   const location = useLocation()
   const navigate = useNavigate()

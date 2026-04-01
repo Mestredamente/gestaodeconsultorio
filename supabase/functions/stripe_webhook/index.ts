@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
         signature,
         webhookSecret,
         undefined,
-        cryptoProvider
+        cryptoProvider,
       )
     } else {
       event = JSON.parse(body)
@@ -39,20 +39,20 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   )
 
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        
+
         if (session.metadata?.type === 'payment') {
           // It's a payment for an appointment
           const paciente_id = session.metadata.paciente_id
           const usuario_id = session.metadata.usuario_id
           const amount = session.amount_total ? session.amount_total / 100 : 0
-          
+
           if (usuario_id && paciente_id) {
             const dateObj = new Date()
             await supabase.from('financeiro').insert({
@@ -66,14 +66,14 @@ Deno.serve(async (req: Request) => {
               metodo_pagamento: 'stripe',
               data_atualizacao: dateObj.toISOString(),
             })
-            
+
             // Log de auditoria
             await supabase.from('logs_auditoria').insert({
               usuario_id: usuario_id,
               acao: 'Pagamento via Stripe',
               tabela_afetada: 'financeiro',
               registro_id: paciente_id,
-              detalhes: { amount, status: 'recebido' }
+              detalhes: { amount, status: 'recebido' },
             })
           }
         } else if (session.metadata?.type === 'subscription' || session.client_reference_id) {
@@ -93,22 +93,29 @@ Deno.serve(async (req: Request) => {
               .eq('id', userId)
 
             // UPSERT subscriptions
-            const { data: subData } = await supabase.from('subscriptions').upsert({
-              user_id: userId,
-              plan_id: planId,
-              status: 'active'
-            }, { onConflict: 'user_id' }).select('id').single()
+            const { data: subData } = await supabase
+              .from('subscriptions')
+              .upsert(
+                {
+                  user_id: userId,
+                  plan_id: planId,
+                  status: 'active',
+                },
+                { onConflict: 'user_id' },
+              )
+              .select('id')
+              .single()
 
             // Insert payment log
             if (subData) {
               await supabase.from('payments').insert({
-                 subscription_id: subData.id,
-                 amount: session.amount_total ? session.amount_total / 100 : 0,
-                 status: 'paid',
-                 gateway: 'stripe',
-                 transaction_id: session.id,
-                 due_date: new Date().toISOString(),
-                 paid_date: new Date().toISOString()
+                subscription_id: subData.id,
+                amount: session.amount_total ? session.amount_total / 100 : 0,
+                status: 'paid',
+                gateway: 'stripe',
+                transaction_id: session.id,
+                due_date: new Date().toISOString(),
+                paid_date: new Date().toISOString(),
               })
             }
           }
@@ -132,7 +139,9 @@ Deno.serve(async (req: Request) => {
             await supabase
               .from('usuarios')
               .update({
-                data_proxima_cobranca: new Date(subscription.current_period_end * 1000).toISOString(),
+                data_proxima_cobranca: new Date(
+                  subscription.current_period_end * 1000,
+                ).toISOString(),
                 stripe_subscription_id: subscription.id,
               })
               .eq('id', user.id)
@@ -140,11 +149,10 @@ Deno.serve(async (req: Request) => {
             await supabase
               .from('subscriptions')
               .update({
-                 renewal_date: new Date(subscription.current_period_end * 1000).toISOString(),
-                 status: 'active'
+                renewal_date: new Date(subscription.current_period_end * 1000).toISOString(),
+                status: 'active',
               })
               .eq('user_id', user.id)
-
           } else if (status === 'canceled' || status === 'unpaid') {
             await supabase
               .from('usuarios')

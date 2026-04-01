@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 
 export default function PatientRecord() {
   const { id } = useParams()
-  const { user } = useAuth()
+  const { user, userProfile } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
 
@@ -115,6 +115,14 @@ export default function PatientRecord() {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     )
+
+  if (userProfile?.role === 'secretaria') {
+    return (
+      <div className="p-8 text-center text-red-500 font-bold">
+        Acesso negado. Secretárias não têm permissão para acessar prontuários.
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
