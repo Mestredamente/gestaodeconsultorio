@@ -109,6 +109,8 @@ export default function Settings() {
     especialidade: '',
     valor_sessao_padrao: '',
     dados_bancarios: { banco: '', agencia: '', conta: '' },
+    nivel_formacao: '',
+    portal_settings: {},
   })
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -156,9 +158,14 @@ export default function Settings() {
         especialidade: data.especialidade || '',
         valor_sessao_padrao: data.valor_sessao_padrao || '',
         dados_bancarios: data.dados_bancarios || { banco: '', agencia: '', conta: '' },
+        nivel_formacao: (data as any).nivel_formacao || '',
+        portal_settings: data.portal_settings || {},
       })
       if (data.preferencias_dashboard) {
         setPreferences(data.preferencias_dashboard)
+      }
+      if (data.portal_settings?.tema_cor) {
+        setPreferences((prev: any) => ({ ...prev, theme_color: data.portal_settings.tema_cor }))
       }
     }
 
@@ -190,10 +197,20 @@ export default function Settings() {
     if (!user) return
     setSaving(true)
     try {
-      const payload = { ...settings, preferencias_dashboard: preferences }
+      const payload = {
+        ...settings,
+        preferencias_dashboard: { ...preferences, theme_color: preferences.theme_color },
+        portal_settings: {
+          ...(settings.portal_settings as any),
+          tema_cor: preferences.theme_color,
+        },
+      }
       if (payload.whatsapp_tipo === 'personal') payload.whatsapp_tipo = 'padrao'
 
-      const { error } = await supabase.from('usuarios').update(payload).eq('id', user.id)
+      const { error } = await supabase
+        .from('usuarios')
+        .update(payload as any)
+        .eq('id', user.id)
       if (error) throw error
 
       toast({ title: 'Configurações salvas com sucesso!' })
@@ -203,6 +220,38 @@ export default function Settings() {
       }
     } catch (err: any) {
       toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveAppearance = async () => {
+    if (!user) return
+    setSaving(true)
+    try {
+      const payload = {
+        logo_url: settings.logo_url,
+        preferencias_dashboard: { ...preferences, theme_color: preferences.theme_color },
+        portal_settings: {
+          ...(settings.portal_settings as any),
+          tema_cor: preferences.theme_color,
+        },
+      }
+
+      const { error } = await supabase
+        .from('usuarios')
+        .update(payload as any)
+        .eq('id', user.id)
+      if (error) throw error
+
+      toast({ title: 'Aparência salva com sucesso!' })
+
+      if (preferences.theme_color) {
+        document.documentElement.className = `theme-${preferences.theme_color}`
+        document.documentElement.setAttribute('data-theme', preferences.theme_color)
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar aparência', description: err.message, variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -470,10 +519,40 @@ export default function Settings() {
                 <div className="space-y-2">
                   <Label>Especialidade</Label>
                   <Input
+                    list="especialidades-list"
                     value={settings.especialidade}
                     onChange={(e) => setSettings({ ...settings, especialidade: e.target.value })}
                     className="h-12 rounded-xl"
+                    placeholder="Ex: Psicologia Clínica"
                   />
+                  <datalist id="especialidades-list">
+                    <option value="Psicologia Clínica" />
+                    <option value="Psicanálise" />
+                    <option value="Terapia Cognitivo-Comportamental (TCC)" />
+                    <option value="Psicopedagogia" />
+                    <option value="Neuropsicologia" />
+                    <option value="Psiquiatria" />
+                    <option value="Psicologia Infantil" />
+                    <option value="Psicologia Organizacional" />
+                  </datalist>
+                </div>
+                <div className="space-y-2">
+                  <Label>Nível de Formação</Label>
+                  <Select
+                    value={settings.nivel_formacao}
+                    onValueChange={(v) => setSettings({ ...settings, nivel_formacao: v })}
+                  >
+                    <SelectTrigger className="h-12 rounded-xl bg-white">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="graduacao">Graduação</SelectItem>
+                      <SelectItem value="especializacao">Especialização</SelectItem>
+                      <SelectItem value="mestrado">Mestrado</SelectItem>
+                      <SelectItem value="doutorado">Doutorado</SelectItem>
+                      <SelectItem value="pos_doutorado">Pós-doutorado</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>CPF</Label>
@@ -910,6 +989,20 @@ export default function Settings() {
                     />
                   ))}
                 </div>
+              </div>
+              <div className="pt-6 border-t border-slate-100 flex justify-end">
+                <Button
+                  onClick={handleSaveAppearance}
+                  disabled={saving}
+                  className="rounded-xl h-12 px-8 gap-2"
+                >
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Salvar Aparência
+                </Button>
               </div>
             </CardContent>
           </Card>
