@@ -10,6 +10,14 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useToast } from '@/hooks/use-toast'
+import { maskPhone, maskCEP, fetchAddressByCEP } from '@/lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Save,
   Loader2,
@@ -18,6 +26,12 @@ import {
   Link as LinkIcon,
   Shield,
   Send,
+  Users,
+  Palette,
+  Trash2,
+  Plus,
+  MapPin,
+  Image as ImageIcon,
 } from 'lucide-react'
 
 export default function Settings() {
@@ -25,12 +39,27 @@ export default function Settings() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [fetchingCep, setFetchingCep] = useState(false)
+
+  const [team, setTeam] = useState<any[]>([])
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteNome, setInviteNome] = useState('')
+  const [inviteRole, setInviteRole] = useState('profissional')
+  const [inviting, setInviting] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
   const [testingWhatsApp, setTestingWhatsApp] = useState(false)
   const [testPhone, setTestPhone] = useState('')
 
   const [settings, setSettings] = useState({
     nome_consultorio: '',
-    endereco_consultorio: '',
+    cep: '',
+    rua: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
     telefone_consultorio: '',
     chave_pix: '',
     lembrete_whatsapp_ativo: false,
@@ -46,36 +75,57 @@ export default function Settings() {
     whatsapp_api_key: '',
     whatsapp_business_phone_id: '',
     whatsapp_business_account_id: '',
+    logo_url: '',
   })
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      if (!user) return
-      const { data } = await supabase.from('usuarios').select('*').eq('id', user.id).single()
-      if (data) {
-        setSettings({
-          nome_consultorio: data.nome_consultorio || '',
-          endereco_consultorio: data.endereco_consultorio || '',
-          telefone_consultorio: data.telefone_consultorio || '',
-          chave_pix: data.chave_pix || '',
-          lembrete_whatsapp_ativo: data.lembrete_whatsapp_ativo || false,
-          template_lembrete: data.template_lembrete || '',
-          whatsapp_confirmacao_ativa: data.whatsapp_confirmacao_ativa || false,
-          template_confirmacao: data.template_confirmacao || '',
-          pre_consulta_ativa: data.pre_consulta_ativa || false,
-          template_pre_consulta: data.template_pre_consulta || '',
-          agendamento_publico_ativo: data.agendamento_publico_ativo || false,
-          politica_cancelamento: data.politica_cancelamento || '',
-          texto_contrato: data.texto_contrato || '',
-          whatsapp_tipo:
-            data.whatsapp_tipo === 'personal' ? 'padrao' : data.whatsapp_tipo || 'padrao',
-          whatsapp_api_key: data.whatsapp_api_key || '',
-          whatsapp_business_phone_id: data.whatsapp_business_phone_id || '',
-          whatsapp_business_account_id: data.whatsapp_business_account_id || '',
-        })
+  const [preferences, setPreferences] = useState<any>({ theme_color: 'indigo' })
+
+  const fetchSettings = async () => {
+    if (!user) return
+    const { data } = await supabase.from('usuarios').select('*').eq('id', user.id).single()
+    if (data) {
+      setSettings({
+        nome_consultorio: data.nome_consultorio || '',
+        cep: data.cep || '',
+        rua: data.rua || '',
+        numero: data.numero || '',
+        complemento: data.complemento || '',
+        bairro: data.bairro || '',
+        cidade: data.cidade || '',
+        estado: data.estado || '',
+        telefone_consultorio: data.telefone_consultorio || '',
+        chave_pix: data.chave_pix || '',
+        lembrete_whatsapp_ativo: data.lembrete_whatsapp_ativo || false,
+        template_lembrete: data.template_lembrete || '',
+        whatsapp_confirmacao_ativa: data.whatsapp_confirmacao_ativa || false,
+        template_confirmacao: data.template_confirmacao || '',
+        pre_consulta_ativa: data.pre_consulta_ativa || false,
+        template_pre_consulta: data.template_pre_consulta || '',
+        agendamento_publico_ativo: data.agendamento_publico_ativo || false,
+        politica_cancelamento: data.politica_cancelamento || '',
+        texto_contrato: data.texto_contrato || '',
+        whatsapp_tipo:
+          data.whatsapp_tipo === 'personal' ? 'padrao' : data.whatsapp_tipo || 'padrao',
+        whatsapp_api_key: data.whatsapp_api_key || '',
+        whatsapp_business_phone_id: data.whatsapp_business_phone_id || '',
+        whatsapp_business_account_id: data.whatsapp_business_account_id || '',
+        logo_url: data.logo_url || '',
+      })
+      if (data.preferencias_dashboard) {
+        setPreferences(data.preferencias_dashboard)
       }
-      setLoading(false)
     }
+
+    const { data: teamData } = await supabase
+      .from('usuarios')
+      .select('id, nome, email, role')
+      .eq('parent_id', user.id)
+    if (teamData) setTeam(teamData)
+
+    setLoading(false)
+  }
+
+  useEffect(() => {
     fetchSettings()
   }, [user])
 
@@ -83,16 +133,86 @@ export default function Settings() {
     if (!user) return
     setSaving(true)
     try {
-      const payload = { ...settings }
+      const payload = { ...settings, preferencias_dashboard: preferences }
       if (payload.whatsapp_tipo === 'personal') payload.whatsapp_tipo = 'padrao'
+
       const { error } = await supabase.from('usuarios').update(payload).eq('id', user.id)
       if (error) throw error
+
       toast({ title: 'Configurações salvas com sucesso!' })
-      setSettings(payload)
+
+      if (preferences.theme_color) {
+        document.documentElement.className = `theme-${preferences.theme_color}`
+      }
     } catch (err: any) {
       toast({ title: 'Erro ao salvar', description: err.message, variant: 'destructive' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleCepChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskCEP(e.target.value)
+    setSettings({ ...settings, cep: masked })
+
+    if (masked.length === 9) {
+      setFetchingCep(true)
+      try {
+        const address = await fetchAddressByCEP(masked)
+        if (address) {
+          setSettings((prev) => ({
+            ...prev,
+            rua: address.rua,
+            bairro: address.bairro,
+            cidade: address.cidade,
+            estado: address.estado,
+          }))
+          toast({ title: 'Endereço encontrado!' })
+        }
+      } catch (err) {
+        toast({ title: 'Erro ao buscar CEP', variant: 'destructive' })
+      } finally {
+        setFetchingCep(false)
+      }
+    }
+  }
+
+  const handleInvite = async () => {
+    if (!inviteEmail || !inviteNome) {
+      toast({ title: 'Preencha o e-mail e o nome', variant: 'destructive' })
+      return
+    }
+    setInviting(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('convidar_usuario', {
+        body: { email: inviteEmail, nome: inviteNome, role: inviteRole },
+      })
+      if (error || data?.error) throw new Error(error?.message || data?.error)
+      toast({ title: 'Convite enviado com sucesso!' })
+      setInviteEmail('')
+      setInviteNome('')
+      fetchSettings()
+    } catch (err: any) {
+      toast({ title: 'Erro ao convidar', description: err.message, variant: 'destructive' })
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const handleDeleteMember = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este membro definitivamente?')) return
+    setDeletingId(id)
+    try {
+      const { data, error } = await supabase.functions.invoke('excluir_usuario', {
+        body: { usuario_id: id },
+      })
+      if (error || data?.error) throw new Error(error?.message || data?.error)
+      toast({ title: 'Membro excluído com sucesso!' })
+      fetchSettings()
+    } catch (err: any) {
+      toast({ title: 'Erro ao excluir', description: err.message, variant: 'destructive' })
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -108,46 +228,19 @@ export default function Settings() {
     setTestingWhatsApp(true)
     try {
       const cleanPhone = testPhone.replace(/\D/g, '')
-      if (cleanPhone.length < 10 || cleanPhone.length > 14) {
-        throw new Error('Número inválido. Use o formato: 55 + DDD + Número.')
-      }
-
       const { data, error } = await supabase.functions.invoke('enviar_mensagem_whatsapp', {
         body: {
           tipo_whatsapp: settings.whatsapp_tipo,
           telefone: cleanPhone,
-          mensagem: 'Olá! Este é um teste de integração do seu CRM de Gestão de Consultório.',
+          mensagem: 'Olá! Este é um teste de integração do seu CRM de Gestão.',
           usuario_id: user?.id,
         },
       })
 
-      if (error) throw error
-      if (data?.success === false) throw new Error(data.error || 'Erro desconhecido na API')
-
-      await supabase.from('log_whatsapp').insert({
-        telefone: cleanPhone,
-        mensagem: 'Teste de Integração CRM',
-        status: 'sucesso',
-        usuario_id: user?.id,
-      })
-
-      if (data?.fallback) {
-        toast({
-          title: 'Teste Simulado (Fallback)',
-          description: 'Credenciais ausentes. O sistema simulou o envio corretamente.',
-        })
-      } else {
-        toast({ title: 'Sucesso!', description: 'Mensagem de teste enviada com sucesso via API.' })
-      }
+      if (error || data?.error) throw new Error(error?.message || data?.error)
+      toast({ title: 'Sucesso!', description: 'Mensagem de teste processada com sucesso.' })
     } catch (err: any) {
       toast({ title: 'Falha no teste', description: err.message, variant: 'destructive' })
-      await supabase.from('log_whatsapp').insert({
-        telefone: testPhone,
-        mensagem: 'Teste de Integração CRM',
-        status: 'erro',
-        erro: err.message,
-        usuario_id: user?.id,
-      })
     } finally {
       setTestingWhatsApp(false)
     }
@@ -160,19 +253,27 @@ export default function Settings() {
       </div>
     )
 
+  const colors = [
+    { id: 'indigo', name: 'Índigo', class: 'bg-indigo-500' },
+    { id: 'emerald', name: 'Esmeralda', class: 'bg-emerald-500' },
+    { id: 'rose', name: 'Rosa', class: 'bg-rose-500' },
+    { id: 'blue', name: 'Azul', class: 'bg-blue-500' },
+    { id: 'slate', name: 'Grafite', class: 'bg-slate-500' },
+  ]
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in pb-10 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4 sm:pt-0">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Configurações</h1>
-          <p className="text-slate-500 mt-1">Personalize o comportamento do seu sistema</p>
+          <p className="text-slate-500 mt-1">Personalize o comportamento e a equipe</p>
         </div>
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="h-14 md:h-11 px-6 rounded-xl gap-2 font-bold w-full sm:w-auto"
+          className="h-14 md:h-11 px-6 rounded-xl gap-2 font-bold w-full sm:w-auto shadow-md"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{' '}
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Salvar Alterações
         </Button>
       </div>
@@ -181,36 +282,51 @@ export default function Settings() {
         <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl scrollbar-hide border border-slate-100">
           <TabsTrigger
             value="geral"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
           >
             <Building2 className="w-4 h-4" /> Perfil
           </TabsTrigger>
           <TabsTrigger
+            value="equipe"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+          >
+            <Users className="w-4 h-4" /> Equipe
+          </TabsTrigger>
+          <TabsTrigger
+            value="aparencia"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+          >
+            <Palette className="w-4 h-4" /> Aparência
+          </TabsTrigger>
+          <TabsTrigger
             value="comunicacao"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
           >
             <MessageCircle className="w-4 h-4" /> Mensagens
           </TabsTrigger>
           <TabsTrigger
             value="portal"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
           >
             <LinkIcon className="w-4 h-4" /> Portal
           </TabsTrigger>
           <TabsTrigger
             value="legal"
-            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
           >
             <Shield className="w-4 h-4" /> Legal
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="geral">
+        <TabsContent value="geral" className="space-y-6">
           <Card className="rounded-[2rem] border-slate-200 shadow-sm">
-            <CardContent className="p-6 space-y-5">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 rounded-t-[2rem]">
+              <CardTitle className="text-lg">Dados Principais</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <Label>Nome do Consultório</Label>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Nome do Consultório / Profissional</Label>
                   <Input
                     value={settings.nome_consultorio}
                     onChange={(e) => setSettings({ ...settings, nome_consultorio: e.target.value })}
@@ -218,33 +334,246 @@ export default function Settings() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Telefone</Label>
+                  <Label>Telefone (WhatsApp)</Label>
                   <Input
                     inputMode="tel"
+                    placeholder="(00) 00000-0000"
                     value={settings.telefone_consultorio}
                     onChange={(e) =>
-                      setSettings({ ...settings, telefone_consultorio: e.target.value })
-                    }
-                    className="h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Endereço</Label>
-                  <Input
-                    value={settings.endereco_consultorio}
-                    onChange={(e) =>
-                      setSettings({ ...settings, endereco_consultorio: e.target.value })
+                      setSettings({ ...settings, telefone_consultorio: maskPhone(e.target.value) })
                     }
                     className="h-12 rounded-xl"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Chave PIX</Label>
+                  <Label>Chave PIX (Padrão para Recebimentos)</Label>
                   <Input
                     value={settings.chave_pix}
                     onChange={(e) => setSettings({ ...settings, chave_pix: e.target.value })}
-                    className="h-12 rounded-xl font-mono"
+                    className="h-12 rounded-xl font-mono text-sm"
                   />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 rounded-t-[2rem]">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-primary" /> Endereço
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2 relative">
+                  <Label>CEP</Label>
+                  <Input
+                    value={settings.cep}
+                    inputMode="numeric"
+                    onChange={handleCepChange}
+                    placeholder="00000-000"
+                    className="h-12 rounded-xl pr-10"
+                  />
+                  {fetchingCep && (
+                    <Loader2 className="absolute right-3 top-9 w-4 h-4 text-slate-400 animate-spin" />
+                  )}
+                </div>
+                <div className="space-y-2 md:col-span-3">
+                  <Label>Rua / Logradouro</Label>
+                  <Input
+                    value={settings.rua}
+                    onChange={(e) => setSettings({ ...settings, rua: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Número</Label>
+                  <Input
+                    value={settings.numero}
+                    onChange={(e) => setSettings({ ...settings, numero: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Complemento</Label>
+                  <Input
+                    value={settings.complemento}
+                    onChange={(e) => setSettings({ ...settings, complemento: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Bairro</Label>
+                  <Input
+                    value={settings.bairro}
+                    onChange={(e) => setSettings({ ...settings, bairro: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Cidade</Label>
+                  <Input
+                    value={settings.cidade}
+                    onChange={(e) => setSettings({ ...settings, cidade: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Estado</Label>
+                  <Input
+                    value={settings.estado}
+                    onChange={(e) => setSettings({ ...settings, estado: e.target.value })}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="equipe" className="space-y-6">
+          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 rounded-t-[2rem]">
+              <CardTitle className="text-lg">Gestão de Acessos</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="p-5 bg-indigo-50/50 border border-indigo-100 rounded-2xl">
+                <h3 className="font-bold text-indigo-900 mb-4">Adicionar Colaborador</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>E-mail do Colaborador</Label>
+                    <Input
+                      placeholder="email@exemplo.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      className="bg-white rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nome</Label>
+                    <Input
+                      placeholder="Nome"
+                      value={inviteNome}
+                      onChange={(e) => setInviteNome(e.target.value)}
+                      className="bg-white rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Perfil</Label>
+                    <Select value={inviteRole} onValueChange={setInviteRole}>
+                      <SelectTrigger className="bg-white rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="profissional">Profissional</SelectItem>
+                        <SelectItem value="secretaria">Secretária</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleInvite}
+                    disabled={inviting}
+                    className="sm:col-span-4 h-12 rounded-xl gap-2 font-bold bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {inviting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                    Enviar Convite
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-bold text-slate-800 mb-4 border-b pb-2">Membros da Equipe</h3>
+                {team.length === 0 ? (
+                  <p className="text-slate-500 text-sm">Nenhum membro adicionado ainda.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {team.map((member) => (
+                      <div
+                        key={member.id}
+                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 gap-4"
+                      >
+                        <div>
+                          <p className="font-bold text-slate-800">
+                            {member.nome || 'Usuário Pendente'}
+                          </p>
+                          <p className="text-sm text-slate-500">{member.email}</p>
+                          <span className="inline-block mt-1 px-2.5 py-0.5 bg-slate-200 text-slate-700 text-xs font-semibold rounded-md uppercase">
+                            {member.role || 'Profissional'}
+                          </span>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="rounded-lg gap-2"
+                          onClick={() => handleDeleteMember(member.id)}
+                          disabled={deletingId === member.id}
+                        >
+                          {deletingId === member.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}{' '}
+                          Excluir
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="aparencia" className="space-y-6">
+          <Card className="rounded-[2rem] border-slate-200 shadow-sm">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 rounded-t-[2rem]">
+              <CardTitle className="text-lg">Personalização Visual</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-8">
+              <div className="space-y-4">
+                <Label className="text-base font-bold">Logotipo do Consultório (URL)</Label>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="w-24 h-24 bg-slate-100 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
+                    {settings.logo_url ? (
+                      <img
+                        src={settings.logo_url}
+                        alt="Logo"
+                        className="w-full h-full object-contain p-2"
+                      />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-slate-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      placeholder="https://exemplo.com/logo.png"
+                      value={settings.logo_url}
+                      onChange={(e) => setSettings({ ...settings, logo_url: e.target.value })}
+                      className="h-12 rounded-xl"
+                    />
+                    <p className="text-xs text-slate-500">
+                      Cole o link (URL) direto de uma imagem para utilizá-la nos portais,
+                      prescrições e propostas.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-6 border-t border-slate-100">
+                <Label className="text-base font-bold">Paleta de Cores (Tema)</Label>
+                <div className="flex flex-wrap gap-4">
+                  {colors.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setPreferences({ ...preferences, theme_color: c.id })}
+                      className={`w-14 h-14 rounded-full ${c.class} shadow-sm ring-offset-2 transition-all hover:scale-110 ${preferences.theme_color === c.id ? 'ring-4 ring-slate-800 scale-110' : ''}`}
+                      title={c.name}
+                    />
+                  ))}
                 </div>
               </div>
             </CardContent>
@@ -253,7 +582,7 @@ export default function Settings() {
 
         <TabsContent value="comunicacao" className="space-y-6">
           <Card className="rounded-[2rem] border-slate-200 shadow-sm">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4 rounded-t-[2rem]">
               <CardTitle className="text-lg">Integração WhatsApp</CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
@@ -311,7 +640,7 @@ export default function Settings() {
               </div>
               <div className="pt-6 border-t border-slate-100">
                 <h4 className="font-bold mb-3">Testar Conexão</h4>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Input
                     placeholder="5511999999999"
                     value={testPhone}
@@ -322,13 +651,13 @@ export default function Settings() {
                   <Button
                     onClick={handleTestWhatsApp}
                     disabled={testingWhatsApp}
-                    className="h-12 rounded-xl gap-2"
+                    className="h-12 rounded-xl gap-2 w-full sm:w-auto"
                   >
                     {testingWhatsApp ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <Send className="w-4 h-4" />
-                    )}{' '}
+                    )}
                     Enviar Teste
                   </Button>
                 </div>
@@ -337,15 +666,13 @@ export default function Settings() {
           </Card>
 
           <Card className="rounded-[2rem] border-slate-200 shadow-sm">
-            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4 rounded-t-[2rem]">
               <CardTitle className="text-lg">Automações</CardTitle>
             </CardHeader>
-            <CardContent className="p-6 space-y-8">
-              <div className="space-y-4 p-4 rounded-xl border border-slate-100 bg-slate-50/30">
+            <CardContent className="p-6 space-y-6">
+              <div className="space-y-4 p-5 rounded-2xl border border-slate-100 bg-slate-50/30">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="font-bold">Lembrete de Sessão (24h)</Label>
-                  </div>
+                  <Label className="font-bold text-base">Lembrete de Sessão (24h)</Label>
                   <Switch
                     checked={settings.lembrete_whatsapp_ativo}
                     onCheckedChange={(c) =>
@@ -363,11 +690,9 @@ export default function Settings() {
                   />
                 )}
               </div>
-              <div className="space-y-4 p-4 rounded-xl border border-slate-100 bg-slate-50/30">
+              <div className="space-y-4 p-5 rounded-2xl border border-slate-100 bg-slate-50/30">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="font-bold">Confirmação de Agendamento</Label>
-                  </div>
+                  <Label className="font-bold text-base">Confirmação de Agendamento</Label>
                   <Switch
                     checked={settings.whatsapp_confirmacao_ativa}
                     onCheckedChange={(c) =>
@@ -391,10 +716,15 @@ export default function Settings() {
 
         <TabsContent value="portal">
           <Card className="rounded-[2rem] border-slate-200 shadow-sm">
-            <CardContent className="p-6 space-y-6 pt-6">
-              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50">
+            <CardContent className="p-6 pt-6">
+              <div className="flex items-center justify-between p-5 rounded-2xl border border-slate-100 bg-slate-50">
                 <div>
-                  <Label className="font-bold">Agendamento Público</Label>
+                  <Label className="font-bold text-base">
+                    Agendamento Público (Página da Clínica)
+                  </Label>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Permitir que novos pacientes realizem agendamentos online via link público.
+                  </p>
                 </div>
                 <Switch
                   checked={settings.agendamento_publico_ativo}
@@ -406,25 +736,26 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="legal">
           <Card className="rounded-[2rem] border-slate-200 shadow-sm">
             <CardContent className="p-6 space-y-6 pt-6">
               <div className="space-y-3">
-                <Label className="font-bold">Contrato de Prestação</Label>
+                <Label className="font-bold text-base">Contrato de Prestação de Serviços</Label>
                 <Textarea
                   value={settings.texto_contrato}
                   onChange={(e) => setSettings({ ...settings, texto_contrato: e.target.value })}
-                  className="min-h-[250px] rounded-xl font-mono"
+                  className="min-h-[250px] rounded-xl font-mono text-sm leading-relaxed"
                 />
               </div>
               <div className="space-y-3">
-                <Label className="font-bold">Política de Cancelamento</Label>
+                <Label className="font-bold text-base">Política de Cancelamento</Label>
                 <Textarea
                   value={settings.politica_cancelamento}
                   onChange={(e) =>
                     setSettings({ ...settings, politica_cancelamento: e.target.value })
                   }
-                  className="min-h-[100px] rounded-xl"
+                  className="min-h-[120px] rounded-xl text-sm leading-relaxed"
                 />
               </div>
             </CardContent>

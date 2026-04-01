@@ -181,6 +181,18 @@
   }
 }
 
+@media (max-width: 768px) {
+  /* Fix horizontal scrolling for Shadcn Tables on mobile */
+  .relative.w-full.overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure tables don't shrink too much on mobile, allowing proper horizontal scrolling */
+  table {
+    min-width: 600px;
+  }
+}
+
 /* Improve tap targets on mobile */
 @media (max-width: 768px) {
   button,

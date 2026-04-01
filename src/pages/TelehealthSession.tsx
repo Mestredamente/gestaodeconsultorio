@@ -781,8 +781,9 @@ export default function TelehealthSession() {
 
         <div className="flex-1 flex flex-col relative p-0 bg-slate-900">
           <iframe
-            allow="camera; microphone; fullscreen; display-capture; autoplay"
-            src={`https://meet.jit.si/PsicManager_${(apt?.id || agendamentoId || 'avulsa').replace(/-/g, '')}${apt?.sala_virtual_token ? `?jwt=${apt.sala_virtual_token}` : ''}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}&config.prejoinPageEnabled=false`}
+            allow="camera *; microphone *; display-capture *; autoplay *; clipboard-read; clipboard-write; fullscreen *"
+            allowFullScreen
+            src={`https://meet.jit.si/PsicManager_${(apt?.id || agendamentoId || 'avulsa').replace(/-/g, '')}${apt?.sala_virtual_token ? `?jwt=${apt.sala_virtual_token}` : ''}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}&config.prejoinPageEnabled=false&config.disableDeepLinking=true`}
             className="w-full h-full border-0 absolute inset-0 pt-16 md:pt-0"
           />
         </div>

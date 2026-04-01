@@ -180,8 +180,9 @@ export default function PublicVirtualRoom() {
         </header>
         <main className="flex-1 relative">
           <iframe
-            allow="camera; microphone; fullscreen; display-capture; autoplay"
-            src={`https://meet.jit.si/${roomName}`}
+            allow="camera *; microphone *; display-capture *; autoplay *; clipboard-read; clipboard-write; fullscreen *"
+            allowFullScreen
+            src={`https://meet.jit.si/${roomName}#config.disableDeepLinking=true&config.prejoinPageEnabled=false`}
             className="w-full h-full border-0 absolute inset-0"
             style={{ minHeight: '100%' }}
           />

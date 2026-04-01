@@ -370,8 +370,9 @@ export default function VirtualRoom() {
           </div>
         )}
         <iframe
-          src={`https://meet.jit.si/PsicManager_${activeSession.id.replace(/-/g, '')}${activeSession.sala_virtual_token ? `?jwt=${activeSession.sala_virtual_token}` : ''}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}&config.prejoinPageEnabled=false`}
-          allow="camera; microphone; fullscreen; display-capture; autoplay"
+          src={`https://meet.jit.si/PsicManager_${activeSession.id.replace(/-/g, '')}${activeSession.sala_virtual_token ? `?jwt=${activeSession.sala_virtual_token}` : ''}#config.startWithAudioMuted=${!micOn}&config.startWithVideoMuted=${!camOn}&config.prejoinPageEnabled=false&config.disableDeepLinking=true`}
+          allow="camera *; microphone *; display-capture *; autoplay *; clipboard-read; clipboard-write; fullscreen *"
+          allowFullScreen
           className={`w-full h-full border-0 absolute inset-0 pt-16 pb-24 z-0 ${!iframeLoaded ? 'opacity-0' : 'opacity-100'}`}
           onLoad={() => setIframeLoaded(true)}
         />
