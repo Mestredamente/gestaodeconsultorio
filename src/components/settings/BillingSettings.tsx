@@ -98,7 +98,7 @@ export function BillingSettings({ user, formData, setFormData }: BillingSettings
   const handleUpgrade = async (newPlanId: string) => {
     setUpgradingTo(newPlanId)
     try {
-      const return_url = `${window.location.origin}/configuracoes?upgrade_success=true`
+      const return_url = `${window.location.origin}/configuracoes?tab=assinatura&upgrade_success=true`
       const { data, error } = await supabase.functions.invoke('processar_pagamento', {
         body: { plano_id: newPlanId, metodo_pagamento: 'cartao', gateway: 'stripe', return_url },
       })

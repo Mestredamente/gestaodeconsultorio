@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -34,11 +35,20 @@ import {
   Image as ImageIcon,
   Copy,
   Upload,
+  CreditCard,
 } from 'lucide-react'
+import { BillingSettings } from '@/components/settings/BillingSettings'
 
 export default function Settings() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const searchParams = new URLSearchParams(location.search)
+  const tabParam = searchParams.get('tab') || 'geral'
+  const [activeTab, setActiveTab] = useState(tabParam)
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [fetchingCep, setFetchingCep] = useState(false)
@@ -79,6 +89,10 @@ export default function Settings() {
     whatsapp_business_phone_id: '',
     whatsapp_business_account_id: '',
     logo_url: '',
+    plano: 'gratuito',
+    data_proxima_cobranca: null,
+    cartao_bandeira: '',
+    cartao_final: '',
   })
 
   const [preferences, setPreferences] = useState<any>({ theme_color: 'indigo' })
@@ -113,6 +127,10 @@ export default function Settings() {
         whatsapp_business_phone_id: data.whatsapp_business_phone_id || '',
         whatsapp_business_account_id: data.whatsapp_business_account_id || '',
         logo_url: data.logo_url || '',
+        plano: data.plano || 'gratuito',
+        data_proxima_cobranca: data.data_proxima_cobranca || null,
+        cartao_bandeira: data.cartao_bandeira || '',
+        cartao_final: data.cartao_final || '',
       })
       if (data.preferencias_dashboard) {
         setPreferences(data.preferencias_dashboard)
@@ -131,6 +149,17 @@ export default function Settings() {
   useEffect(() => {
     fetchSettings()
   }, [user])
+
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam)
+    }
+  }, [tabParam])
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    navigate(`/configuracoes?tab=${value}`, { replace: true })
+  }
 
   const handleSave = async () => {
     if (!user) return
@@ -299,6 +328,9 @@ export default function Settings() {
     { id: 'rose', name: 'Rosa', class: 'bg-rose-500' },
     { id: 'blue', name: 'Azul', class: 'bg-blue-500' },
     { id: 'slate', name: 'Grafite', class: 'bg-slate-500' },
+    { id: 'violet', name: 'Violeta', class: 'bg-violet-500' },
+    { id: 'amber', name: 'Âmbar', class: 'bg-amber-500' },
+    { id: 'cyan', name: 'Ciano', class: 'bg-cyan-500' },
   ]
 
   return (
@@ -318,7 +350,7 @@ export default function Settings() {
         </Button>
       </div>
 
-      <Tabs defaultValue="geral" className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="mb-6 flex w-full justify-start overflow-x-auto h-auto bg-slate-100/50 p-1.5 rounded-2xl scrollbar-hide border border-slate-100">
           <TabsTrigger
             value="geral"
@@ -355,6 +387,12 @@ export default function Settings() {
             className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
           >
             <Shield className="w-4 h-4" /> Legal
+          </TabsTrigger>
+          <TabsTrigger
+            value="assinatura"
+            className="px-5 py-3 md:py-2.5 rounded-xl font-bold flex gap-2 shrink-0"
+          >
+            <CreditCard className="w-4 h-4" /> Assinatura
           </TabsTrigger>
         </TabsList>
 
@@ -848,6 +886,10 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="assinatura" className="space-y-6">
+          <BillingSettings user={user} formData={settings} setFormData={setSettings} />
         </TabsContent>
       </Tabs>
     </div>

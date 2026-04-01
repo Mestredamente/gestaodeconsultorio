@@ -10,6 +10,7 @@ import {
   Video,
   ShieldAlert,
   Briefcase,
+  CreditCard,
 } from 'lucide-react'
 
 export const navItems = [
@@ -24,5 +25,6 @@ export const navItems = [
   { name: 'Marketing', path: '/marketing', icon: MessageSquare },
   { name: 'Relatórios', path: '/relatorios', icon: PieChart },
   { name: 'Logs', path: '/logs', icon: ShieldAlert },
+  { name: 'Meu Plano', path: '/configuracoes?tab=assinatura', icon: CreditCard },
   { name: 'Configurações', path: '/configuracoes', icon: Settings },
 ]
