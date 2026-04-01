@@ -197,7 +197,7 @@ export default function Settings() {
     if (!user) return
     setSaving(true)
     try {
-      const payload = {
+      const payload: any = {
         ...settings,
         preferencias_dashboard: { ...preferences, theme_color: preferences.theme_color },
         portal_settings: {
@@ -205,6 +205,19 @@ export default function Settings() {
           tema_cor: preferences.theme_color,
         },
       }
+
+      // Sanitização do valor padrão da sessão para evitar erros no banco de dados numérico
+      if (
+        payload.valor_sessao_padrao === '' ||
+        payload.valor_sessao_padrao === null ||
+        payload.valor_sessao_padrao === undefined
+      ) {
+        payload.valor_sessao_padrao = null
+      } else {
+        const parsed = parseFloat(payload.valor_sessao_padrao.toString().replace(',', '.'))
+        payload.valor_sessao_padrao = isNaN(parsed) ? null : parsed
+      }
+
       if (payload.whatsapp_tipo === 'personal') payload.whatsapp_tipo = 'padrao'
 
       const { error } = await supabase
@@ -594,6 +607,7 @@ export default function Settings() {
                       <Label>Valor Padrão da Sessão</Label>
                       <Input
                         type="number"
+                        step="0.01"
                         value={settings.valor_sessao_padrao}
                         onChange={(e) =>
                           setSettings({ ...settings, valor_sessao_padrao: e.target.value })
