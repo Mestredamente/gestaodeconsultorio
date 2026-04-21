@@ -37,6 +37,7 @@
     "bloquear_assinaturas_vencidas": 1,
     "excluir_minha_conta": 1,
     "gerar_convite": 1,
-    "audit_logger": 1
+    "audit_logger": 1,
+    "analisar_sentimento_chamada": 1
   }
 }
