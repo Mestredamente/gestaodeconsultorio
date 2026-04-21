@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
@@ -142,18 +143,26 @@ const AppRoutes = () => (
   </Routes>
 )
 
-const App = () => (
-  <AuthProvider>
-    <AuthorizationProvider>
-      <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppRoutes />
-        </TooltipProvider>
-      </BrowserRouter>
-    </AuthorizationProvider>
-  </AuthProvider>
-)
+const App = () => {
+  useEffect(() => {
+    document.documentElement.lang = 'pt-BR'
+    document.documentElement.setAttribute('translate', 'no')
+    document.body.classList.add('notranslate')
+  }, [])
+
+  return (
+    <AuthProvider>
+      <AuthorizationProvider>
+        <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </TooltipProvider>
+        </BrowserRouter>
+      </AuthorizationProvider>
+    </AuthProvider>
+  )
+}
 
 export default App

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,9 +22,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Briefcase, Clock, FileText, Users, Check, X, ShieldAlert } from 'lucide-react'
+import {
+  Briefcase,
+  Clock,
+  FileText,
+  Users,
+  ShieldAlert,
+  FileUp,
+  CheckCircle,
+  XCircle,
+  Search,
+  FileDown,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ProtectedComponent } from '@/components/ProtectedComponent'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function HR() {
   const { user } = useAuth()
@@ -46,6 +65,8 @@ export default function HR() {
     data_fim: '',
     anexo_url: '',
   })
+
+  const [uploadingAtestado, setUploadingAtestado] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -86,10 +107,10 @@ export default function HR() {
       .order('created_at', { ascending: false })
     if (minhasSolic) setSolicitacoes(minhasSolic)
 
-    if (userRole === 'admin') {
+    if (userRole === 'admin' || userRole === 'superadmin' || userRole === 'secretaria') {
       const { data: teamData } = await supabase
         .from('usuarios')
-        .select('id, email, role, nome_consultorio')
+        .select('id, email, role, nome_consultorio, nome, cpf, portal_settings')
         .eq('parent_id', pId)
       if (teamData) setEquipe(teamData)
     }
@@ -131,19 +152,49 @@ export default function HR() {
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    try {
+      setUploadingAtestado(true)
+      const fileExt = file.name.split('.').pop()
+      const fileName = `atestado-${user.id}-${Date.now()}.${fileExt}`
+      const filePath = `rh/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('documentos-propostas')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('documentos-propostas').getPublicUrl(filePath)
+      setNovaSolicitacao((prev) => ({ ...prev, anexo_url: data.publicUrl }))
+      toast({ title: 'Arquivo anexado com sucesso' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao anexar arquivo', description: err.message, variant: 'destructive' })
+    } finally {
+      setUploadingAtestado(false)
+    }
+  }
+
   const enviarSolicitacao = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
+    if (!novaSolicitacao.data_inicio || !novaSolicitacao.data_fim) {
+      toast({ title: 'Preencha as datas', variant: 'destructive' })
+      return
+    }
     const { error } = await supabase.from('solicitacoes_rh').insert({
       usuario_id: user.id,
       ...novaSolicitacao,
     })
     if (!error) {
-      toast({ title: 'Solicitação enviada' })
+      toast({ title: 'Solicitação enviada com sucesso!' })
       setNovaSolicitacao({ tipo: 'atestado', data_inicio: '', data_fim: '', anexo_url: '' })
       fetchData(role, parentId || user.id)
     } else {
-      toast({ title: 'Erro ao enviar', variant: 'destructive' })
+      toast({ title: 'Erro ao enviar', description: error.message, variant: 'destructive' })
     }
   }
 
@@ -168,225 +219,301 @@ export default function HR() {
       requiredPermission="manage_settings"
       fallback={<div className="p-8 text-center text-slate-500">Acesso negado. Área restrita.</div>}
     >
-      <div className="space-y-6 animate-fade-in pb-10">
+      <div className="space-y-6 animate-fade-in pb-10 max-w-6xl mx-auto px-4 md:px-0 mt-4">
         <div className="flex items-center gap-3">
           <div className="bg-primary/10 p-3 rounded-xl">
             <Briefcase className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">RH & Gestão</h1>
-            <p className="text-slate-500 text-sm mt-1">Ponto eletrônico, atestados e equipe.</p>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">RH & Pessoal</h1>
+            <p className="text-slate-500 text-sm mt-1">
+              Ponto eletrônico, atestados e dados da equipe.
+            </p>
           </div>
         </div>
 
         <Tabs defaultValue="ponto" className="w-full">
-          <TabsList className="bg-slate-100/50 border border-slate-200 h-auto p-1">
-            <TabsTrigger value="ponto" className="gap-2 py-2">
+          <TabsList className="bg-slate-100/50 border border-slate-200 h-auto p-1.5 rounded-xl flex flex-wrap justify-start">
+            <TabsTrigger value="ponto" className="gap-2 py-2.5 rounded-lg font-medium">
               <Clock className="w-4 h-4" /> Ponto Eletrônico
             </TabsTrigger>
-            <TabsTrigger value="solicitacoes" className="gap-2 py-2">
-              <FileText className="w-4 h-4" /> Atestados e Férias
+            <TabsTrigger value="solicitacoes" className="gap-2 py-2.5 rounded-lg font-medium">
+              <FileText className="w-4 h-4" /> Atestados e Solicitações
             </TabsTrigger>
-            {role === 'admin' && (
-              <TabsTrigger value="equipe" className="gap-2 py-2">
-                <Users className="w-4 h-4" /> Equipe (Admin)
+            {(role === 'admin' || role === 'superadmin' || role === 'secretaria') && (
+              <TabsTrigger value="equipe" className="gap-2 py-2.5 rounded-lg font-medium">
+                <Users className="w-4 h-4" /> Gestão da Equipe
               </TabsTrigger>
             )}
           </TabsList>
 
           <TabsContent value="ponto" className="space-y-6 mt-6">
-            <Card className="shadow-sm border-slate-200">
-              <CardHeader className="bg-slate-50/50 border-b border-slate-100">
-                <CardTitle className="text-lg">
-                  Meu Ponto Hoje - {new Date().toLocaleDateString('pt-BR')}
-                </CardTitle>
+            <Card className="shadow-sm border-slate-200 rounded-[2rem] overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
+                <CardTitle className="text-xl">Registro de Ponto - Hoje</CardTitle>
+                <CardDescription>
+                  {new Date().toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </CardDescription>
               </CardHeader>
               <CardContent className="p-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div className="p-4 border rounded-lg bg-slate-50">
-                    <p className="text-xs font-bold uppercase text-slate-500 mb-2">Entrada</p>
-                    <p className="text-xl font-medium">{hojePonto?.entrada || '--:--'}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                  <div className="p-6 border border-slate-100 rounded-2xl bg-white shadow-sm flex flex-col justify-between">
+                    <p className="text-sm font-bold uppercase text-slate-500 mb-3 tracking-wider">
+                      Entrada
+                    </p>
+                    <p className="text-3xl font-bold text-slate-800 mb-4">
+                      {hojePonto?.entrada || '--:--'}
+                    </p>
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-4 w-full"
+                      variant={hojePonto?.entrada ? 'secondary' : 'default'}
+                      className="w-full rounded-xl h-12 font-bold"
                       disabled={!!hojePonto?.entrada}
                       onClick={() => baterPonto('entrada')}
                     >
+                      {hojePonto?.entrada ? (
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                      ) : (
+                        <Clock className="w-4 h-4 mr-2" />
+                      )}
                       Registrar
                     </Button>
                   </div>
-                  <div className="p-4 border rounded-lg bg-slate-50">
-                    <p className="text-xs font-bold uppercase text-slate-500 mb-2">Saída Almoço</p>
-                    <p className="text-xl font-medium">{hojePonto?.saida_almoco || '--:--'}</p>
+                  <div className="p-6 border border-slate-100 rounded-2xl bg-white shadow-sm flex flex-col justify-between">
+                    <p className="text-sm font-bold uppercase text-slate-500 mb-3 tracking-wider">
+                      Saída Almoço
+                    </p>
+                    <p className="text-3xl font-bold text-slate-800 mb-4">
+                      {hojePonto?.saida_almoco || '--:--'}
+                    </p>
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-4 w-full"
+                      variant={hojePonto?.saida_almoco ? 'secondary' : 'outline'}
+                      className="w-full rounded-xl h-12 font-bold"
                       disabled={!hojePonto?.entrada || !!hojePonto?.saida_almoco}
                       onClick={() => baterPonto('saida_almoco')}
                     >
-                      Registrar
+                      {hojePonto?.saida_almoco ? (
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                      ) : (
+                        'Registrar'
+                      )}
                     </Button>
                   </div>
-                  <div className="p-4 border rounded-lg bg-slate-50">
-                    <p className="text-xs font-bold uppercase text-slate-500 mb-2">
-                      Retorno Almoço
+                  <div className="p-6 border border-slate-100 rounded-2xl bg-white shadow-sm flex flex-col justify-between">
+                    <p className="text-sm font-bold uppercase text-slate-500 mb-3 tracking-wider">
+                      Retorno
                     </p>
-                    <p className="text-xl font-medium">{hojePonto?.retorno_almoco || '--:--'}</p>
+                    <p className="text-3xl font-bold text-slate-800 mb-4">
+                      {hojePonto?.retorno_almoco || '--:--'}
+                    </p>
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-4 w-full"
+                      variant={hojePonto?.retorno_almoco ? 'secondary' : 'outline'}
+                      className="w-full rounded-xl h-12 font-bold"
                       disabled={!hojePonto?.saida_almoco || !!hojePonto?.retorno_almoco}
                       onClick={() => baterPonto('retorno_almoco')}
                     >
-                      Registrar
+                      {hojePonto?.retorno_almoco ? (
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                      ) : (
+                        'Registrar'
+                      )}
                     </Button>
                   </div>
-                  <div className="p-4 border rounded-lg bg-slate-50">
-                    <p className="text-xs font-bold uppercase text-slate-500 mb-2">Saída</p>
-                    <p className="text-xl font-medium">{hojePonto?.saida || '--:--'}</p>
+                  <div className="p-6 border border-slate-100 rounded-2xl bg-white shadow-sm flex flex-col justify-between">
+                    <p className="text-sm font-bold uppercase text-slate-500 mb-3 tracking-wider">
+                      Saída Final
+                    </p>
+                    <p className="text-3xl font-bold text-slate-800 mb-4">
+                      {hojePonto?.saida || '--:--'}
+                    </p>
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-4 w-full text-red-600 border-red-200 hover:bg-red-50"
+                      variant={hojePonto?.saida ? 'secondary' : 'destructive'}
+                      className="w-full rounded-xl h-12 font-bold"
                       disabled={!hojePonto?.entrada || !!hojePonto?.saida}
                       onClick={() => baterPonto('saida')}
                     >
-                      Encerrar Dia
+                      {hojePonto?.saida ? <CheckCircle className="w-4 h-4 mr-2" /> : 'Encerrar Dia'}
                     </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-base">Histórico Recente</CardTitle>
+            <Card className="shadow-sm rounded-[2rem] overflow-hidden border-slate-200">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
+                <CardTitle className="text-lg">Meu Histórico Recente</CardTitle>
               </CardHeader>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Entrada</TableHead>
-                    <TableHead>Almoço</TableHead>
-                    <TableHead>Retorno</TableHead>
-                    <TableHead>Saída</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pontos.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        {new Date(p.data + 'T12:00:00').toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell>{p.entrada || '-'}</TableCell>
-                      <TableCell>{p.saida_almoco || '-'}</TableCell>
-                      <TableCell>{p.retorno_almoco || '-'}</TableCell>
-                      <TableCell>{p.saida || '-'}</TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50 hover:bg-slate-50">
+                      <TableHead className="font-bold">Data</TableHead>
+                      <TableHead className="font-bold">Entrada</TableHead>
+                      <TableHead className="font-bold">Almoço</TableHead>
+                      <TableHead className="font-bold">Retorno</TableHead>
+                      <TableHead className="font-bold">Saída</TableHead>
                     </TableRow>
-                  ))}
-                  {pontos.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-6 text-slate-500">
-                        Nenhum registro encontrado.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {pontos.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium text-slate-700">
+                          {new Date(p.data + 'T12:00:00').toLocaleDateString('pt-BR')}
+                        </TableCell>
+                        <TableCell>{p.entrada || '-'}</TableCell>
+                        <TableCell>{p.saida_almoco || '-'}</TableCell>
+                        <TableCell>{p.retorno_almoco || '-'}</TableCell>
+                        <TableCell>{p.saida || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                    {pontos.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                          Nenhum registro encontrado. Comece a bater o ponto para ver o histórico.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </Card>
           </TabsContent>
 
           <TabsContent value="solicitacoes" className="space-y-6 mt-6">
-            <Card className="shadow-sm">
-              <CardHeader className="bg-slate-50/50 border-b border-slate-100">
-                <CardTitle className="text-lg">Nova Solicitação</CardTitle>
+            <Card className="shadow-sm rounded-[2rem] border-slate-200 overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
+                <CardTitle className="text-lg">Nova Solicitação (Atestado / Férias)</CardTitle>
+                <CardDescription>
+                  Envie atestados médicos ou solicite férias para análise.
+                </CardDescription>
               </CardHeader>
               <CardContent className="p-6">
-                <form onSubmit={enviarSolicitacao} className="flex gap-4 items-end flex-wrap">
-                  <div className="space-y-1">
-                    <Label>Tipo</Label>
-                    <Select
-                      value={novaSolicitacao.tipo}
-                      onValueChange={(v) => setNovaSolicitacao({ ...novaSolicitacao, tipo: v })}
-                    >
-                      <SelectTrigger className="w-[150px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="atestado">Atestado</SelectItem>
-                        <SelectItem value="ferias">Férias</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <form onSubmit={enviarSolicitacao} className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+                    <div className="space-y-2">
+                      <Label className="font-bold text-slate-700">Tipo de Solicitação</Label>
+                      <Select
+                        value={novaSolicitacao.tipo}
+                        onValueChange={(v) => setNovaSolicitacao({ ...novaSolicitacao, tipo: v })}
+                      >
+                        <SelectTrigger className="h-12 rounded-xl bg-white border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="atestado">Atestado Médico</SelectItem>
+                          <SelectItem value="ferias">Férias</SelectItem>
+                          <SelectItem value="ausencia">Ausência Justificada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-bold text-slate-700">Data de Início</Label>
+                      <Input
+                        type="date"
+                        required
+                        value={novaSolicitacao.data_inicio}
+                        onChange={(e) =>
+                          setNovaSolicitacao({ ...novaSolicitacao, data_inicio: e.target.value })
+                        }
+                        className="h-12 rounded-xl bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-bold text-slate-700">Data de Retorno/Fim</Label>
+                      <Input
+                        type="date"
+                        required
+                        value={novaSolicitacao.data_fim}
+                        onChange={(e) =>
+                          setNovaSolicitacao({ ...novaSolicitacao, data_fim: e.target.value })
+                        }
+                        className="h-12 rounded-xl bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2 flex flex-col justify-end h-full">
+                      <Label className="font-bold text-slate-700 mb-2">Anexar Documento</Label>
+                      <div className="relative">
+                        <Input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={handleFileUpload}
+                          disabled={uploadingAtestado}
+                          className="h-12 rounded-xl bg-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer pt-2"
+                        />
+                        {uploadingAtestado && (
+                          <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-xl">
+                            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                          </div>
+                        )}
+                      </div>
+                      {novaSolicitacao.anexo_url && (
+                        <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1 font-medium">
+                          <CheckCircle className="w-3 h-3" /> Arquivo anexado
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label>Início</Label>
-                    <Input
-                      type="date"
-                      required
-                      value={novaSolicitacao.data_inicio}
-                      onChange={(e) =>
-                        setNovaSolicitacao({ ...novaSolicitacao, data_inicio: e.target.value })
-                      }
-                    />
+                  <div className="flex justify-end border-t border-slate-100 pt-6">
+                    <Button type="submit" className="h-12 px-8 rounded-xl font-bold">
+                      Enviar Solicitação
+                    </Button>
                   </div>
-                  <div className="space-y-1">
-                    <Label>Fim</Label>
-                    <Input
-                      type="date"
-                      required
-                      value={novaSolicitacao.data_fim}
-                      onChange={(e) =>
-                        setNovaSolicitacao({ ...novaSolicitacao, data_fim: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1 flex-1 min-w-[200px]">
-                    <Label>Anexo (URL do documento)</Label>
-                    <Input
-                      placeholder="https://..."
-                      value={novaSolicitacao.anexo_url}
-                      onChange={(e) =>
-                        setNovaSolicitacao({ ...novaSolicitacao, anexo_url: e.target.value })
-                      }
-                    />
-                  </div>
-                  <Button type="submit">Enviar Solicitação</Button>
                 </form>
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm">
+            <Card className="shadow-sm rounded-[2rem] border-slate-200 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Período</TableHead>
-                    <TableHead>Enviado em</TableHead>
-                    <TableHead>Status</TableHead>
+                  <TableRow className="bg-slate-50 hover:bg-slate-50">
+                    <TableHead className="font-bold">Tipo</TableHead>
+                    <TableHead className="font-bold">Período</TableHead>
+                    <TableHead className="font-bold">Enviado em</TableHead>
+                    <TableHead className="font-bold">Anexo</TableHead>
+                    <TableHead className="font-bold text-right">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {solicitacoes.map((s) => (
                     <TableRow key={s.id}>
-                      <TableCell className="capitalize font-medium">{s.tipo}</TableCell>
-                      <TableCell>
+                      <TableCell className="capitalize font-medium text-slate-800">
+                        {s.tipo}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
                         {new Date(s.data_inicio).toLocaleDateString('pt-BR')} até{' '}
                         {new Date(s.data_fim).toLocaleDateString('pt-BR')}
                       </TableCell>
-                      <TableCell>{new Date(s.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell className="text-slate-600">
+                        {new Date(s.created_at).toLocaleDateString('pt-BR')}
+                      </TableCell>
                       <TableCell>
+                        {s.anexo_url ? (
+                          <a
+                            href={s.anexo_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-sm font-medium"
+                          >
+                            <FileDown className="w-4 h-4" /> Visualizar
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
                         <Badge
                           variant={
                             s.status === 'aprovado'
-                              ? 'secondary'
+                              ? 'default'
                               : s.status === 'rejeitado'
                                 ? 'destructive'
                                 : 'outline'
                           }
-                          className="capitalize"
+                          className={`capitalize px-3 py-1 ${s.status === 'aprovado' ? 'bg-emerald-500 hover:bg-emerald-600' : ''}`}
                         >
                           {s.status}
                         </Badge>
@@ -395,8 +522,8 @@ export default function HR() {
                   ))}
                   {solicitacoes.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-6 text-slate-500">
-                        Nenhuma solicitação encontrada.
+                      <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                        Nenhuma solicitação enviada.
                       </TableCell>
                     </TableRow>
                   )}
@@ -405,34 +532,141 @@ export default function HR() {
             </Card>
           </TabsContent>
 
-          {role === 'admin' && (
+          {(role === 'admin' || role === 'superadmin' || role === 'secretaria') && (
             <TabsContent value="equipe" className="space-y-6 mt-6">
-              <Card className="shadow-sm border-slate-200">
-                <CardHeader className="bg-slate-50/50 border-b border-slate-100">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-amber-500" /> Gestão Centralizada
-                  </CardTitle>
+              <Card className="shadow-sm border-slate-200 rounded-[2rem] overflow-hidden">
+                <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <ShieldAlert className="w-5 h-5 text-indigo-500" /> Gestão Centralizada da
+                        Equipe
+                      </CardTitle>
+                      <CardDescription>
+                        Acesse os dados de contratação, conselho, PIS, CPF e detalhes de cada
+                        membro.
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <p className="text-sm text-slate-500 mb-6">
-                    Aqui você pode visualizar as aprovações pendentes de sua equipe. As
-                    configurações de permissões de acesso estão na aba Configurações.
-                  </p>
-
-                  <h3 className="font-bold text-slate-800 mb-3">Membros da Equipe</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {equipe.map((e) => (
-                      <div key={e.id} className="p-4 border border-slate-200 rounded-lg shadow-sm">
-                        <p className="font-semibold text-slate-800">{e.email}</p>
-                        <Badge variant="outline" className="mt-1 uppercase text-[10px]">
-                          {e.role}
-                        </Badge>
-                      </div>
+                      <Dialog key={e.id}>
+                        <DialogTrigger asChild>
+                          <div className="p-5 border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-white group flex flex-col h-full">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center font-bold text-lg uppercase group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                {e.nome?.charAt(0) || e.email.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800 text-lg leading-tight line-clamp-1">
+                                  {e.nome || 'Usuário'}
+                                </p>
+                                <p className="text-sm text-slate-500 line-clamp-1">{e.email}</p>
+                              </div>
+                            </div>
+                            <div className="mt-auto space-y-2">
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500">Perfil:</span>
+                                <Badge
+                                  variant="outline"
+                                  className="uppercase text-[10px] font-bold bg-slate-50"
+                                >
+                                  {e.role === 'professional' ? 'Profissional' : e.role}
+                                </Badge>
+                              </div>
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500">CPF:</span>
+                                <span className="font-mono text-slate-700">
+                                  {e.cpf || 'Não informado'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[600px] rounded-2xl p-0 overflow-hidden">
+                          <div className="bg-indigo-600 p-6 text-white flex items-center gap-4">
+                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center font-bold text-2xl uppercase">
+                              {e.nome?.charAt(0) || e.email.charAt(0)}
+                            </div>
+                            <div>
+                              <DialogTitle className="text-2xl font-bold">
+                                {e.nome || 'Usuário Sem Nome'}
+                              </DialogTitle>
+                              <p className="text-indigo-100 opacity-90">{e.email}</p>
+                              <Badge className="mt-2 bg-white/20 hover:bg-white/30 text-white uppercase text-[10px] border-none">
+                                {e.role === 'professional' ? 'Profissional' : e.role}
+                              </Badge>
+                            </div>
+                          </div>
+                          <ScrollArea className="max-h-[60vh]">
+                            <div className="p-6 space-y-6">
+                              <div>
+                                <h4 className="font-bold text-slate-800 text-base mb-3 border-b border-slate-100 pb-2">
+                                  Dados Pessoais e Profissionais
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <span className="block text-slate-500 mb-1">CPF</span>
+                                    <span className="font-medium text-slate-800">
+                                      {e.cpf || 'Não informado'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-500 mb-1">PIS</span>
+                                    <span className="font-medium text-slate-800">
+                                      {e.portal_settings?.pis || 'Não informado'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-500 mb-1">
+                                      Conselho (CRP/CRM)
+                                    </span>
+                                    <span className="font-medium text-slate-800">
+                                      {e.portal_settings?.conselho || 'Não informado'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-slate-500 mb-1">
+                                      Telefone Pessoal
+                                    </span>
+                                    <span className="font-medium text-slate-800">
+                                      {e.portal_settings?.telefone_pessoal || 'Não informado'}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="block text-slate-500 mb-1">
+                                      Endereço Pessoal
+                                    </span>
+                                    <span className="font-medium text-slate-800">
+                                      {e.portal_settings?.endereco_pessoal || 'Não informado'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                <p className="text-sm text-slate-600">
+                                  <strong>Nota:</strong> Para visualizar os atestados, histórico de
+                                  ponto ou aprovar solicitações deste colaborador, a funcionalidade
+                                  de "Painel do Colaborador" será expandida em breve. Por hora, você
+                                  visualiza os dados cadastrais completos.
+                                </p>
+                              </div>
+                            </div>
+                          </ScrollArea>
+                        </DialogContent>
+                      </Dialog>
                     ))}
                     {equipe.length === 0 && (
-                      <p className="text-slate-500 text-sm">
-                        Sua equipe está vazia. Convide membros nas Configurações.
-                      </p>
+                      <div className="col-span-full p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-600 font-medium">Sua equipe está vazia.</p>
+                        <p className="text-slate-400 text-sm mt-1">
+                          Convide membros na aba de Configurações para gerenciar o RH.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </CardContent>

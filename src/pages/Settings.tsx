@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { maskPhone, maskCEP, fetchAddressByCEP, maskCPF } from '@/lib/utils'
 import {
@@ -44,6 +45,7 @@ import {
   Copy,
   Upload,
   CreditCard,
+  X,
 } from 'lucide-react'
 import { BillingSettings } from '@/components/settings/BillingSettings'
 
@@ -110,7 +112,7 @@ export default function Settings() {
     valor_sessao_padrao: '',
     dados_bancarios: { banco: '', agencia: '', conta: '' },
     nivel_formacao: '',
-    portal_settings: {},
+    portal_settings: {} as any,
   })
 
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -118,6 +120,14 @@ export default function Settings() {
   const [deletingAccount, setDeletingAccount] = useState(false)
 
   const [preferences, setPreferences] = useState<any>({ theme_color: 'indigo' })
+
+  const maskCurrency = (value: string | number) => {
+    if (value === undefined || value === null) return ''
+    let strVal = value.toString().replace(/\D/g, '')
+    if (!strVal) return ''
+    const numVal = Number(strVal) / 100
+    return numVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
 
   const fetchSettings = async () => {
     if (!user) return
@@ -156,7 +166,9 @@ export default function Settings() {
         nome: data.nome || '',
         cpf: data.cpf || '',
         especialidade: data.especialidade || '',
-        valor_sessao_padrao: data.valor_sessao_padrao || '',
+        valor_sessao_padrao: data.valor_sessao_padrao
+          ? maskCurrency((data.valor_sessao_padrao * 100).toString())
+          : '',
         dados_bancarios: data.dados_bancarios || { banco: '', agencia: '', conta: '' },
         nivel_formacao: (data as any).nivel_formacao || '',
         portal_settings: data.portal_settings || {},
@@ -201,12 +213,11 @@ export default function Settings() {
         ...settings,
         preferencias_dashboard: { ...preferences, theme_color: preferences.theme_color },
         portal_settings: {
-          ...(settings.portal_settings as any),
+          ...settings.portal_settings,
           tema_cor: preferences.theme_color,
         },
       }
 
-      // Sanitização do valor padrão da sessão para evitar erros no banco de dados numérico
       if (
         payload.valor_sessao_padrao === '' ||
         payload.valor_sessao_padrao === null ||
@@ -214,7 +225,8 @@ export default function Settings() {
       ) {
         payload.valor_sessao_padrao = null
       } else {
-        const parsed = parseFloat(payload.valor_sessao_padrao.toString().replace(',', '.'))
+        const strVal = payload.valor_sessao_padrao.toString().replace(/\./g, '').replace(',', '.')
+        const parsed = parseFloat(strVal)
         payload.valor_sessao_padrao = isNaN(parsed) ? null : parsed
       }
 
@@ -246,7 +258,7 @@ export default function Settings() {
         logo_url: settings.logo_url,
         preferencias_dashboard: { ...preferences, theme_color: preferences.theme_color },
         portal_settings: {
-          ...(settings.portal_settings as any),
+          ...settings.portal_settings,
           tema_cor: preferences.theme_color,
         },
       }
@@ -329,9 +341,25 @@ export default function Settings() {
         },
       })
 
+      const link = data?.joinLink || `${window.location.origin}/join/${data?.token}`
+
       toast({
-        title:
-          'Convite enviado com sucesso! O profissional receberá um email com o link de acesso.',
+        title: 'Convite enviado!',
+        description: (
+          <div className="mt-2 flex flex-col gap-3">
+            <p className="text-sm">
+              Um email foi enviado. Você também pode copiar o link abaixo e enviar diretamente via
+              WhatsApp:
+            </p>
+            <div className="flex items-center gap-2">
+              <Input readOnly value={link} className="h-9 text-xs bg-slate-50" />
+              <Button size="sm" type="button" onClick={() => navigator.clipboard.writeText(link)}>
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        ),
+        duration: 10000,
       })
       setInviteEmail('')
       setInviteNome('')
@@ -425,6 +453,35 @@ export default function Settings() {
     } finally {
       setTestingWhatsApp(false)
     }
+  }
+
+  const handleAddEspecialidade = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const val = e.currentTarget.value.trim()
+      if (val) {
+        const current = settings.especialidade
+          ? settings.especialidade
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : []
+        if (!current.includes(val)) {
+          setSettings({ ...settings, especialidade: [...current, val].join(', ') })
+        }
+        e.currentTarget.value = ''
+      }
+    }
+  }
+
+  const removeEspecialidade = (esp: string) => {
+    const current = settings.especialidade
+      ? settings.especialidade
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : []
+    setSettings({ ...settings, especialidade: current.filter((s) => s !== esp).join(', ') })
   }
 
   if (loading)
@@ -529,14 +586,34 @@ export default function Settings() {
                     className="h-12 rounded-xl"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Especialidade</Label>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Especialidades</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {settings.especialidade
+                      ?.split(',')
+                      .filter(Boolean)
+                      .map((esp, i) => (
+                        <Badge
+                          key={i}
+                          variant="secondary"
+                          className="gap-1 px-3 py-1 text-sm rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                        >
+                          {esp.trim()}
+                          <button
+                            type="button"
+                            onClick={() => removeEspecialidade(esp.trim())}
+                            className="hover:text-red-500 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                  </div>
                   <Input
-                    list="especialidades-list"
-                    value={settings.especialidade}
-                    onChange={(e) => setSettings({ ...settings, especialidade: e.target.value })}
+                    onKeyDown={handleAddEspecialidade}
                     className="h-12 rounded-xl"
-                    placeholder="Ex: Psicologia Clínica"
+                    placeholder="Digite uma especialidade e pressione Enter"
+                    list="especialidades-list"
                   />
                   <datalist id="especialidades-list">
                     <option value="Psicologia Clínica" />
@@ -576,105 +653,191 @@ export default function Settings() {
                     placeholder="000.000.000-00"
                   />
                 </div>
-                {isOwner && (
-                  <>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label>Nome do Consultório</Label>
-                      <Input
-                        value={settings.nome_consultorio}
-                        onChange={(e) =>
-                          setSettings({ ...settings, nome_consultorio: e.target.value })
-                        }
-                        className="h-12 rounded-xl"
-                      />
-                    </div>
+
+                <div className="space-y-4 md:col-span-2 pt-6 border-t border-slate-100">
+                  <h3 className="font-bold text-slate-800">Dados de Contratação e Profissionais</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2">
-                      <Label>Telefone (WhatsApp)</Label>
+                      <Label>PIS</Label>
                       <Input
-                        inputMode="tel"
-                        placeholder="(00) 00000-0000"
-                        value={settings.telefone_consultorio}
+                        value={settings.portal_settings?.pis || ''}
                         onChange={(e) =>
                           setSettings({
                             ...settings,
-                            telefone_consultorio: maskPhone(e.target.value),
+                            portal_settings: { ...settings.portal_settings, pis: e.target.value },
                           })
                         }
                         className="h-12 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Valor Padrão da Sessão</Label>
+                      <Label>Registro no Conselho (Ex: CRP 00/0000)</Label>
                       <Input
-                        type="number"
-                        step="0.01"
-                        value={settings.valor_sessao_padrao}
+                        value={settings.portal_settings?.conselho || ''}
                         onChange={(e) =>
-                          setSettings({ ...settings, valor_sessao_padrao: e.target.value })
+                          setSettings({
+                            ...settings,
+                            portal_settings: {
+                              ...settings.portal_settings,
+                              conselho: e.target.value,
+                            },
+                          })
                         }
                         className="h-12 rounded-xl"
-                        placeholder="150.00"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Chave PIX (Padrão para Recebimentos)</Label>
+                      <Label>Telefone Pessoal / Celular</Label>
                       <Input
-                        value={settings.chave_pix}
-                        onChange={(e) => setSettings({ ...settings, chave_pix: e.target.value })}
-                        className="h-12 rounded-xl font-mono text-sm"
+                        inputMode="tel"
+                        value={settings.portal_settings?.telefone_pessoal || ''}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            portal_settings: {
+                              ...settings.portal_settings,
+                              telefone_pessoal: maskPhone(e.target.value),
+                            },
+                          })
+                        }
+                        className="h-12 rounded-xl"
+                        placeholder="(00) 00000-0000"
                       />
                     </div>
-                    <div className="space-y-2 md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                      <div className="col-span-1 sm:col-span-3">
-                        <Label className="font-bold">Dados Bancários</Label>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Banco</Label>
-                        <Input
-                          value={settings.dados_bancarios?.banco}
-                          onChange={(e) =>
-                            setSettings({
-                              ...settings,
-                              dados_bancarios: {
-                                ...settings.dados_bancarios,
-                                banco: e.target.value,
-                              },
-                            })
-                          }
-                          className="bg-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Agência</Label>
-                        <Input
-                          value={settings.dados_bancarios?.agencia}
-                          onChange={(e) =>
-                            setSettings({
-                              ...settings,
-                              dados_bancarios: {
-                                ...settings.dados_bancarios,
-                                agencia: e.target.value,
-                              },
-                            })
-                          }
-                          className="bg-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Conta</Label>
-                        <Input
-                          value={settings.dados_bancarios?.conta}
-                          onChange={(e) =>
-                            setSettings({
-                              ...settings,
-                              dados_bancarios: {
-                                ...settings.dados_bancarios,
-                                conta: e.target.value,
-                              },
-                            })
-                          }
-                          className="bg-white"
-                        />
+                    <div className="space-y-2">
+                      <Label>Endereço Pessoal</Label>
+                      <Input
+                        value={settings.portal_settings?.endereco_pessoal || ''}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            portal_settings: {
+                              ...settings.portal_settings,
+                              endereco_pessoal: e.target.value,
+                            },
+                          })
+                        }
+                        className="h-12 rounded-xl"
+                        placeholder="Rua, Número, Bairro, Cidade - UF"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {isOwner && (
+                  <>
+                    <div className="space-y-4 md:col-span-2 pt-6 border-t border-slate-100">
+                      <h3 className="font-bold text-slate-800">Dados da Clínica</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Nome do Consultório</Label>
+                          <Input
+                            value={settings.nome_consultorio}
+                            onChange={(e) =>
+                              setSettings({ ...settings, nome_consultorio: e.target.value })
+                            }
+                            className="h-12 rounded-xl"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Telefone (WhatsApp)</Label>
+                          <Input
+                            inputMode="tel"
+                            placeholder="(00) 00000-0000"
+                            value={settings.telefone_consultorio}
+                            onChange={(e) =>
+                              setSettings({
+                                ...settings,
+                                telefone_consultorio: maskPhone(e.target.value),
+                              })
+                            }
+                            className="h-12 rounded-xl"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Valor Padrão da Sessão</Label>
+                          <div className="relative">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
+                              R$
+                            </div>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              value={settings.valor_sessao_padrao}
+                              onChange={(e) =>
+                                setSettings({
+                                  ...settings,
+                                  valor_sessao_padrao: maskCurrency(e.target.value),
+                                })
+                              }
+                              className="h-12 rounded-xl pl-9"
+                              placeholder="0,00"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Chave PIX (Padrão para Recebimentos)</Label>
+                          <Input
+                            value={settings.chave_pix}
+                            onChange={(e) =>
+                              setSettings({ ...settings, chave_pix: e.target.value })
+                            }
+                            className="h-12 rounded-xl font-mono text-sm"
+                          />
+                        </div>
+                        <div className="space-y-2 md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <div className="col-span-1 sm:col-span-3">
+                            <Label className="font-bold">Dados Bancários</Label>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Banco</Label>
+                            <Input
+                              value={settings.dados_bancarios?.banco}
+                              onChange={(e) =>
+                                setSettings({
+                                  ...settings,
+                                  dados_bancarios: {
+                                    ...settings.dados_bancarios,
+                                    banco: e.target.value,
+                                  },
+                                })
+                              }
+                              className="bg-white"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Agência</Label>
+                            <Input
+                              value={settings.dados_bancarios?.agencia}
+                              onChange={(e) =>
+                                setSettings({
+                                  ...settings,
+                                  dados_bancarios: {
+                                    ...settings.dados_bancarios,
+                                    agencia: e.target.value,
+                                  },
+                                })
+                              }
+                              className="bg-white"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Conta</Label>
+                            <Input
+                              value={settings.dados_bancarios?.conta}
+                              onChange={(e) =>
+                                setSettings({
+                                  ...settings,
+                                  dados_bancarios: {
+                                    ...settings.dados_bancarios,
+                                    conta: e.target.value,
+                                  },
+                                })
+                              }
+                              className="bg-white"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </>
@@ -770,7 +933,7 @@ export default function Settings() {
             <Card className="rounded-[2rem] border-slate-200 shadow-sm">
               <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4 rounded-t-[2rem]">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-primary" /> Endereço
+                  <MapPin className="w-5 h-5 text-primary" /> Endereço da Clínica
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">

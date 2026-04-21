@@ -47,6 +47,8 @@ import {
   RefreshCcw,
   Volume2,
   AlertCircle,
+  Copy,
+  Link as LinkIcon,
 } from 'lucide-react'
 
 export default function VirtualRoom() {
@@ -59,6 +61,7 @@ export default function VirtualRoom() {
   const [activeSession, setActiveSession] = useState<any | null>(null)
 
   const [inDeviceTest, setInDeviceTest] = useState(false)
+  const [testingConnectionOnly, setTestingConnectionOnly] = useState(false)
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([])
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedVideo, setSelectedVideo] = useState<string>('')
@@ -121,6 +124,7 @@ export default function VirtualRoom() {
 
   const prepareSession = async (apt: any) => {
     setActiveSession(apt)
+    setTestingConnectionOnly(false)
     setInDeviceTest(true)
     setDeviceError(null)
 
@@ -153,10 +157,73 @@ export default function VirtualRoom() {
     }
   }
 
+  const prepareTestConnection = async () => {
+    setTestingConnectionOnly(true)
+    setInDeviceTest(true)
+    setDeviceError(null)
+
+    try {
+      if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        throw new Error('Acesso à câmera requer conexão HTTPS segura.')
+      }
+
+      let tempStream
+      try {
+        tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      } catch (err) {
+        tempStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        setCamOn(false)
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoInput = devices.filter((device) => device.kind === 'videoinput')
+      const audioInput = devices.filter((device) => device.kind === 'audioinput')
+      setVideoDevices(videoInput)
+      setAudioDevices(audioInput)
+      if (videoInput.length > 0) setSelectedVideo(videoInput[0].deviceId)
+      if (audioInput.length > 0) setSelectedAudio(audioInput[0].deviceId)
+      if (tempStream) tempStream.getTracks().forEach((t) => t.stop())
+    } catch (err: any) {
+      console.error(err)
+      setDeviceError('Acesso à câmera/microfone negado. Verifique as permissões do navegador.')
+      setCamOn(false)
+      setMicOn(false)
+    }
+  }
+
+  const handleCopyLink = async (apt: any) => {
+    try {
+      if (apt.link_sala_virtual) {
+        await navigator.clipboard.writeText(apt.link_sala_virtual)
+        toast({ title: 'Link copiado com sucesso!' })
+        return
+      }
+
+      const { data, error } = await supabase.functions.invoke('gerar_link_sala_virtual', {
+        body: { agendamento_id: apt.id },
+      })
+
+      if (error || !data?.link) throw new Error('Erro ao gerar link')
+
+      await navigator.clipboard.writeText(data.link)
+      toast({ title: 'Link gerado e copiado com sucesso!' })
+
+      setAppointments((prev) =>
+        prev.map((a) =>
+          a.id === apt.id
+            ? { ...a, link_sala_virtual: data.link, sala_virtual_token: data.token }
+            : a,
+        ),
+      )
+    } catch (err: any) {
+      toast({ title: 'Erro ao copiar link', description: err.message, variant: 'destructive' })
+    }
+  }
+
   useEffect(() => {
     let activeStream: MediaStream | null = null
     const acquireStream = async () => {
-      if (!activeSession || deviceError || !inDeviceTest) return
+      if (deviceError || !inDeviceTest) return
       try {
         let constraints: MediaStreamConstraints = {
           video: selectedVideo ? { deviceId: { exact: selectedVideo } } : camOn,
@@ -178,7 +245,7 @@ export default function VirtualRoom() {
     return () => {
       if (activeStream) activeStream.getTracks().forEach((t) => t.stop())
     }
-  }, [activeSession, selectedVideo, selectedAudio, inDeviceTest])
+  }, [inDeviceTest, selectedVideo, selectedAudio, deviceError])
 
   useEffect(() => {
     if (stream && inDeviceTest) {
@@ -191,7 +258,6 @@ export default function VirtualRoom() {
     if (stream) stream.getTracks().forEach((t) => t.stop())
     setStream(null)
 
-    // Pequeno delay para garantir que o hardware da câmera foi liberado pelo SO mobile
     setTimeout(() => {
       setInDeviceTest(false)
       setIframeLoaded(false)
@@ -258,19 +324,28 @@ export default function VirtualRoom() {
       </div>
     )
 
-  if (!activeSession) {
+  if (!activeSession && !inDeviceTest) {
     return (
       <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 bg-primary/10 text-primary rounded-xl">
-            <Video className="w-6 h-6" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-primary/10 text-primary rounded-xl">
+              <Video className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sala Virtual</h1>
+              <p className="text-slate-500">
+                Selecione uma sessão agendada para hoje para iniciar o atendimento.
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sala Virtual</h1>
-            <p className="text-slate-500">
-              Selecione uma sessão agendada para hoje para iniciar o atendimento.
-            </p>
-          </div>
+          <Button
+            onClick={prepareTestConnection}
+            variant="outline"
+            className="gap-2 rounded-xl h-11 w-full sm:w-auto shrink-0 shadow-sm"
+          >
+            <Settings className="w-4 h-4" /> Testar Equipamentos
+          </Button>
         </div>
         {appointments.length === 0 ? (
           <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
@@ -302,12 +377,25 @@ export default function VirtualRoom() {
                         {p?.nome?.charAt(0).toUpperCase() || 'P'}
                       </div>
                     </div>
-                    <Button
-                      onClick={() => prepareSession(apt)}
-                      className="w-full gap-2 rounded-xl h-11 bg-primary hover:bg-primary/90"
-                    >
-                      <Video className="w-4 h-4" /> Preparar Sala
-                    </Button>
+                    <div className="flex gap-2 w-full mt-auto">
+                      <Button
+                        onClick={() => prepareSession(apt)}
+                        className="flex-1 gap-2 rounded-xl h-11 bg-primary hover:bg-primary/90"
+                      >
+                        <Video className="w-4 h-4" /> Iniciar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCopyLink(apt)
+                        }}
+                        className="rounded-xl h-11 w-11 p-0 shrink-0 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
+                        title="Copiar link para o paciente"
+                      >
+                        <LinkIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )
@@ -318,9 +406,11 @@ export default function VirtualRoom() {
     )
   }
 
-  const patient = Array.isArray(activeSession.pacientes)
-    ? activeSession.pacientes[0]
-    : activeSession.pacientes
+  const patient = activeSession
+    ? Array.isArray(activeSession.pacientes)
+      ? activeSession.pacientes[0]
+      : activeSession.pacientes
+    : null
 
   if (inDeviceTest) {
     return (
@@ -333,6 +423,7 @@ export default function VirtualRoom() {
               setStream(null)
               setActiveSession(null)
               setInDeviceTest(false)
+              setTestingConnectionOnly(false)
             }}
             className="gap-2 text-slate-500 hover:text-slate-800 -ml-2 mb-2"
           >
@@ -350,7 +441,14 @@ export default function VirtualRoom() {
                   <VideoOff className="w-8 h-8" />
                   <h3>Erro de Permissão</h3>
                   <p>{deviceError}</p>
-                  <Button variant="outline" onClick={() => prepareSession(activeSession)}>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      testingConnectionOnly
+                        ? prepareTestConnection()
+                        : prepareSession(activeSession)
+                    }
+                  >
                     <RefreshCcw className="w-4 h-4 mr-2" /> Tentar Novamente
                   </Button>
                 </div>
@@ -397,10 +495,20 @@ export default function VirtualRoom() {
           </Card>
           <Button
             className="w-full gap-2 text-lg h-14 bg-primary hover:bg-primary/90 text-white disabled:opacity-50"
-            onClick={joinLiveSession}
+            onClick={() => {
+              if (testingConnectionOnly) {
+                if (stream) stream.getTracks().forEach((t) => t.stop())
+                setStream(null)
+                setInDeviceTest(false)
+                setTestingConnectionOnly(false)
+              } else {
+                joinLiveSession()
+              }
+            }}
             disabled={!!deviceError}
           >
-            <CheckCircle className="w-5 h-5" /> Entrar na Sessão
+            <CheckCircle className="w-5 h-5" />{' '}
+            {testingConnectionOnly ? 'Finalizar Teste' : 'Entrar na Sessão'}
           </Button>
         </div>
       </div>
