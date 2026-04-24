@@ -4,16 +4,17 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
-  
+
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
     const { data: subs, error } = await supabase
@@ -33,8 +34,8 @@ Deno.serve(async (req: Request) => {
       const omiePayload = {
         cliente: u.nome_consultorio || u.email,
         documento: u.cpf || '',
-        receita: sub.plan_id === 'pro' ? 79.00 : 39.90,
-        data_pagamento: new Date().toISOString()
+        receita: sub.plan_id === 'pro' ? 79.0 : 39.9,
+        data_pagamento: new Date().toISOString(),
       }
 
       let attempt = 0
@@ -42,7 +43,7 @@ Deno.serve(async (req: Request) => {
       while (attempt < 3 && !success) {
         try {
           if (Math.random() < 0.2) throw new Error('503 Service Unavailable')
-          await new Promise(r => setTimeout(r, 200))
+          await new Promise((r) => setTimeout(r, 200))
           success = true
           synced++
         } catch (e) {
@@ -51,16 +52,19 @@ Deno.serve(async (req: Request) => {
             failed++
             console.error(`Falha ao sincronizar Omie para ${u.email}:`, e)
           } else {
-            await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
+            await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000))
           }
         }
       }
     }
 
     return new Response(JSON.stringify({ success: true, synced, failed }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 })

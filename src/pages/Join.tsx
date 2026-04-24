@@ -34,7 +34,12 @@ export default function Join() {
         .single()
 
       if (error || !data) {
-        toast({ title: 'Link de convite inválido ou expirado', variant: 'destructive' })
+        console.error('Error fetching invite:', error)
+        toast({
+          title: 'Link de convite inválido ou expirado',
+          description: 'Por favor solicite um novo convite ao administrador.',
+          variant: 'destructive',
+        })
         navigate('/auth')
       } else {
         setInvite(data)

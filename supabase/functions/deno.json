@@ -36,7 +36,7 @@
     "renovar_assinaturas": 1,
     "bloquear_assinaturas_vencidas": 1,
     "excluir_minha_conta": 1,
-    "gerar_convite": 2,
+    "gerar_convite": 3,
     "audit_logger": 1,
     "analisar_sentimento_chamada": 1,
     "sincronizar_omie": 1,
