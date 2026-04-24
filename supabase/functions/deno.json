@@ -38,6 +38,8 @@
     "excluir_minha_conta": 1,
     "gerar_convite": 2,
     "audit_logger": 1,
-    "analisar_sentimento_chamada": 1
+    "analisar_sentimento_chamada": 1,
+    "sincronizar_omie": 1,
+    "gerar_nfse": 1
   }
 }
