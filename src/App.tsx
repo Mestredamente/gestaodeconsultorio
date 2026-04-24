@@ -37,6 +37,7 @@ import HR from './pages/HR'
 import VirtualRoom from './pages/VirtualRoom'
 import Contacts from './pages/Contacts'
 import NewPatientForm from './components/NewPatientForm'
+import LGPD from './pages/LGPD'
 import Join from './pages/Join'
 import { AuthorizationProvider } from './hooks/use-authorization'
 
@@ -137,6 +138,7 @@ const AppRoutes = () => (
       <Route path="/configuracoes" element={<Settings />} />
       <Route path="/perfil" element={<Navigate to="/configuracoes" replace />} />
       <Route path="/contatos" element={<Contacts />} />
+      <Route path="/lgpd" element={<LGPD />} />
       <Route path="/admin" element={<AdminSaasDashboard />} />
     </Route>
     <Route path="*" element={<NotFound />} />
